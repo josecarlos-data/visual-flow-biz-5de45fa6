@@ -192,9 +192,10 @@ export type Database = {
         Row: {
           atributo_key: string
           bloque_id: string | null
+          cita: string | null
           cod_cliente: number
           comercial_nombre: string | null
-          confianza: number | null
+          confianza: string | null
           confirmado_en: string | null
           confirmado_por: string | null
           created_at: string
@@ -214,9 +215,10 @@ export type Database = {
         Insert: {
           atributo_key: string
           bloque_id?: string | null
+          cita?: string | null
           cod_cliente: number
           comercial_nombre?: string | null
-          confianza?: number | null
+          confianza?: string | null
           confirmado_en?: string | null
           confirmado_por?: string | null
           created_at?: string
@@ -236,9 +238,10 @@ export type Database = {
         Update: {
           atributo_key?: string
           bloque_id?: string | null
+          cita?: string | null
           cod_cliente?: number
           comercial_nombre?: string | null
-          confianza?: number | null
+          confianza?: string | null
           confirmado_en?: string | null
           confirmado_por?: string | null
           created_at?: string
@@ -1658,9 +1661,10 @@ export type Database = {
         Row: {
           atributo_key: string | null
           bloque_id: string | null
+          cita: string | null
           cod_cliente: number | null
           comercial_nombre: string | null
-          confianza: number | null
+          confianza: string | null
           confirmado_en: string | null
           confirmado_por: string | null
           created_at: string | null
