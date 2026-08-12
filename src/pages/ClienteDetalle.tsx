@@ -23,6 +23,7 @@ import {
   useClienteVisitas, useMotivos, usePuedeVerMargen, useSituacionesVigentes, useClienteDocumentos, useVisitaBloques,
   etiquetaCategoria, eur, num, eurK, fechaCorta,
 } from "@/hooks/useCrm";
+import { ClientePerfilTab } from "@/components/ClientePerfilTab";
 
 interface Insights {
   resumen: string;
@@ -315,7 +316,7 @@ export default function ClienteDetalle() {
           <TabsTrigger value="productos">Productos</TabsTrigger>
           <TabsTrigger value="documentos">Documentos</TabsTrigger>
           <TabsTrigger value="visitas">Visitas</TabsTrigger>
-
+          <TabsTrigger value="perfil">Perfil</TabsTrigger>
           <TabsTrigger value="ia">Análisis IA</TabsTrigger>
         </TabsList>
 
@@ -573,6 +574,11 @@ export default function ClienteDetalle() {
             })
           )}
         </TabsContent>
+
+        <TabsContent value="perfil">
+          {codNum != null && <ClientePerfilTab cod={codNum} />}
+        </TabsContent>
+
 
         <TabsContent value="ia" className="space-y-4">
           <div className="flex items-center justify-between gap-2">

@@ -1082,3 +1082,134 @@ export function tendencia(actual: number, anterior: number): "sube" | "baja" | "
   if (v < -0.05) return "baja";
   return "estable";
 }
+
+/* ---------------------------------------------------------------------------
+ * Perfil comercial del cliente (modelo de hechos).
+ * El valor vigente no se almacena: se deriva del hecho más reciente no
+ * descartado. Editar un valor es SIEMPRE un INSERT nuevo, nunca un UPDATE.
+ * ------------------------------------------------------------------------- */
+
+export interface PerfilAtributo {
+  key: string;
+  nombre: string;
+  descripcion: string | null;
+  tipo: string;
+  opciones: OpcionesDef;
+  unidad: string | null;
+  grupo: string;
+  sort_order: number;
+}
+
+export interface PerfilHecho {
+  id: string;
+  cod_cliente: number;
+  atributo_key: string;
+  valor_texto: string;
+  valor_num: number | null;
+  visita_id: string | null;
+  bloque_id: string | null;
+  comercial_nombre: string | null;
+  observado_en: string;
+  confianza: string | null;
+  cita: string | null;
+  fuente: string;
+  estado: string;
+}
+
+/** Catálogo de atributos de perfil activos, ordenados por grupo y posición. */
+export function usePerfilAtributos() {
+  return useQuery({
+    queryKey: ["crm_perfil_atributos"],
+    queryFn: async (): Promise<PerfilAtributo[]> => {
+      const { data, error } = await supabase
+        .from("perfil_atributos")
+        .select("key, nombre, descripcion, tipo, opciones, unidad, grupo, sort_order")
+        .eq("is_active", true)
+        .order("grupo")
+        .order("sort_order");
+      if (error) throw error;
+      return (data ?? []) as unknown as PerfilAtributo[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/** Valor vigente de cada atributo para un cliente. */
+export function useClientePerfil(cod: number | null) {
+  return useQuery({
+    queryKey: ["crm_cliente_perfil", cod],
+    enabled: cod != null,
+    queryFn: async (): Promise<PerfilHecho[]> => {
+      const { data, error } = await supabase
+        .from("v_cliente_perfil_vigente")
+        .select(
+          "id, cod_cliente, atributo_key, valor_texto, valor_num, visita_id, bloque_id, comercial_nombre, observado_en, confianza, cita, fuente, estado",
+        )
+        .eq("cod_cliente", cod!);
+      if (error) throw error;
+      return (data ?? []) as unknown as PerfilHecho[];
+    },
+  });
+}
+
+export interface NuevoHechoPerfil {
+  cod_cliente: number;
+  atributo_key: string;
+  valor_texto: string;
+  valor_num: number | null;
+}
+
+/** Confirmar un hecho existente y registrar hechos nuevos (fuente manual). */
+export function usePerfilMutations(cod: number | null) {
+  const qc = useQueryClient();
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["crm_cliente_perfil", cod] });
+
+  const confirmar = useMutation({
+    mutationFn: async (id: string) => {
+      const { data: auth } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from("cliente_perfil_datos")
+        .update({
+          estado: "confirmado",
+          confirmado_por: auth.user?.id ?? null,
+          confirmado_en: new Date().toISOString(),
+        })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+
+  const guardarValor = useMutation({
+    mutationFn: async (h: NuevoHechoPerfil) => {
+      const { data: auth } = await supabase.auth.getUser();
+      const userId = auth.user?.id ?? null;
+      let nombre: string | null = null;
+      if (userId) {
+        const { data: perfil } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("user_id", userId)
+          .maybeSingle();
+        nombre = perfil?.full_name || auth.user?.email || null;
+      }
+      const { error } = await supabase.from("cliente_perfil_datos").insert({
+        cod_cliente: h.cod_cliente,
+        atributo_key: h.atributo_key,
+        valor_texto: h.valor_texto,
+        valor_num: h.valor_num,
+        visita_id: null,
+        bloque_id: null,
+        user_id: userId,
+        comercial_nombre: nombre,
+        observado_en: hoyISO(),
+        fuente: "manual",
+        estado: "confirmado",
+      } as never);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+
+  return { confirmar, guardarValor };
+}
