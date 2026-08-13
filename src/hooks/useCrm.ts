@@ -1150,6 +1150,8 @@ export function useClientePerfil(cod: number | null) {
       return (data ?? []) as unknown as PerfilHecho[];
     },
   });
+}
+
 /** Historial de hechos no descartados de un cliente, ordenado por reciente primero. */
 export interface PerfilHechoHistorico extends PerfilHecho {
   created_at: string;
