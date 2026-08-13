@@ -125,25 +125,30 @@ function EditorValor({
 }
 
 function FilaAtributo({
-  atributo, hecho, cod, onEditar,
+  atributo, hecho, cod, onEditar, valorAnterior,
 }: {
   atributo: PerfilAtributo;
   hecho: PerfilHecho | undefined;
   cod: number;
   onEditar: () => void;
+  valorAnterior?: string;
 }) {
   const { confirmar } = usePerfilMutations(cod);
   const sinConfirmar = hecho?.estado === "sin_confirmar";
+
+  const trazabilidad = useMemo(() => {
+    if (!hecho) return "nunca observado";
+    const partes: string[] = [`visto el ${diaMes(hecho.observado_en)}`];
+    if (hecho.comercial_nombre) partes.push(`por ${hecho.comercial_nombre}`);
+    if (valorAnterior) partes.push(`antes ${valorAnterior}`);
+    return partes.join(" · ");
+  }, [hecho, valorAnterior]);
 
   return (
     <div className="flex items-start justify-between gap-3 border-b py-3 last:border-b-0">
       <div className="min-w-0">
         <p className="text-sm font-medium">{atributo.nombre}</p>
-        <p className="text-xs text-muted-foreground">
-          {hecho
-            ? `visto el ${diaMes(hecho.observado_en)}${hecho.comercial_nombre ? ` por ${hecho.comercial_nombre}` : ""}`
-            : "nunca observado"}
-        </p>
+        <p className="text-xs text-muted-foreground">{trazabilidad}</p>
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
