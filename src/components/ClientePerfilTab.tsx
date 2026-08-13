@@ -197,6 +197,7 @@ function FilaAtributo({
 export function ClientePerfilTab({ cod }: { cod: number }) {
   const { data: atributos, isLoading } = usePerfilAtributos();
   const { data: hechos } = useClientePerfil(cod);
+  const { data: historico } = useClientePerfilHistorico(cod);
   const [editando, setEditando] = useState<string | null>(null);
 
   const porAtributo = useMemo(() => {
@@ -204,6 +205,17 @@ export function ClientePerfilTab({ cod }: { cod: number }) {
     for (const h of hechos ?? []) map.set(h.atributo_key, h);
     return map;
   }, [hechos]);
+
+  const valorAnteriorPorAtributo = useMemo(() => {
+    const vistos = new Map<string, number>();
+    const anteriores = new Map<string, string>();
+    for (const h of historico ?? []) {
+      const count = vistos.get(h.atributo_key) ?? 0;
+      if (count === 1) anteriores.set(h.atributo_key, h.valor_texto);
+      vistos.set(h.atributo_key, count + 1);
+    }
+    return anteriores;
+  }, [historico]);
 
   const grupos = useMemo(() => {
     const map = new Map<string, PerfilAtributo[]>();
@@ -242,6 +254,7 @@ export function ClientePerfilTab({ cod }: { cod: number }) {
                 hecho={porAtributo.get(a.key)}
                 cod={cod}
                 onEditar={() => setEditando(a.key)}
+                valorAnterior={valorAnteriorPorAtributo.get(a.key)}
               />
             ))}
           </CardContent>
