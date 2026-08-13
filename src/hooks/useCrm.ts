@@ -1150,6 +1150,29 @@ export function useClientePerfil(cod: number | null) {
       return (data ?? []) as unknown as PerfilHecho[];
     },
   });
+/** Historial de hechos no descartados de un cliente, ordenado por reciente primero. */
+export interface PerfilHechoHistorico extends PerfilHecho {
+  created_at: string;
+}
+
+export function useClientePerfilHistorico(cod: number | null) {
+  return useQuery({
+    queryKey: ["crm_cliente_perfil_historico", cod],
+    enabled: cod != null,
+    queryFn: async (): Promise<PerfilHechoHistorico[]> => {
+      const { data, error } = await supabase
+        .from("cliente_perfil_datos")
+        .select(
+          "id, cod_cliente, atributo_key, valor_texto, valor_num, visita_id, bloque_id, comercial_nombre, observado_en, confianza, cita, fuente, estado, created_at",
+        )
+        .eq("cod_cliente", cod!)
+        .neq("estado", "descartado")
+        .order("observado_en", { ascending: false })
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as PerfilHechoHistorico[];
+    },
+  });
 }
 
 export interface NuevoHechoPerfil {
