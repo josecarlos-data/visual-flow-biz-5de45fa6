@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import {
-  useCatalogos, useClientePerfil, usePerfilAtributos, usePerfilMutations,
+  useCatalogos, useClientePerfil, useClientePerfilHistorico, usePerfilAtributos, usePerfilMutations,
   type PerfilAtributo, type PerfilHecho,
 } from "@/hooks/useCrm";
 import { parseMulti, resolverOpciones, serializeMulti } from "@/lib/motivoCampos";
