@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import {
-  useCatalogos, useClientePerfil, usePerfilAtributos, usePerfilMutations,
+  useCatalogos, useClientePerfil, useClientePerfilHistorico, usePerfilAtributos, usePerfilMutations,
   type PerfilAtributo, type PerfilHecho,
 } from "@/hooks/useCrm";
 import { parseMulti, resolverOpciones, serializeMulti } from "@/lib/motivoCampos";
@@ -125,25 +125,30 @@ function EditorValor({
 }
 
 function FilaAtributo({
-  atributo, hecho, cod, onEditar,
+  atributo, hecho, cod, onEditar, valorAnterior,
 }: {
   atributo: PerfilAtributo;
   hecho: PerfilHecho | undefined;
   cod: number;
   onEditar: () => void;
+  valorAnterior?: string;
 }) {
   const { confirmar } = usePerfilMutations(cod);
   const sinConfirmar = hecho?.estado === "sin_confirmar";
+
+  const trazabilidad = useMemo(() => {
+    if (!hecho) return "nunca observado";
+    const partes: string[] = [`visto el ${diaMes(hecho.observado_en)}`];
+    if (hecho.comercial_nombre) partes.push(`por ${hecho.comercial_nombre}`);
+    if (valorAnterior) partes.push(`antes ${valorAnterior}`);
+    return partes.join(" · ");
+  }, [hecho, valorAnterior]);
 
   return (
     <div className="flex items-start justify-between gap-3 border-b py-3 last:border-b-0">
       <div className="min-w-0">
         <p className="text-sm font-medium">{atributo.nombre}</p>
-        <p className="text-xs text-muted-foreground">
-          {hecho
-            ? `visto el ${diaMes(hecho.observado_en)}${hecho.comercial_nombre ? ` por ${hecho.comercial_nombre}` : ""}`
-            : "nunca observado"}
-        </p>
+        <p className="text-xs text-muted-foreground">{trazabilidad}</p>
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
@@ -192,6 +197,7 @@ function FilaAtributo({
 export function ClientePerfilTab({ cod }: { cod: number }) {
   const { data: atributos, isLoading } = usePerfilAtributos();
   const { data: hechos } = useClientePerfil(cod);
+  const { data: historico } = useClientePerfilHistorico(cod);
   const [editando, setEditando] = useState<string | null>(null);
 
   const porAtributo = useMemo(() => {
@@ -199,6 +205,17 @@ export function ClientePerfilTab({ cod }: { cod: number }) {
     for (const h of hechos ?? []) map.set(h.atributo_key, h);
     return map;
   }, [hechos]);
+
+  const valorAnteriorPorAtributo = useMemo(() => {
+    const vistos = new Map<string, number>();
+    const anteriores = new Map<string, string>();
+    for (const h of historico ?? []) {
+      const count = vistos.get(h.atributo_key) ?? 0;
+      if (count === 1) anteriores.set(h.atributo_key, h.valor_texto);
+      vistos.set(h.atributo_key, count + 1);
+    }
+    return anteriores;
+  }, [historico]);
 
   const grupos = useMemo(() => {
     const map = new Map<string, PerfilAtributo[]>();
@@ -237,6 +254,7 @@ export function ClientePerfilTab({ cod }: { cod: number }) {
                 hecho={porAtributo.get(a.key)}
                 cod={cod}
                 onEditar={() => setEditando(a.key)}
+                valorAnterior={valorAnteriorPorAtributo.get(a.key)}
               />
             ))}
           </CardContent>
