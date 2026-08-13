@@ -1187,7 +1187,10 @@ export interface NuevoHechoPerfil {
 /** Confirmar un hecho existente y registrar hechos nuevos (fuente manual). */
 export function usePerfilMutations(cod: number | null) {
   const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["crm_cliente_perfil", cod] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["crm_cliente_perfil", cod] });
+    qc.invalidateQueries({ queryKey: ["crm_cliente_perfil_historico", cod] });
+  };
 
   const confirmar = useMutation({
     mutationFn: async (id: string) => {
