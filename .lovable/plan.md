@@ -1,107 +1,130 @@
-# Diagnóstico: timeouts en la importación de bloques
+# Por qué las RLS de visita_bloques hacen seq scan completo de visitas
 
-## Cómo escribe hoy `src/lib/datasets/bloquesExtraccion.ts`
+## 1. Políticas actuales de `visita_bloques` (texto exacto)
 
-Leído el código (bloque `upload`, líneas 461-482, y `escribir`, 391-415):
+Las cuatro son PERMISSIVE, rol `authenticated`.
 
-- **No** se lanza todo en paralelo. Hay un bucle por lotes con `const CONC = 5`: se cogen 5 items, `Promise.all` sobre esos 5, se espera, y se pasa al siguiente lote.
-- **Concurrencia máxima: 5 peticiones simultáneas.** Nunca más.
-- **Una petición HTTP por bloque.** Cada item es un `UPDATE ... eq(id)` o un `INSERT` independiente contra PostgREST. No hay upsert masivo.
-
-## Tu hipótesis: descartada
-
-La saturación del pool no encaja con lo medido:
-
-- Concurrencia tope de 5, no de 1.104.
-- Salud actual del backend: conexiones 15/60, clientes de pool 1/200. Sin saturación.
-
-## Lo que sí dicen las estadísticas del servidor
-
-`pg_stat_statements` sobre el UPDATE exacto que emite la importación:
-
-```text
-UPDATE visita_bloques SET campos, campos_meta WHERE id = $2
-  llamadas 2.272 · media 7.085 ms · máx 7.953 ms
-UPDATE visita_bloques SET campos, campos_meta, motivo_key WHERE id = $2
-  llamadas 45 · media 6.848 ms · máx 7.834 ms
+**SELECT — "ver bloques de visitas visibles"** (USING):
+```sql
+EXISTS (
+  SELECT 1 FROM visitas v
+  WHERE v.id = visita_bloques.visita_id
+    AND ( is_admin(auth.uid())
+       OR has_role(auth.uid(), 'director_comercial')
+       OR v.user_id = auth.uid()
+       OR ( has_role(auth.uid(), 'jefe_de_zona')
+            AND v.cod_cliente IN (SELECT cod_cliente FROM clientes_permitidos(auth.uid())) ) ) )
 ```
 
-El `statement_timeout` del rol `authenticated` es **8 s**. La media de esas
-sentencias está pegada al techo: el tiempo se consume **dentro de Postgres**,
-no en la cola del pool. No es un problema de cómo el cliente reparte el
-trabajo.
+**UPDATE — "editar bloques propios o revisables"** (USING y WITH CHECK, idénticos):
+```sql
+EXISTS (
+  SELECT 1 FROM visitas v
+  WHERE v.id = visita_bloques.visita_id
+    AND ( v.user_id = auth.uid() OR is_admin(auth.uid()) OR puede_revisar_visitas(auth.uid()) ) )
+```
 
-Además, no es exclusivo de la escritura: el `SELECT` de bloques por
-`visita_id` que hace la fase de preparación va a 2.275 ms de media, y
-`panel_ventas_kpis()` a 1.927 ms. Todo el acceso a estas tablas va lento,
-lo que apunta a un cuello común (contención o CPU del servidor), no a un
-plan concreto.
+**INSERT — "crear bloques en visitas propias"** (WITH CHECK): mismo cuerpo que el UPDATE.
 
-Descartado ya, con datos:
+**DELETE — "borrar bloques propios o admin"** (USING): mismo cuerpo que el UPDATE.
 
-- Plan del trigger: el plan genérico de la consulta interna de
-  `promover_perfil_desde_bloque` usa índices (`visita_bloques_pkey`,
-  `visitas_pkey`). No degenera en escaneo secuencial.
-- Volumen de datos: `visita_bloques` 21.527 filas / 5,4 MB,
-  `cliente_perfil_datos` 117 filas. Nada aquí justifica 7 s.
-- Bloqueos largos: no se observan.
+## 2. Funciones auxiliares
 
-## Plan de trabajo
+Todas son `STABLE SECURITY DEFINER`, `search_path = public`, `COST 100`, y **no** son `LEAKPROOF`:
 
-### 1. Medir dónde se van los 7 s (antes de tocar nada)
+| Función | Volatilidad | SECURITY DEFINER | Cuerpo |
+|---|---|---|---|
+| `is_approved(uuid)` | STABLE | sí | EXISTS sobre `profiles` |
+| `is_admin(uuid)` | STABLE | sí | EXISTS sobre `user_roles` |
+| `has_role(uuid, app_role)` | STABLE | sí | EXISTS sobre `user_roles` |
+| `puede_revisar_visitas(uuid)` | STABLE | sí | `is_approved AND (is_admin OR has_role(director) OR has_role(jefe_de_zona))` |
+| `clientes_permitidos(uuid)` | STABLE, SRF | sí | recorre `clientes` con `is_approved/is_admin/has_role/get_user_*` |
+| `get_user_delegacion / get_user_employee_code` | STABLE | sí | lectura de `profiles` |
 
-- Ejecutar el UPDATE con `EXPLAIN (ANALYZE, BUFFERS)` **bajo el rol
-  `authenticated`** con las RLS activas, no como propietario. La medición de
-  63 ms se hizo sin RLS; los cuatro triggers de `visita_bloques` más las
-  políticas (`EXISTS` sobre `visitas` con `is_admin` / `puede_revisar_visitas`)
-  solo aparecen en ese contexto.
-- Repetir con el trigger de promoción deshabilitado en una transacción de
-  prueba, para separar coste de trigger y coste de RLS.
-- Revisar el tamaño de instancia de Lovable Cloud: que consultas triviales
-  ronden el segundo sugiere CPU corta para la carga actual.
+Es decir: la marca STABLE ya está bien puesta. Ese no es el fallo.
 
-### 2. Corrección de la escritura: un RPC masivo (recomendado)
+## 3. Políticas de `visitas`
 
-Sustituir la petición por bloque por **un único RPC por tanda de ~200-500
-bloques**, que recibe un `jsonb` con el lote y hace la escritura en conjunto:
+**SELECT — "Role-scoped view visitas"**:
+```sql
+is_approved(auth.uid()) AND (
+     is_admin(auth.uid())
+  OR has_role(auth.uid(),'director_comercial')
+  OR (has_role(auth.uid(),'jefe_de_zona') AND cod_cliente IN (SELECT c.cod_cliente FROM clientes c WHERE c.delegacion = get_user_delegacion(auth.uid())))
+  OR user_id = auth.uid()
+  OR (has_role(auth.uid(),'comercial') AND cod_cliente IN (SELECT c.cod_cliente FROM clientes c WHERE c.vendedor = get_user_employee_code(auth.uid()))) )
+```
+UPDATE y DELETE siguen la misma forma; INSERT exige `is_approved AND user_id = auth.uid()`.
 
-- Un `INSERT ... ON CONFLICT` / `UPDATE ... FROM jsonb_to_recordset` en una
-  sola sentencia: una evaluación de RLS y de planificación por lote en vez de
-  una por fila.
-- El trigger de perfil se ejecuta igual (es `FOR EACH ROW`), pero deja de
-  pagarse el ida y vuelta HTTP, la autenticación JWT y la reevaluación de
-  políticas 1.100 veces.
-- El RPC devuelve por fila `ok` / mensaje de error, para conservar el detalle
-  actual de fallos en la UI y la idempotencia (se puede reintentar).
+## 4. Diagnóstico: por qué se hashea en vez de usar el índice
 
-Por qué esto y no "lotes con concurrencia limitada": la concurrencia ya está
-limitada a 5 y no es el problema. Bajarla solo alarga la importación; el coste
-real es por sentencia, y la única palanca que lo reduce de verdad es agrupar
-varias filas en una sentencia.
+El plan medido lo muestra con precisión:
 
-### 3. Salvaguarda para importaciones grandes
+```text
+Filter: (ANY (visita_id = (hashed SubPlan 20).col1)) AND (ANY (visita_id = (hashed SubPlan 28).col1))
+  SubPlan 20 -> Seq Scan on visitas v_2   2.000 ms  rows=21492   (política USING de UPDATE)
+  SubPlan 28 -> Seq Scan on visitas v_3     744 ms  rows=21492   (política SELECT, con clientes_permitidos)
+SubPlan 3 / 10 -> Index Scan using visitas_pkey  3,4 ms / 0,9 ms (WITH CHECK, correlados)
+```
 
-- Si la medición del paso 1 confirma que el trigger es una parte relevante del
-  coste: en el RPC de importación, desactivarlo a nivel de sesión
-  (`session_replication_role` no vale con SECURITY DEFINER estándar; se usaría
-  una variable de sesión leída por el trigger para saltarse la promoción) y
-  ejecutar al final un **backfill de perfil** en una sola sentencia sobre los
-  bloques del lote. Mucho más barato que 1.100 promociones individuales.
-- Mantener el reintento idempotente que ya existe.
+El patrón `EXISTS (...)` **ya está escrito como pides**. El problema es que el planificador lo deshace: cuando un `EXISTS` correlaciona por una igualdad simple sobre una columna del relation externo (`v.id = visita_bloques.visita_id`), Postgres aplica `convert_EXISTS_to_ANY` y lo reescribe como
 
-### 4. Verificación
+```sql
+visita_bloques.visita_id = ANY (SELECT v.id FROM visitas WHERE <resto de condiciones>)
+```
 
-- Reimportar el CSV de 1.104 filas y comprobar 0 timeouts.
-- Comprobar en `pg_stat_statements` que la media de la sentencia de escritura
-  baja de segundos a decenas de ms por bloque.
-- Comprobar que `cliente_perfil_datos` queda con los mismos hechos que
-  produciría la ruta fila a fila (mismo recuento por `bloque_id`).
+Al hacerlo, la correlación desaparece: la subconsulta pasa a ser **independiente de la fila externa**, y el planificador la ejecuta una sola vez, hasheada. Materializar ese hash exige recorrer las 21.492 visitas.
 
-## Detalle técnico
+Dos razones por las que el `EXISTS` no se convierte en un semi-join normal (que sí usaría el índice):
 
-- Fichero a cambiar: `src/lib/datasets/bloquesExtraccion.ts` (solo la fase
-  `upload`; `parse` y `prepare` no se tocan).
-- Nueva función de base de datos `importar_bloques_extraccion(jsonb)` con
-  control de permisos explícito dentro (solo admin / revisor), devolviendo
-  `TABLE(visita_id uuid, orden int, ok boolean, error text)`.
-- Sin cambios de esquema en `visita_bloques` ni en `cliente_perfil_datos`.
+- `visita_bloques` es la **relación destino** del UPDATE, y las quals de RLS se evalúan a nivel de scan de esa relación, no como join; el sublink no se puede subir a semijoin.
+- El escaneo interno de `visitas` arrastra su **propia RLS**, que Postgres trata como subconsulta con barrera de seguridad. Las funciones `is_admin`, `has_role`, `clientes_permitidos` no son LEAKPROOF, así que sus condiciones se aplican **antes** que la qual correlada, impidiendo el acceso por `visitas_pkey`.
+
+Coste real: 21.492 filas × varias llamadas STABLE de coste 100 (`is_approved`, `is_admin`, `has_role`×3, `get_user_*`) = ~2 s por subplan, 221.483 buffers para tocar una fila. Y se paga **dos veces por UPDATE** (política SELECT + política UPDATE). El mismo mecanismo golpea el `SELECT` de bloques por `visita_id`.
+
+Prueba de que la ruta indexada existe y es barata: los `WITH CHECK` (SubPlan 3 y 10) sí se ejecutan correlados y tardan **3,4 ms y 0,9 ms** con 8 buffers. Es el mismo predicado, ejecutado de la forma correcta: 0,03 % del coste.
+
+## 5. Reformulación propuesta
+
+Reescribir el `EXISTS` no basta: **es precisamente la forma que el planificador convierte en hash**. Añadir `OFFSET 0` o `LIMIT 1` dentro del EXISTS bloquearía la conversión, pero es un truco frágil que depende de la versión de Postgres y no elimina la RLS anidada de `visitas`.
+
+La reformulación correcta es sacar la comprobación de la qual y meterla en una función auxiliar, igual que ya hace el resto del proyecto (`can_view_cliente`, `clientes_permitidos`):
+
+```sql
+CREATE FUNCTION public.puede_ver_bloque(_visita_id uuid) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.visitas v
+    WHERE v.id = _visita_id
+      AND ( is_admin(auth.uid()) OR has_role(auth.uid(),'director_comercial')
+         OR v.user_id = auth.uid()
+         OR ( has_role(auth.uid(),'jefe_de_zona')
+              AND v.cod_cliente IN (SELECT cod_cliente FROM clientes_permitidos(auth.uid())) ) ) )
+$$;
+-- y su gemela puede_editar_bloque(_visita_id) con la condición de UPDATE/INSERT/DELETE
+```
+
+Las políticas quedan en `USING (puede_ver_bloque(visita_id))` y `USING/WITH CHECK (puede_editar_bloque(visita_id))`, con la misma semántica exacta.
+
+Por qué esto sí usa el índice:
+
+1. No hay sublink en la qual, así que no hay nada que `convert_EXISTS_to_ANY` pueda hashear. La función se invoca una vez por fila candidata, y aquí solo hay una (`id = ...` por PK).
+2. Dentro de la función, `_visita_id` es un parámetro constante: el `EXISTS` se resuelve con `visitas_pkey` — la ruta de 0,9 ms ya medida.
+3. Al ser SECURITY DEFINER, la lectura interna de `visitas` no reaplica la RLS de `visitas`, que es la que arrastraba `clientes` y `get_user_*` fila a fila. La autorización no se debilita: la condición evaluada es literalmente la misma que hoy contiene la política.
+
+Estimación: de ~1.500 ms a unos pocos ms por fila. Con eso, las 1.104 filas de la importación dejan de acercarse al `statement_timeout` de 8 s y no hace falta tocar el tamaño de instancia.
+
+## 6. Cómo lo verificaríamos antes de dar nada por bueno
+
+1. Crear las dos funciones y reemplazar las cuatro políticas en una migración.
+2. Repetir el mismo `EXPLAIN (ANALYZE, BUFFERS)` sobre el bloque `4420d557-…` bajo rol `authenticated`, y exigir: sin `hashed SubPlan`, sin `Seq Scan on visitas`, buffers en decenas y no en cientos de miles.
+3. Comprobar la autorización con tres usuarios reales (comercial, jefe de zona, admin): que un comercial siga sin ver ni editar bloques ajenos.
+4. Solo después, reintentar la importación completa y medir.
+
+## Fuera de alcance por ahora
+
+`panel_ventas_kpis()` y el `SELECT` lento de bloques comparten síntoma, pero su causa aún no está medida individualmente. Se revisan después de confirmar la mejora en `visita_bloques`.
+
+## Nota de seguridad
+
+Las nuevas funciones son SECURITY DEFINER intencionadas y encajan con la política ya registrada en la memoria de seguridad del proyecto: son funciones auxiliares que las propias RLS necesitan y que comprueban rol internamente. No se amplía ningún permiso: `anon` no recibe EXECUTE.
