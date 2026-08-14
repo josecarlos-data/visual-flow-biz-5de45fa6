@@ -2016,7 +2016,6 @@ export type Database = {
           vendedor: string
         }[]
       }
-      diag_trigger_promocion: { Args: { _enable: boolean }; Returns: undefined }
       fecha_corte_datos: { Args: never; Returns: string }
       get_distinct_delegaciones: {
         Args: never
