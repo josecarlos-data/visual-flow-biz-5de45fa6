@@ -1940,6 +1940,8 @@ export type Database = {
       }
     }
     Functions: {
+      _diag_as_user: { Args: { _sql: string; _uid: string }; Returns: Json }
+      _diag_explain: { Args: { _sql: string; _uid: string }; Returns: Json }
       buscar_productos: {
         Args: { _limite?: number; _q: string }
         Returns: {
