@@ -2016,6 +2016,7 @@ export type Database = {
           vendedor: string
         }[]
       }
+      diag_trigger_promocion: { Args: { _enable: boolean }; Returns: undefined }
       fecha_corte_datos: { Args: never; Returns: string }
       get_distinct_delegaciones: {
         Args: never
@@ -2053,13 +2054,6 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_approved: { Args: { _user_id: string }; Returns: boolean }
-      medir_update_bloque: {
-        Args: { _id: string; _uid: string }
-        Returns: {
-          escenario: string
-          linea: string
-        }[]
-      }
       objetivos_propuesta: {
         Args: { _anio: number; _pct?: number }
         Returns: {
