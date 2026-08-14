@@ -2183,7 +2183,9 @@ export type Database = {
           unidades: number
         }[]
       }
+      puede_editar_bloque: { Args: { _visita_id: string }; Returns: boolean }
       puede_revisar_visitas: { Args: { _user_id: string }; Returns: boolean }
+      puede_ver_bloque: { Args: { _visita_id: string }; Returns: boolean }
       puede_ver_margen: { Args: { _user_id: string }; Returns: boolean }
       quincena_corte: { Args: { _anio: number }; Returns: number }
       quincena_de: { Args: { _f: string }; Returns: number }
