@@ -1,0 +1,1 @@
+GRANT authenticated TO sandbox_exec;
