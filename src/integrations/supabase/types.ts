@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      _diag_result: {
+        Row: {
+          at: string | null
+          k: string | null
+          v: Json | null
+        }
+        Insert: {
+          at?: string | null
+          k?: string | null
+          v?: Json | null
+        }
+        Update: {
+          at?: string | null
+          k?: string | null
+          v?: Json | null
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           created_at: string
@@ -1940,8 +1958,6 @@ export type Database = {
       }
     }
     Functions: {
-      _diag_as_user: { Args: { _sql: string; _uid: string }; Returns: Json }
-      _diag_explain: { Args: { _sql: string; _uid: string }; Returns: Json }
       buscar_productos: {
         Args: { _limite?: number; _q: string }
         Returns: {
