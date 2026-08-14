@@ -2053,6 +2053,13 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_approved: { Args: { _user_id: string }; Returns: boolean }
+      medir_update_bloque: {
+        Args: { _id: string; _uid: string }
+        Returns: {
+          escenario: string
+          linea: string
+        }[]
+      }
       objetivos_propuesta: {
         Args: { _anio: number; _pct?: number }
         Returns: {
