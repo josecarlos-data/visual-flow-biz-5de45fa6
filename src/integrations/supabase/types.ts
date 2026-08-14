@@ -14,24 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      _diag_result: {
-        Row: {
-          at: string | null
-          k: string | null
-          v: Json | null
-        }
-        Insert: {
-          at?: string | null
-          k?: string | null
-          v?: Json | null
-        }
-        Update: {
-          at?: string | null
-          k?: string | null
-          v?: Json | null
-        }
-        Relationships: []
-      }
       app_settings: {
         Row: {
           created_at: string
