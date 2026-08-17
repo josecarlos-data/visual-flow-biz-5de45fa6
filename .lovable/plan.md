@@ -1,112 +1,82 @@
-# Mapa de lentitud: causa común a toda la app + causa propia de Ventas
+# Mapa de las 11 funciones lentas (solo diagnóstico, nada aplicado)
 
-Todo lo que sigue está medido hoy contra la base de datos real. No se ha aplicado ningún cambio.
+Medido hoy contra la base real. Los tiempos de `pg_stat_statements` son tuyos; los planes que cito los he ejecutado yo como propietario (sin RLS), lo que permite separar "coste propio de la consulta" de "coste de la autorización".
 
-## Parte 1 — La causa común
+## 1) ¿Todas empiezan resolviendo el conjunto de clientes visibles?
 
-### 1.1 Los índices están bien. No es eso.
+**Sí, con `WITH p AS (SELECT ... FROM clientes_permitidos(auth.uid()))`:**
+- `panel_top_clientes`, `panel_top_familias`, `panel_top_marcas`, `panel_canales`, `panel_devoluciones`, `panel_alertas`
 
-| Tabla | Índice que usan las funciones de rol | Estado |
-|---|---|---|
-| `user_roles` | `user_roles_user_id_role_key (user_id, role)` UNIQUE | existe, se usa como *Index Only Scan*, 1 buffer, 0,003 ms |
-| `profiles` | `profiles_user_id_key (user_id)` UNIQUE | existe (con 4 filas hace seq scan de 1 página, irrelevante) |
+**No usan `clientes_permitidos`; comprueban un solo cliente con `can_view_cliente(auth.uid(), _cod)`:**
+- `cliente_top_productos`, `cliente_documentos` — una sola llamada de autorización por ejecución, no por fila
 
-Una llamada suelta a `has_role` o `is_approved` cuesta microsegundos. El problema no es lo que cuesta una llamada, sino **cuántas veces se llama**.
+**No usa ninguna de las dos:**
+- `objetivos_seguimiento` — resuelve el rol una sola vez en variables plpgsql (`v_todos`, `v_vend`) y luego filtra por `c.vendedor`. La autorización aquí **no cuesta nada**.
 
-### 1.2 Por qué se llaman una vez por fila
+## 2) ¿Cuáles se arreglan con la envoltura del paso 1 y cuáles tienen problema propio?
 
-`is_approved`, `is_admin`, `has_role`, `get_user_delegacion`, `get_user_employee_code`, `can_view_cliente`, `clientes_permitidos`: todas son `STABLE SECURITY DEFINER`, `COST 100`, no `LEAKPROOF`.
+La envoltura en subconsulta escalar **ya está aplicada** dentro de `clientes_permitidos` y `can_view_cliente` (paso 1). Por tanto **ninguna de estas once mejora con más envoltura**: lo que queda es coste propio.
 
-`STABLE` está bien puesto, pero **no basta**: `STABLE` sólo garantiza que el valor no cambia dentro de la sentencia; no obliga al planificador a evaluarlas una sola vez. Y hay un detalle decisivo: **una función SQL con `SECURITY DEFINER` nunca se inlinea**. Postgres la deja como caja negra, la mete en la qual y la evalúa **fila a fila**.
+| Función | Qué le queda por resolver |
+|---|---|
+| `objetivos_seguimiento` | Agregación completa sobre `ventas_diarias`. Ver punto 3. |
+| `panel_devoluciones` | `ventas_diarias` con `operacion='Abono' AND EXTRACT(YEAR FROM fecha)=_anio`. El `EXTRACT` **no es sargable**: `idx_vd_fecha` no se puede usar y hace barrido secuencial de 433k filas. Además recorre el CTE `a` tres veces (tres `GROUP BY` distintos). |
+| `cliente_top_productos` | Filtra por `cod_cliente` (índice bien) pero repite el `EXTRACT(YEAR ...)` y hace `LEFT JOIN productos` + `GROUP BY` sobre cuatro expresiones `COALESCE`. Coste medio, no crítico. |
+| `cliente_documentos` | `GROUP BY id_documento` con `array_agg` sobre todas las líneas históricas del cliente antes de aplicar `LIMIT`. Ordena por `MIN(fecha)` sobre el conjunto completo. |
+| `panel_top_familias` / `panel_top_marcas` / `panel_top_clientes` / `panel_canales` | Leen tablas resumen, correcto. Lo que pagan es materializar `clientes_permitidos` (11.592 filas para admin) y hacer hash join contra el resumen. Estructuralmente sanas; ~0,5-1,2 s es sobre todo caché fría. |
+| `panel_alertas` | Igual, más `situaciones_activas()` y **tres pasadas sobre el CTE `k`** (una por tipo de alerta). |
 
-Consecuencia directa, con los tamaños reales de las tablas:
+Resumen: **problema de agregación/índices**, no de rol, en `objetivos_seguimiento`, `panel_devoluciones`, `cliente_documentos` y en menor medida `cliente_top_productos`. Las cuatro `panel_top_*`/`canales`/`alertas` solo tienen coste de volumen.
 
-| Política | Tabla | Filas | Llamadas a funciones de rol por consulta |
-|---|---|---|---|
-| `Role-scoped view clientes` | `clientes` | 11.592 | hasta 5 × 11.592 ≈ **58.000** |
-| `Role-scoped view ventas_diarias` | `ventas_diarias` | 433.215 | `can_view_cliente` una vez **por fila leída** |
-| `Role-scoped view resumen_cliente_mes` | `resumen_cliente_mes` | 35.488 | ídem |
-| `Role-scoped view resumen_documentos` | `resumen_documentos` | 38.467 | ídem |
-| `Role-scoped view cliente_kpis` | `cliente_kpis` | ~11.500 | ídem |
-| `Role-scoped view visitas` | `visitas` | 21.492 | + subconsulta `IN (SELECT ... FROM clientes)` |
+## 3) Por qué `objetivos_seguimiento` es cinco veces peor
 
-Y `can_view_cliente` no es barata: dentro hace `is_approved` + hasta tres `has_role` + un `EXISTS` sobre `clientes`. Multiplicado por cientos de miles de filas, ahí están los 3-6 s de la primera carga de cualquier pantalla.
+El CTE `ventas` agrega **`ventas_diarias` en crudo**, no las tablas resumen. Plan real ejecutado hoy (sin RLS, o sea suelo absoluto):
 
-**Prueba medida.** Escribí el mismo predicado de `clientes` pero con las comprobaciones de rol como subconsultas en lugar de llamadas a función. El planificador las convirtió en **InitPlan evaluados una sola vez** (`One-Time Filter`), con *Index Only Scan* sobre `user_roles`: **1.006 buffers en total** para las 11.592 filas, frente a las decenas de miles de invocaciones del plan actual. Mismo resultado (440 clientes del comercial), misma semántica.
-
-Esto es exactamente el patrón que ya arregló `visita_bloques`: sacar la comprobación de la qual para que se evalúe una vez, no por fila.
-
-### 1.3 Sobre el `COST 100`
-
-`COST 100` significa "esta función cuesta 100× una operación básica". Le dice al planificador que evite llamarla, y eso empeora los planes por dos vías: descarta caminos con índice cuando la igualdad útil (`vendedor = get_user_employee_code(...)`) está dentro de un `OR` junto a la función cara, y le lleva a preferir barridos secuenciales. En la práctica el coste real de estas funciones es ~1 buffer. `COST 100` no está justificado; pero bajarlo es cosmético comparado con dejar de llamarlas por fila.
-
-### 1.4 Corrección propuesta para la causa común (no aplicada)
-
-Envolver cada llamada de rol en una subconsulta escalar: `(SELECT public.is_admin(auth.uid()))`. Postgres la promociona a InitPlan y la ejecuta **una vez por sentencia**. La semántica es idéntica — mismo predicado, mismo resultado — y no se toca ninguna condición de autorización.
-
-Aplica a: las políticas de `clientes`, `visitas`, `visitas_planificadas`, `situaciones_cliente`, `rutas`, `cliente_perfil_datos`, y al **cuerpo** de `can_view_cliente` y `clientes_permitidos`.
-
-Para las tablas grandes filtradas por `can_view_cliente` (`ventas_diarias`, `resumen_cliente_mes`, `resumen_documentos`, `cliente_kpis`) hace falta un paso más: sustituir la llamada por fila por una pertenencia a conjunto calculada una vez:
-
-```sql
-USING ( cod_cliente IN (SELECT cod_cliente FROM public.clientes_permitidos(auth.uid())) )
+```text
+Finalize GroupAggregate  actual time=5186..5331 ms  rows=722
+  Buffers: shared hit=29674, temp read=1422 written=1430
+  -> Sort  Sort Method: external merge  Disk: 5672kB     <- vuelca a disco
+     -> Nested Loop  rows=131267 (loops=2)  4846 ms
+        -> Parallel Seq Scan on ventas_diarias  4495 ms
+           Filter: EXTRACT(year FROM fecha) = ANY ('{2026,2025}')
+           Rows Removed by Filter: 85335
+        -> Memoize -> Index Scan clientes_cod_cliente_key  (262.545 loops)
 ```
 
-con `clientes_permitidos` ya optimizada. Semánticamente equivale a `can_view_cliente` (mismo cuerpo, mismos roles); hay que verificarlo caso por caso antes de tocar nada.
+Tres defectos acumulados, y ninguno tiene que ver con la autorización:
 
-### 1.5 Un dato que descarta el hardware como causa principal
+1. **Barrido secuencial completo de `ventas_diarias`** (433.215 filas; 262.545 útiles de 2025-2026). `EXTRACT(YEAR FROM v.fecha) IN (...)` impide usar `idx_vd_fecha`; con `fecha >= '2025-01-01' AND fecha < '2027-01-01'` sí sería sargable.
+2. **Nested loop de 262.545 iteraciones** contra `clientes`, salvado a medias por Memoize (2.609 fallos, 128k aciertos) pero aun así 4,8 s.
+3. **Sort externo a disco** (5,6 MB por worker) porque el planificador estima 1.058 filas y llegan 131.267 — estimación errada por dos órdenes de magnitud, culpa de las expresiones `EXTRACT` sin estadísticas.
 
-La agregación de ventas de un comercial (440 clientes × `resumen_cliente_mes`) tarda **308 ms la primera vez y 8 ms las siguientes**, con índices y sin barridos. La instancia no está ahogada: `generate_series` de 3M filas en 778 ms, conexiones 17/60, disco 19 %. Memoria al 70 % con `shared_buffers` de 224 MB frente a 394 MB de base de datos — la caché justa, lo que explica la penalización de la *primera* carga. Subir instancia ayudaría al margen; no es lo primero que hay que hacer.
+Los 5.087 ms de media que ves son básicamente estos 5,3 s. Bajo `authenticated` no cambia: el filtro de rol es `c.vendedor = v_vend` sobre una variable ya resuelta.
 
-## Parte 2 — Qué tiene Ventas de particular
+Y se ejecuta **por cada objetivo activo** en el sentido de que el resultado se recalcula entero (19 filas en `objetivos`) — el coste no depende del número de objetivos, sino del barrido.
 
-### 2.1 No recalcula sobre `ventas_diarias`
+**Salida natural:** `resumen_cliente_mes` no sirve porque la quincena parte el mes en dos. Haría falta o bien un filtro por rango de fechas + índice, o bien una tabla/vista materializada `resumen_vendedor_quincena (vendedor, ruta_esp, anio, q, importe)` refrescada junto con los demás resúmenes.
 
-Comprobado leyendo las funciones: `panel_ventas_kpis()` y `panel_ventas_mensual()` leen de `resumen_cliente_mes` y `resumen_documentos`, que ya son tablas resumidas. **La hipótesis de que agregan sobre `ventas_diarias` es falsa.** La agregación en sí, medida, cuesta 8 ms.
+**Nota sobre la medición:** este `EXPLAIN` lo he ejecutado como propietario, no con `SET LOCAL ROLE authenticated` dentro de migración, porque eso es un cambio de estado y estamos en modo plan. Dado que la autorización aquí se resuelve en variables antes de la consulta, el plan bajo `authenticated` es el mismo; si quieres la confirmación literal, la lanzo como primer paso de la implementación.
 
-### 2.2 Lo que sí cuesta: `clientes_permitidos(auth.uid())` en cada función
+## 4) Las 14 llamadas: quién las dispara
 
-Las dos funciones empiezan igual:
+Sí, es **una sola carga de pantalla**. `src/pages/Ventas.tsx` tiene dos `useEffect` con `Promise.all`:
 
-```sql
-WITH p AS (SELECT cod_cliente FROM public.clientes_permitidos(auth.uid())), ...
-```
+- Efecto 1 (al montar): `panel_ventas_mensual`, `panel_ventas_kpis`, `panel_alertas`
+- Efecto 2 (cuando se resuelve `anioActual`): `panel_top_clientes`, `panel_top_familias`, `panel_top_marcas`, `panel_canales`, `panel_devoluciones`
 
-`clientes_permitidos` barre las 11.592 filas de `clientes` evaluando por fila `is_approved` + hasta tres `has_role` + `get_user_delegacion`/`get_user_employee_code`. La igualdad útil (`c.vendedor = ...`) está dentro de un `OR`, así que **no puede usar `idx_clientes_vendedor`**. Ese barrido es prácticamente todo el 1.927 ms de `panel_ventas_kpis` y el 1.847 ms de `panel_ventas_mensual`.
+Ocho RPC en dos ráfagas paralelas. Con 14 cargas de Ventas salen exactamente los 14 de cada una.
 
-### 2.3 Y Ventas lo paga varias veces en paralelo
+**Lo que se pide más veces de lo necesario:**
 
-Del `pg_stat_statements` de hoy (medias reales en producción):
+- `objetivos_seguimiento` (12 llamadas) lo dispara `ResumenObjetivos`, que está **dentro de la página de Ventas**, y además `Objetivos.tsx` y `AdminObjetivos.tsx`. Es la función más cara de todas y se está pagando en una pantalla donde solo se muestran **4 tarjetas recortadas** (`.slice(0, 4)`) — trae la serie quincenal completa de todos los objetivos para pintar cuatro barras de progreso.
+- `queryClient` se crea en `src/App.tsx` **sin opciones** (`new QueryClient()`): `staleTime: 0` y `refetchOnWindowFocus: true`. Cada vuelta a la pestaña revalida `objetivos_seguimiento`. Eso explica que sean 12 y no 14: hay caché entre montajes rápidos, pero se invalida enseguida.
+- Las ocho RPC de Ventas **no pasan por React Query**: son `useEffect` + estado local, así que no hay caché ninguna. Volver a Ventas desde el menú relanza las ocho siempre.
+- `anioActual` se inicializa a `new Date().getFullYear()` y luego se recalcula desde `kpis`. Si el año máximo de datos coincide con el actual no hay doble disparo (los contadores 14/14 lo confirman), pero es frágil: en enero, o si los datos se quedan atrás, el efecto 2 se ejecutaría **dos veces**, duplicando cinco RPC.
 
-| Sentencia | Llamadas | Media | Total |
-|---|---:|---:|---:|
-| `panel_ventas_kpis()` | 216 | 1.950 ms | 421 s |
-| `panel_ventas_mensual()` | 217 | 1.847 ms | 401 s |
-| `rutas_visibles()` | 43 | 1.510 ms | 65 s |
-| `SELECT * FROM visitas ORDER BY fecha DESC` | 73 | 550 ms | 40 s |
-| `SELECT ... FROM clientes ORDER BY cliente` | 133 | 477 ms | 63 s |
-| `SELECT * FROM clientes` | 698 | 87 ms | 61 s |
+## Orden que sugiero (pendiente de tu decisión)
 
-La pantalla de Ventas dispara `panel_ventas_kpis`, `panel_ventas_mensual` y varios `panel_top_*` a la vez; cada uno repite el mismo barrido de `clientes`. Con la instancia actual, tres o cuatro barridos concurrentes se estorban entre sí y la primera carga se va a 3-6 s. Rutas paga lo mismo vía `rutas_visibles()`.
-
-**Nota aparte:** el segundo consumidor histórico de tiempo total (6.766 llamadas, 828 s) es un `SELECT ... FROM ventas_mensuales WHERE cod_cliente = ANY (...)`. Esa tabla **ya no existe**; son restos anteriores a la migración. El equivalente actual es el bucle de `useHistoricoData` que pagina `resumen_cliente_mes` en lotes de 500 clientes: para un director son ~24 peticiones HTTP encadenadas, cada una con su evaluación de RLS. Candidato claro a convertirse en un único RPC agregado, pero después de arreglar la RLS.
-
-## Parte 3 — Orden de corrección propuesto por impacto/riesgo
-
-Cada paso es una migración independiente, con verificación de autorización antes de pasar al siguiente.
-
-1. **`clientes_permitidos` y `can_view_cliente`** — envolver las llamadas de rol en subconsultas escalares dentro del cuerpo. Un solo cambio, sin tocar políticas, y beneficia de golpe a Ventas, Rutas, Clientes y todas las tablas resumen. Riesgo mínimo: el predicado no cambia.
-2. **Políticas de `clientes` y `visitas`** — misma envoltura, más convertir el `IN (SELECT ... FROM clientes)` de `visitas` en `IN (SELECT ... FROM clientes_permitidos(auth.uid()))` sólo si se confirma que el conjunto es idéntico. Afecta a Clientes, Visitas, Agenda y ficha de cliente.
-3. **`ventas_diarias`, `resumen_cliente_mes`, `resumen_documentos`, `cliente_kpis`** — sustituir `can_view_cliente` por pertenencia a conjunto. Es donde más filas hay, pero también donde más hay que verificar; por eso va tercero.
-4. **`visitas_planificadas`, `situaciones_cliente`, `rutas`, `cliente_perfil_datos`** — mismo tratamiento, tablas pequeñas, ganancia menor.
-5. **Bajar `COST` de las funciones auxiliares** de 100 a un valor realista (1-10), ya con todo lo anterior aplicado.
-6. **Colapsar el bucle de `useHistoricoData`** en un RPC único. Cambio de aplicación, no de autorización.
-7. **Revisar tamaño de instancia** al final, con los números ya limpios, y sólo si la primera carga en frío sigue molestando.
-
-## Verificación exigida en cada paso
-
-Antes de dar por bueno cualquier paso: para un comercial, un jefe de zona y un admin reales, contar filas visibles en la tabla afectada **antes y después**. Si algún número sube, el cambio está mal y se revierte. Y repetir el `EXPLAIN (ANALYZE, BUFFERS)` exigiendo que desaparezcan los barridos secuenciales y que las funciones de rol aparezcan como `InitPlan`.
-
-## Limitación de la medición de hoy
-
-El rol del sandbox ya no tiene concedido `authenticated` (se revocó al cerrar el diagnóstico anterior) y no puede ejecutar las funciones `SECURITY DEFINER`. Las mediciones se han hecho reproduciendo el predicado de cada política con el UUID del comercial literal, más los tiempos reales de producción de `pg_stat_statements`, que sí vienen del rol `authenticated`. Si quieres los planes exactos bajo RLS, el primer paso de la implementación puede volver a conceder el rol temporalmente, como la vez anterior.
+1. `objetivos_seguimiento`: filtro sargable por rango de fechas + resumen por vendedor/quincena. Es el único a 150 ms del timeout.
+2. `panel_devoluciones`: filtro por rango de fechas e índice parcial sobre abonos.
+3. Caché en cliente: `staleTime` razonable en el `QueryClient` y pasar las ocho RPC de Ventas a React Query; valorar si `ResumenObjetivos` necesita la serie completa o le basta un RPC ligero.
+4. `cliente_documentos` y `cliente_top_productos`: acotar antes de agregar.
+5. Las `panel_top_*` se quedan como están hasta ver el efecto de lo anterior.
