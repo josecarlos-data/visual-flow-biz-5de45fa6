@@ -14,54 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      _diag_q: {
-        Row: {
-          fase: string | null
-          filas: number | null
-          ms: number | null
-        }
-        Insert: {
-          fase?: string | null
-          filas?: number | null
-          ms?: number | null
-        }
-        Update: {
-          fase?: string | null
-          filas?: number | null
-          ms?: number | null
-        }
-        Relationships: []
-      }
-      _diag_qd: {
-        Row: {
-          f: string | null
-          q: number | null
-        }
-        Insert: {
-          f?: string | null
-          q?: number | null
-        }
-        Update: {
-          f?: string | null
-          q?: number | null
-        }
-        Relationships: []
-      }
-      _diag_qv: {
-        Row: {
-          k: string | null
-          v: string | null
-        }
-        Insert: {
-          k?: string | null
-          v?: string | null
-        }
-        Update: {
-          k?: string | null
-          v?: string | null
-        }
-        Relationships: []
-      }
       app_settings: {
         Row: {
           created_at: string
