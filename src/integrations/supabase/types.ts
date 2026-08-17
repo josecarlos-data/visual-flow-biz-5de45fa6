@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      _diag_obj: {
+        Row: {
+          detalle: string | null
+          k: number
+          ms: number | null
+          seccion: string | null
+        }
+        Insert: {
+          detalle?: string | null
+          k?: number
+          ms?: number | null
+          seccion?: string | null
+        }
+        Update: {
+          detalle?: string | null
+          k?: number
+          ms?: number | null
+          seccion?: string | null
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           created_at: string
