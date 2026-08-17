@@ -47,6 +47,21 @@ export type Database = {
         }
         Relationships: []
       }
+      _diag_qv: {
+        Row: {
+          k: string | null
+          v: string | null
+        }
+        Insert: {
+          k?: string | null
+          v?: string | null
+        }
+        Update: {
+          k?: string | null
+          v?: string | null
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           created_at: string
