@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      _diag_p1: {
+        Row: {
+          creado: string | null
+          filas: number | null
+          fn: string | null
+          ms: number | null
+          nota: string | null
+          paso: string | null
+        }
+        Insert: {
+          creado?: string | null
+          filas?: number | null
+          fn?: string | null
+          ms?: number | null
+          nota?: string | null
+          paso?: string | null
+        }
+        Update: {
+          creado?: string | null
+          filas?: number | null
+          fn?: string | null
+          ms?: number | null
+          nota?: string | null
+          paso?: string | null
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           created_at: string
