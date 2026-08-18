@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.quincena_de(date) TO sandbox_exec;

@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.objetivos_seguimiento(integer) TO sandbox_exec;
