@@ -1,89 +1,115 @@
-# Dónde se van los 8 s de objetivos_seguimiento (solo diagnóstico)
+# Datos de medición: objetivos_seguimiento(2026) y caché
 
-## 1) Cuerpo completo y puntos sospechosos
+Solo datos. Sin correcciones.
 
-```sql
-CREATE OR REPLACE FUNCTION public.objetivos_seguimiento(_anio integer)
-RETURNS TABLE(...) LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'public'
-AS $$
-DECLARE v_q int; v_f date; v_todos boolean; v_vend text;
-BEGIN
-  IF NOT public.is_approved(auth.uid()) THEN RETURN; END IF;              -- (A) 1 llamada
-  v_todos := public.is_admin(auth.uid()) OR public.has_role(...);          -- (A) 2 llamadas
-  v_vend  := public.get_user_employee_code(auth.uid());                    -- (A) 1 llamada
-  v_q := public.quincena_corte(_anio);                                     -- (B) max(fecha) de ventas_diarias
-  v_f := public.fecha_corte_datos();                                       -- (B) max(fecha) otra vez
+## 1) Tamaños en disco
 
-  RETURN QUERY
-  WITH obj AS (...),                                                       -- 19 filas
-       rutas_obj AS (...),                                                 -- DISTINCT sobre obj
-       ventas AS ( ... ventas_diarias JOIN clientes
-                   WHERE v.fecha >= make_date(_anio-1,1,1)
-                     AND v.fecha <  make_date(_anio+1,1,1)
-                     AND (v_todos OR c.vendedor = v_vend)
-                   GROUP BY 1,2,3,4 ),                                     -- (C) 262.545 filas leídas -> 722
-       agg AS ( obj JOIN ventas ON ... OR ... NOT IN (SELECT ruta FROM rutas_obj) ), -- (D)
-       serie AS ( jsonb_agg sobre agg )                                    -- (E)
-  SELECT ..., (SELECT SUM(...) FROM agg WHERE id=o.id AND anio=_anio),     -- (F) 3 subconsultas
-              (SELECT SUM(...) ... anio=_anio-1 AND q<=v_q),               --     correladas sobre agg
-              (SELECT SUM(...) ... anio=_anio-1), ...
-  FROM obj o LEFT JOIN serie s ON s.id=o.id ORDER BY ...;
-END $$;
-```
+| Objeto | Tabla | Índices | Total |
+|---|---|---|---|
+| `ventas_diarias` (433.215 filas) | 110 MB | 160 MB | 270 MB |
+| `clientes` | 7.992 kB | 2.864 kB | 11 MB |
+| `objetivos` | 8 kB | 48 kB | 64 kB |
+| **Base completa** | | | **394 MB** |
+| Esquema `public` (todas las tablas + índices) | | | 583 MB |
 
-Inventario de lo que pediste:
-
-- **LOOP explícito: ninguno.** No hay `FOR`, `WHILE` ni cursores. Todo es una única `RETURN QUERY`.
-- **Llamadas a funciones dentro de una consulta: una sola**, `public.quincena_de(v.fecha)` en el CTE `ventas`. Es `IMMUTABLE` y `LANGUAGE sql` de una línea, así que **el planificador la inlinea** (se ve en el plan como `EXTRACT(month...)` desnudo, no como llamada). No cuesta nada.
-- **Llamadas fuera de consulta (una vez cada una):** `is_approved`, `is_admin`, `has_role`, `get_user_employee_code`, `quincena_corte` (que a su vez llama a `fecha_corte_datos`) y `fecha_corte_datos`. Las dos últimas hacen `max(fecha)` sobre `ventas_diarias`: con índice, microsegundos.
-- **Subconsultas correladas: cuatro.** El `NOT IN (SELECT ruta FROM rutas_obj)` dentro del `JOIN` de `agg` (se resuelve como *hashed SubPlan*, una sola vez) y las **tres** `(SELECT SUM(a.importe) FROM agg a WHERE a.id = o.id ...)` del `SELECT` final, que se ejecutan 19 veces cada una sobre un CTE `agg` materializado de 722 filas.
-
-## 2) Tiempo por sección (medido hoy, sin instrumentación de EXPLAIN)
-
-Primero un aviso importante sobre el método: **en esta instancia `EXPLAIN ANALYZE` miente por exceso**. El mismo escaneo de `ventas_diarias` que tarda **346 ms** cronometrado con `clock_timestamp()` aparece como **10.106 ms** dentro de `EXPLAIN ANALYZE`. El reloj del VM es carísimo y la instrumentación por fila multiplica ×30 en nodos de 262.545 filas. Todo lo que sigue está cronometrado sin `EXPLAIN`.
-
-| Sección | Tiempo | Notas |
-|---|---|---|
-| (A) rol: `is_approved` + `is_admin` + `has_role` + `get_user_employee_code` | < 5 ms | cuatro llamadas escalares |
-| (B) `quincena_corte` + `fecha_corte_datos` | < 5 ms | dos `max(fecha)` |
-| (C) CTE `ventas` aislado, en frío | 1.817 ms | primera ejecución |
-| (C) CTE `ventas` aislado, en caliente (3 pasadas seguidas) | **427 / 515 / 477 ms** | 15.039 buffers, todos *hit* |
-| (C)+(D) `ventas` + `agg` | 528 ms | el join con `agg` añade ~50 ms |
-| (C)+(D)+(E) hasta `serie` (jsonb_agg) | 810 ms | |
-| (F) las tres subconsultas correladas sobre `agg` ya materializado | **3,5 ms** | 57 escaneos de 722 filas |
-| Consulta completa con literales, una pasada | 5.396 ms | ver punto 3 |
-| Consulta completa con literales, otra pasada | **814 ms** | mismo SQL, mismos buffers |
-
-Las secciones (A), (B), (E) y (F) **suman menos de 20 ms**. No hay ningún bucle ni ninguna correlada cara. Con literales, la función entera debería costar ~800 ms.
-
-## 3) Dónde están los ~7 s
-
-No están en una sección distinta: están en **la misma sección (C)+(D) ejecutada con otro plan**. La prueba es de contabilidad de buffers:
-
-- Tus 19 llamadas reales vía PostgREST: **media 5.230 ms, máximo 7.985 ms, 303.048 buffers en total = 15.950 buffers por llamada.**
-- Mi consulta ad-hoc con literales: **814 ms, 15.047 buffers.**
-
-Mismos datos, mismos bloques leídos, **6-10× el tiempo**. No se lee nada de más: se calcula de más. Y lo que cambia entre las dos no es el SQL, es que en la función el año es un **parámetro en tiempo de ejecución** (`_anio`), y `v_todos` / `v_vend` son variables plpgsql.
-
-Reproducido hoy sustituyendo los literales por un valor que el planificador no puede ver:
+Índices de `ventas_diarias` por separado (14 índices, 160 MB en total):
 
 ```text
-Hash Join (cost rows=10422) (actual rows=262534)      <- 25× de error
-  -> Bitmap Heap Scan on ventas_diarias
-       Recheck: fecha >= make_date((pr.a - 1),1,1)     <- estimado 48.135, real 262.545
-  Join Filter: (pr.todos OR (c.vendedor = pr.vend))    <- no se puede plegar
-Execution Time: 1.205 ms  (y esto solo hasta el CTE ventas)
+idx_vd_doc                        28 MB
+ventas_diarias_pkey               18 MB
+idx_ventas_diarias_fecha_cliente  16 MB
+idx_ventas_diarias_cliente_fecha  15 MB
+idx_vd_ref                        12 MB
+idx_ventas_diarias_referencia     12 MB
+idx_ventas_diarias_familia_fecha  11 MB
+idx_ventas_diarias_marca_fecha    10 MB
+idx_vd_fecha                     7.896 kB
+idx_vd_cliente                   7.216 kB
+idx_vd_marca                     6.512 kB
+idx_vd_familia                   6.144 kB
+idx_vd_canal                     5.600 kB
+idx_vd_operacion                 5.464 kB
 ```
 
-Con literales el planificador estima 263.407 filas y acierta; con el año como parámetro estima 48.135 y se equivoca por 5×, y tras el `GROUP BY` por 25×. Ese error se propaga a `agg` y al `ORDER BY`, y es exactamente el plan que ya vimos la vez anterior: *Nested Loop* con Memoize de 262.545 iteraciones y *Sort* volcando 5,6 MB a disco. Nada de eso consume buffers compartidos extra — de ahí que sean 8 segundos con solo 16.725 buffers.
+Índices de `clientes`: `clientes_pkey` 1.192 kB, `clientes_cod_cliente_key` 792 kB, `idx_clientes_vendedor` 312 kB, `idx_clientes_delegacion` 296 kB, `idx_clientes_ruta` 176 kB.
 
-**Conclusión:** los 465 ms que medí antes eran del CTE `ventas` **con literales**, es decir, de un plan que la función nunca usa. El filtro sargable sí ayudó (permite el *Bitmap Index Scan*), pero no arregla la causa real, que es la **estimación de cardinalidad bajo parámetros** y el plan que se deriva de ella.
+## 2) Parámetros de memoria
 
-### Lo que falta para cerrar el diagnóstico al 100 %
+| Parámetro | Valor |
+|---|---|
+| `shared_buffers` | 28.672 × 8 kB = **224 MB** |
+| `effective_cache_size` | 49.152 × 8 kB = **384 MB** |
+| `work_mem` | **2.184 kB** (2,13 MB) |
+| `maintenance_work_mem` | 32 MB |
+| `max_connections` | 60 |
+| `max_parallel_workers_per_gather` | 1 |
+| `random_page_cost` / `seq_page_cost` | 1.1 / 1.0 |
+| `jit` | off |
+| `track_io_timing` | **off** (no hay tiempos de E/S por consulta) |
 
-Todo lo anterior está medido de forma indirecta: en modo plan no puedo ejecutar `objetivos_seguimiento` (el rol de consulta no tiene `EXECUTE`) ni hacer `SET LOCAL ROLE authenticated`. La prueba definitiva es un único paso de medición en modo build:
+## 3) pg_statio_user_tables (acumulado desde el último reset de estadísticas)
 
-1. Copia temporal de la función instrumentada con `clock_timestamp()` entre secciones (A, B, C, D+E, F), ejecutada bajo `SET LOCAL ROLE authenticated` con tu UUID, y borrada al terminar.
-2. `EXPLAIN (ANALYZE, TIMING OFF, BUFFERS)` del cuerpo con los parámetros reales, para ver el plan que se elige de verdad — con `TIMING OFF` para no repetir el error de medición de este hilo.
+| Tabla | heap_blks_read | heap_blks_hit | % hit | idx_blks_read | idx_blks_hit |
+|---|---|---|---|---|---|
+| `ventas_diarias` | 31.726 | 18.276.002 | **99,83 %** | 22.330 | 49.812.745 |
+| `clientes` | 4.102 | 28.797.470 | 99,99 % | 482 | 46.138.984 |
 
-Eso confirma o desmiente en una sola pasada que el reparto es ~20 ms de todo lo demás y ~7,9 s en `ventas`+`agg`. Sin correcciones hasta tener ese número.
+Es decir, 0,17 % de las lecturas de heap de `ventas_diarias` han ido a disco (y ese contador incluye el arranque en frío histórico). Aviso: `heap_blks_read` cuenta fallos de *shared buffers*, que pueden servirse igualmente de la caché de página del SO, no necesariamente de disco físico.
+
+## 4) y 5) Cinco ejecuciones cronometradas — NO se han podido hacer tal cual
+
+Motivo, tal cual lo devuelve el servidor con el rol de consulta de este entorno:
+
+```text
+ERROR:  permission denied to set role "authenticated"
+ERROR:  permission denied for function objetivos_seguimiento
+```
+
+El rol `supabase_read_only_user` no tiene `EXECUTE` sobre la función (fue parte del endurecimiento de seguridad) ni puede hacer `SET ROLE authenticated`. Para los cinco tiempos reales de la función hace falta modo Build (crear una copia temporal ejecutable, o conceder EXECUTE temporalmente).
+
+Lo que sí se ha podido medir sin cambiar nada: el bloque caro de la función, el CTE `ventas` con la fórmula de `quincena_de` ya inlineada y el mismo rango sargable, ejecutado cinco veces seguidas en la misma sesión (el rol tiene `BYPASSRLS`, así que no filtra por vendedor: lee **más** filas que tu caso, no menos):
+
+```text
+pasada 1:  983,9 ms   (en frío)
+pasada 2:  366,6 ms
+pasada 3:  361,8 ms
+pasada 4:  363,2 ms
+pasada 5:  361,4 ms
+```
+
+Contador de disco medido antes y después de esas cinco pasadas (equivale a lo que pedías en el punto 5, medido entre pasadas calientes):
+
+```text
+antes de la pasada 1:  heap_blks_read = 31.726
+tras la pasada 5:      heap_blks_read = 31.726   (sin cambio)
+heap_blks_hit subió de 18.297.092 a 18.297.148
+```
+
+Cero bloques leídos fuera de `shared_buffers` en las cinco pasadas. La porción de `ventas_diarias` que toca el rango 2025-2026 son ~15.000 bloques (≈120 MB) y se mantuvo residente en los 224 MB de `shared_buffers` durante toda la serie, con otras consultas de fondo corriendo.
+
+Qué no cubre esta medición: no incluye el resto del cuerpo de la función (`agg`, `serie`, `jsonb_agg`, subconsultas finales), ni el filtrado RLS por `vendedor`, ni el plan que se elige con `_anio` como parámetro en tiempo de ejecución en vez de literal.
+
+## 6) Tamaños de instancia por encima del actual
+
+Los 224 MB de `shared_buffers` / 384 MB de `effective_cache_size` / 60 conexiones corresponden al escalón **Micro (1 GB RAM, 2 vCPU compartidas)**. Los escalones superiores y su `shared_buffers` (≈25 % de la RAM; valores de la tabla de cómputo estándar, conviene confirmarlos en la pantalla de cómputo del backend antes de decidir):
+
+| Escalón | RAM | vCPU | shared_buffers aprox. | max_connections aprox. |
+|---|---|---|---|---|
+| Micro (actual) | 1 GB | 2 | 224 MB | 60 |
+| Small | 2 GB | 2 | ~512 MB | 90 |
+| Medium | 4 GB | 2 | ~1 GB | 120 |
+| Large | 8 GB | 2 dedicadas | ~2 GB | 160 |
+| XL | 16 GB | 4 | ~4 GB | 240 |
+| 2XL | 32 GB | 8 | ~8 GB | 380 |
+| 4XL | 64 GB | 16 | ~16 GB | 480 |
+
+A partir de Small, `shared_buffers` (512 MB) supera ya el tamaño total de la base (394 MB).
+
+## Lo que hace falta para cerrar los puntos 4 y 5 al 100 %
+
+Un único paso en modo Build, sin cambios permanentes:
+
+1. Conceder `EXECUTE` temporal (o crear copia `objetivos_seguimiento_tmp`), ejecutar cinco veces bajo `SET LOCAL ROLE authenticated` con tu UUID y `request.jwt.claims`, cronometrando con `clock_timestamp()`.
+2. Leer `heap_blks_read` de `ventas_diarias` antes de cada pasada, no solo entre la 3 y la 4.
+3. Instalar `pg_buffercache` de forma temporal para contar cuántos bloques de `ventas_diarias` quedan residentes justo después de cada pasada — es la prueba directa de la hipótesis de evicción, y ahora mismo no está instalada.
+4. Revertir permisos y extensión al terminar.
