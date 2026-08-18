@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      _snap_margen: {
+        Row: {
+          fase: string | null
+          fn: string | null
+          payload: Json | null
+          usuario: string | null
+        }
+        Insert: {
+          fase?: string | null
+          fn?: string | null
+          payload?: Json | null
+          usuario?: string | null
+        }
+        Update: {
+          fase?: string | null
+          fn?: string | null
+          payload?: Json | null
+          usuario?: string | null
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           created_at: string
