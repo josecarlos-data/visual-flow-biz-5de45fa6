@@ -251,7 +251,7 @@ export default function RutaDetalle() {
               <div key={c.cod_cliente} className={`rounded-lg border bg-card p-4 ${marcado ? "" : "opacity-50"}`}>
                 <div className="flex items-start gap-3">
                   <Checkbox checked={marcado} onCheckedChange={() => toggle(c.cod_cliente)} className="mt-1" />
-                  <Link to={`/clientes/${c.cod_cliente}`} className="min-w-0 flex-1">
+                  <Link to={`/clientes/${c.cod_cliente}?volver=${encodeURIComponent(`/rutas/${codigo}`)}&volverTxt=${encodeURIComponent(`Ruta ${ruta}`)}`} className="min-w-0 flex-1">
                     <p className="flex min-w-0 flex-wrap items-center gap-2">
                       <span className="truncate font-medium">{c.cliente}</span>
                       {c.situacion_etiqueta && (
@@ -303,7 +303,7 @@ export default function RutaDetalle() {
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
-                          <Link to={`/clientes/${c.cod_cliente}`}>
+                          <Link to={`/clientes/${c.cod_cliente}?volver=${encodeURIComponent(`/rutas/${codigo}`)}&volverTxt=${encodeURIComponent(`Ruta ${ruta}`)}`}>
                             <User className="mr-2 h-4 w-4" />Ver ficha
                           </Link>
                         </DropdownMenuItem>

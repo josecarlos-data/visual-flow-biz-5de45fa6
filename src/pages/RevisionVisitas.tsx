@@ -279,7 +279,7 @@ export default function RevisionVisitas() {
                   {badgeValidacion(v.validacion)}
                   {v.cod_cliente && (
                     <Button asChild variant="ghost" size="icon">
-                      <Link to={`/clientes/${v.cod_cliente}`}><ExternalLink className="h-4 w-4" /></Link>
+                      <Link to={`/clientes/${v.cod_cliente}?volver=${encodeURIComponent('/visitas/revision')}&volverTxt=${encodeURIComponent('Revisión de visitas')}`}><ExternalLink className="h-4 w-4" /></Link>
                     </Button>
                   )}
                   <Button size="sm" variant="outline" onClick={() => abrir(v)}>Revisar</Button>

@@ -191,7 +191,7 @@ export default function Agenda() {
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
                     {i + 1}
                   </span>
-                  <Link to={`/clientes/${p.cod_cliente}`} className="min-w-0 flex-1">
+                  <Link to={`/clientes/${p.cod_cliente}?volver=${encodeURIComponent('/agenda')}&volverTxt=${encodeURIComponent('Agenda')}`} className="min-w-0 flex-1">
                     <p className={`truncate font-medium ${hecha ? "text-muted-foreground line-through" : ""}`}>
                       {c?.cliente ?? `Cliente #${p.cod_cliente}`}
                     </p>
