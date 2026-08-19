@@ -116,6 +116,8 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
+            <Route path="/register" element={<Navigate to="/auth" replace />} />
+            <Route path="/auth/register" element={<Navigate to="/auth" replace />} />
             <Route path="/pending" element={<PendingRoute><PendingApproval /></PendingRoute>} />
             <Route path="/" element={<ProtectedRoute dashboardKey="ventas"><Ventas /></ProtectedRoute>} />
             <Route path="/ventas-historico" element={<ProtectedRoute dashboardKey="ventas"><Dashboard /></ProtectedRoute>} />
