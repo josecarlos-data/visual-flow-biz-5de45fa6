@@ -406,6 +406,17 @@ Deno.serve(async (req) => {
   const key = Deno.env.get("LOVABLE_API_KEY");
   if (!key) return json({ error: "Falta la configuración de IA" }, 500);
 
+  // Solo usuarios autenticados: evita consumo anónimo de créditos de IA.
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!authHeader.startsWith("Bearer ")) return json({ error: "No autenticado" }, 401);
+  const userClient = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: authHeader } } },
+  );
+  const { data: { user }, error: authError } = await userClient.auth.getUser();
+  if (authError || !user) return json({ error: "No autenticado" }, 401);
+
   try {
     const tipo = req.headers.get("content-type") ?? "";
 
