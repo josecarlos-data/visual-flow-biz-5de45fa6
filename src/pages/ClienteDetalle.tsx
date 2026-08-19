@@ -21,9 +21,10 @@ import { toast } from "@/hooks/use-toast";
 import {
   useCliente, useClienteVentas, useClienteKpis, useClienteProductos, useClienteMix,
   useClienteVisitas, useMotivos, usePuedeVerMargen, useSituacionesVigentes, useClienteDocumentos, useVisitaBloques,
-  etiquetaCategoria, eur, num, eurK, fechaCorta,
+  etiquetaCategoria, eur, num, eurK, fechaCorta, type DocumentoCliente,
 } from "@/hooks/useCrm";
 import { ClientePerfilTab } from "@/components/ClientePerfilTab";
+import { DocumentoLineasDialog } from "@/components/DocumentoLineasDialog";
 
 interface Insights {
   resumen: string;
@@ -63,6 +64,8 @@ export default function ClienteDetalle() {
   const situacion = codNum != null ? situaciones.get(codNum) : undefined;
   const [insights, setInsights] = useState<Insights | null>(null);
   const [anioProd, setAnioProd] = useState<string>("todos");
+  const [docSeleccionado, setDocSeleccionado] = useState<DocumentoCliente | null>(null);
+  const [dialogoLineasOpen, setDialogoLineasOpen] = useState(false);
   const { data: productos, isLoading: cargandoProductos } = useClienteProductos(
     codNum,
     anioProd === "todos" ? null : Number(anioProd),
@@ -497,19 +500,26 @@ export default function ClienteDetalle() {
                       <TableHead>Documento</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Canal</TableHead>
-                      <TableHead>Vendedor</TableHead>
+                      <TableHead>Registrado por</TableHead>
                       <TableHead className="text-right">Líneas</TableHead>
                       <TableHead className="text-right">Importe</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {documentos!.map((d) => (
-                      <TableRow key={d.id_documento}>
+                      <TableRow
+                        key={d.id_documento}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => {
+                          setDocSeleccionado(d);
+                          setDialogoLineasOpen(true);
+                        }}
+                      >
                         <TableCell className="whitespace-nowrap">{fechaCorta(d.fecha)}{d.hora ? ` ${d.hora.slice(0, 5)}` : ""}</TableCell>
                         <TableCell className="font-mono text-xs">{d.id_documento}</TableCell>
                         <TableCell>{d.operacion ?? d.tipo_documento ?? "—"}</TableCell>
                         <TableCell>{d.canal ?? "—"}</TableCell>
-                        <TableCell className="truncate">{d.vendedor_linea ?? "—"}</TableCell>
+                        <TableCell className="truncate">{d.registrado_por ?? "—"}</TableCell>
                         <TableCell className="text-right">{num(d.lineas)}</TableCell>
                         <TableCell className={`text-right font-medium ${d.importe < 0 ? "text-destructive" : ""}`}>{eur(d.importe, 2)}</TableCell>
                       </TableRow>
@@ -519,6 +529,13 @@ export default function ClienteDetalle() {
               )}
             </CardContent>
           </Card>
+
+          <DocumentoLineasDialog
+            open={dialogoLineasOpen}
+            onOpenChange={setDialogoLineasOpen}
+            codCliente={codNum!}
+            documento={docSeleccionado}
+          />
         </TabsContent>
 
         <TabsContent value="visitas" className="space-y-3">
