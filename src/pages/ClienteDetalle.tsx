@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeft, Phone, Mail, MapPin, Route as RouteIcon, Sparkles, Loader2,
@@ -64,6 +64,7 @@ export default function ClienteDetalle() {
   const situacion = codNum != null ? situaciones.get(codNum) : undefined;
   const [insights, setInsights] = useState<Insights | null>(null);
   const [anioProd, setAnioProd] = useState<string>("todos");
+  const anioProdInicializado = useRef(false);
   const [docSeleccionado, setDocSeleccionado] = useState<DocumentoCliente | null>(null);
   const [dialogoLineasOpen, setDialogoLineasOpen] = useState(false);
   const { data: productos, isLoading: cargandoProductos } = useClienteProductos(
@@ -100,6 +101,14 @@ export default function ClienteDetalle() {
     () => Array.from(new Set((ventas ?? []).map((v) => v.anio))).sort((a, b) => b - a),
     [ventas],
   );
+
+  useEffect(() => {
+    if (anios.length > 0 && !anioProdInicializado.current) {
+      setAnioProd(String(anios[0]));
+      anioProdInicializado.current = true;
+    }
+  }, [anios]);
+
   const anioActual = anios[0] ?? new Date().getFullYear();
   const anioPrevio = anioActual - 1;
 

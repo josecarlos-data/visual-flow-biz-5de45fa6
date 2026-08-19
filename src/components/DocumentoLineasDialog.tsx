@@ -124,11 +124,14 @@ export function DocumentoLineasDialog({
           <span className="text-muted-foreground">
             {lineas?.length ?? 0} líneas · {num(unidadesTotales)} unidades
           </span>
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">Total documento</span>
-            <span className={`text-lg font-semibold tabular-nums ${esNegativo ? "text-destructive" : ""}`}>
-              {eur(total, 2)}
-            </span>
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">Total documento</span>
+              <span className={`text-lg font-semibold tabular-nums ${esNegativo ? "text-destructive" : ""}`}>
+                {eur(total, 2)}
+              </span>
+            </div>
+            <span className="text-xs text-muted-foreground">Importes sin IVA (base imponible)</span>
           </div>
         </div>
       </DialogContent>
