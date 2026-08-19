@@ -21,7 +21,7 @@ import { toast } from "@/hooks/use-toast";
 import {
   useCliente, useClienteVentas, useClienteKpis, useClienteProductos, useClienteMix,
   useClienteVisitas, useMotivos, usePuedeVerMargen, useSituacionesVigentes, useClienteDocumentos, useVisitaBloques,
-  etiquetaCategoria, eur, num, eurK, fechaCorta,
+  etiquetaCategoria, eur, num, eurK, fechaCorta, type DocumentoCliente,
 } from "@/hooks/useCrm";
 import { ClientePerfilTab } from "@/components/ClientePerfilTab";
 import { DocumentoLineasDialog } from "@/components/DocumentoLineasDialog";
