@@ -64,6 +64,8 @@ export default function ClienteDetalle() {
   const situacion = codNum != null ? situaciones.get(codNum) : undefined;
   const [insights, setInsights] = useState<Insights | null>(null);
   const [anioProd, setAnioProd] = useState<string>("todos");
+  const [docSeleccionado, setDocSeleccionado] = useState<DocumentoCliente | null>(null);
+  const [dialogoLineasOpen, setDialogoLineasOpen] = useState(false);
   const { data: productos, isLoading: cargandoProductos } = useClienteProductos(
     codNum,
     anioProd === "todos" ? null : Number(anioProd),
