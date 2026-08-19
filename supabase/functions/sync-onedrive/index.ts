@@ -166,7 +166,33 @@ async function syncDataset(admin: ReturnType<typeof createClient>, cfg: Row) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+  // --- Autenticación: solo administradores autenticados pueden lanzar la sincronización ---
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!authHeader.startsWith("Bearer ")) return json({ error: "No autenticado" }, 401);
+
+  const userClient = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: authHeader } } },
+  );
+  const { data: { user }, error: authError } = await userClient.auth.getUser();
+  if (authError || !user) return json({ error: "No autenticado" }, 401);
+
+  const { data: roles } = await admin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", user.id)
+    .eq("role", "admin")
+    .maybeSingle();
+  if (!roles) return json({ error: "Acceso restringido a administradores" }, 403);
 
   try {
     const body = await req.json().catch(() => ({}));
