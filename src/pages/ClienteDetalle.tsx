@@ -101,6 +101,14 @@ export default function ClienteDetalle() {
     () => Array.from(new Set((ventas ?? []).map((v) => v.anio))).sort((a, b) => b - a),
     [ventas],
   );
+
+  useEffect(() => {
+    if (anios.length > 0 && !anioProdInicializado.current) {
+      setAnioProd(String(anios[0]));
+      anioProdInicializado.current = true;
+    }
+  }, [anios]);
+
   const anioActual = anios[0] ?? new Date().getFullYear();
   const anioPrevio = anioActual - 1;
 
