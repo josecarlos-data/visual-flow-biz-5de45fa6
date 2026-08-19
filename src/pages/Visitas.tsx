@@ -132,7 +132,7 @@ export default function Visitas() {
               </>
             );
             return v.cod_cliente != null ? (
-              <Link key={v.id} to={`/clientes/${v.cod_cliente}`} className="block rounded-lg border bg-card p-4 hover:bg-accent">
+              <Link key={v.id} to={`/clientes/${v.cod_cliente}?volver=${encodeURIComponent('/visitas')}&volverTxt=${encodeURIComponent('Visitas')}`} className="block rounded-lg border bg-card p-4 hover:bg-accent">
                 {contenido}
               </Link>
             ) : (

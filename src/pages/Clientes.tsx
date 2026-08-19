@@ -128,7 +128,7 @@ export default function Clientes() {
             {filtered.slice(0, 300).map((c) => (
               <Link
                 key={c.cod_cliente}
-                to={`/clientes/${c.cod_cliente}`}
+                to={`/clientes/${c.cod_cliente}?volver=${encodeURIComponent('/clientes')}&volverTxt=${encodeURIComponent('Clientes')}`}
                 className="block rounded-lg border bg-card p-4 transition-colors hover:bg-accent"
               >
                 <div className="flex items-start justify-between gap-3">

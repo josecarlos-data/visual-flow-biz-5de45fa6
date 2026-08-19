@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, Phone, Mail, MapPin, Route as RouteIcon, Sparkles, Loader2,
   TrendingUp, TrendingDown, Package, Plus, AlertTriangle, Target, MessageSquareQuote,
@@ -48,7 +48,13 @@ function Dato({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default function ClienteDetalle() {
   const { cod } = useParams();
+  const [searchParams] = useSearchParams();
   const codNum = cod ? Number(cod) : null;
+
+  const volverRaw = searchParams.get("volver");
+  const volverTxtRaw = searchParams.get("volverTxt");
+  const volver = volverRaw && volverRaw.startsWith("/") && !volverRaw.startsWith("//") ? volverRaw : "/clientes";
+  const volverTxt = volverTxtRaw && volverTxtRaw.trim() ? decodeURIComponent(volverTxtRaw) : "Clientes";
 
   const { data: cliente, isLoading } = useCliente(codNum);
   const { data: ventas } = useClienteVentas(codNum);
@@ -175,8 +181,8 @@ export default function ClienteDetalle() {
 
   return (
     <div className="space-y-4">
-      <Link to="/clientes" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" /> Clientes
+      <Link to={volver} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="h-4 w-4" /> {volverTxt}
       </Link>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
