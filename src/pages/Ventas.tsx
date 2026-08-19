@@ -442,7 +442,7 @@ export default function Ventas() {
           <CardHeader><CardTitle>Top 10 clientes {anioActual}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
             {topClientes.map((c, i) => (
-              <Link key={c.cod_cliente} to={`/clientes/${c.cod_cliente}?volver=${encodeURIComponent('/ventas')}&volverTxt=${encodeURIComponent('Ventas')}`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
+              <Link key={c.cod_cliente} to={`/clientes/${c.cod_cliente}?volver=${encodeURIComponent('/')}&volverTxt=${encodeURIComponent('Ventas')}`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
                 <span className="flex min-w-0 items-center gap-2">
                   <span className="w-5 text-xs text-muted-foreground">{i + 1}</span>
                   <span className="truncate">{c.cliente}</span>
@@ -515,7 +515,7 @@ function FilaAlerta({ a, detalle, badge }: { a: AlertaRow; detalle: string; badg
   const atenuada = a.situacion_efecto === "justificada" || a.situacion_efecto === "ocultar";
   return (
     <Link
-      to={`/clientes/${a.cod_cliente}?volver=${encodeURIComponent('/ventas')}&volverTxt=${encodeURIComponent('Ventas')}`}
+      to={`/clientes/${a.cod_cliente}?volver=${encodeURIComponent('/')}&volverTxt=${encodeURIComponent('Ventas')}`}
       className={`flex items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent ${atenuada ? "opacity-70" : ""}`}
     >
       <span className="min-w-0">
