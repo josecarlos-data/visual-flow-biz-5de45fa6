@@ -24,6 +24,7 @@ import {
   etiquetaCategoria, eur, num, eurK, fechaCorta,
 } from "@/hooks/useCrm";
 import { ClientePerfilTab } from "@/components/ClientePerfilTab";
+import { DocumentoLineasDialog } from "@/components/DocumentoLineasDialog";
 
 interface Insights {
   resumen: string;
