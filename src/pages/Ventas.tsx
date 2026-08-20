@@ -449,7 +449,14 @@ export default function Ventas() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle>Top 10 clientes {anioActual}</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Top 10 clientes {anioActual}</CardTitle>
+            {shareTopClientes !== null && (
+              <CardDescription>
+                Estos {topClientes.length} clientes representan el {fmtShare(shareTopClientes)} de tu cartera
+              </CardDescription>
+            )}
+          </CardHeader>
           <CardContent className="space-y-2">
             {topClientes.map((c, i) => (
               <Link key={c.cod_cliente} to={`/clientes/${c.cod_cliente}?volver=${encodeURIComponent('/')}&volverTxt=${encodeURIComponent('Ventas')}`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
@@ -459,6 +466,11 @@ export default function Ventas() {
                 </span>
                 <span className="shrink-0 text-right">
                   <span className="font-medium">{eur(c.importe)}</span>
+                  {shareTopClientes !== null && (
+                    <span className="block text-xs text-muted-foreground">
+                      {fmtShare((c.importe / kpiActual!.importe) * 100)} de cartera
+                    </span>
+                  )}
                   {verMargen && c.importe > 0 && (
                     <span className="ml-2 text-xs text-muted-foreground">{((c.margen / c.importe) * 100).toFixed(1)}%</span>
                   )}
@@ -468,6 +480,7 @@ export default function Ventas() {
             {topClientes.length === 0 && <Vacio />}
           </CardContent>
         </Card>
+
 
         <Card>
           <CardHeader><CardTitle>Top familias {anioActual}</CardTitle></CardHeader>
