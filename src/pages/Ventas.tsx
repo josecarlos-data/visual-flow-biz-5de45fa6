@@ -174,6 +174,14 @@ export default function Ventas() {
     kpiActual && kpiPrevio && kpiPrevio.ticket_medio > 0
       ? ((kpiActual.ticket_medio - kpiPrevio.ticket_medio) / kpiPrevio.ticket_medio) * 100
       : null;
+  // Tasa de devolución: importe abonado sobre la venta bruta (neto + abonos).
+  const tasaDevolucion = (() => {
+    if (!kpiActual) return 0;
+    const abonos = Math.abs(kpiActual.importe_abonos);
+    const bruto = kpiActual.importe + abonos;
+    return bruto > 0 ? (abonos / bruto) * 100 : 0;
+  })();
+
   // Peso de los clientes listados sobre la cartera total del año (sin nuevas consultas).
   const shareTopClientes =
     kpiActual && kpiActual.importe > 0
@@ -181,6 +189,7 @@ export default function Ventas() {
       : null;
 
   const fmtShare = (v: number) => `${v.toFixed(1).replace(".", ",")} %`;
+
 
 
 
