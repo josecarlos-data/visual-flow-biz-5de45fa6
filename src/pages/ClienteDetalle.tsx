@@ -600,8 +600,8 @@ export default function ClienteDetalle() {
                         </p>
                       ))
                     )}
-                    {v.observaciones && <p className="whitespace-pre-wrap text-sm">{v.observaciones}</p>}
-                    {(v.transcripcion || (v.observaciones_original && v.observaciones_original !== v.observaciones)) && (
+                    {bloques.length === 0 && v.observaciones && <p className="whitespace-pre-wrap text-sm">{v.observaciones}</p>}
+                    {bloques.length > 0 && (v.transcripcion || v.observaciones_original) && (
                       <Collapsible>
                         <CollapsibleTrigger className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
                           <span>Ver texto original</span>
