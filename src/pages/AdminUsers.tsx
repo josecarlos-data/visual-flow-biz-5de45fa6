@@ -40,9 +40,10 @@ export default function AdminUsers() {
 
   const fetchData = async () => {
     setLoading(true);
-    const [profilesRes, clientesRes, dashboardsRes] = await Promise.all([
+    const [profilesRes, vendedoresRes, delegacionesRes, dashboardsRes] = await Promise.all([
       supabase.from("profiles").select("user_id, full_name, email, employee_code, is_approved, delegacion, ver_margen"),
-      supabase.from("clientes").select("vendedor, delegacion"),
+      supabase.rpc("get_distinct_vendedores"),
+      supabase.rpc("get_distinct_delegaciones"),
       supabase
         .from("dashboards" as any)
         .select("key, name, sort_order, is_active")
@@ -51,18 +52,15 @@ export default function AdminUsers() {
     ]);
 
     const profiles = profilesRes.data ?? [];
-    const clientes = clientesRes.data ?? [];
     const catalog = (((dashboardsRes.data as any[]) ?? []) as DashboardCatalogItem[]).map((d) => ({
       key: d.key,
       name: d.name,
     }));
     setDashboardCatalog(catalog);
 
-    // Extract unique vendedores and delegaciones
-    const uniqueVendedores = [...new Set(clientes.map((c) => c.vendedor).filter(Boolean) as string[])].sort();
-    const uniqueDelegaciones = [...new Set(clientes.map((c) => c.delegacion).filter(Boolean) as string[])].sort();
-    setVendedores(uniqueVendedores);
-    setDelegaciones(uniqueDelegaciones);
+    setVendedores((vendedoresRes.data ?? []).map((d: { vendedor: string }) => d.vendedor));
+    setDelegaciones((delegacionesRes.data ?? []).map((d: { delegacion: string }) => d.delegacion));
+
 
     const userIds = profiles.map((p) => p.user_id);
     const [rolesRes, accessRes] = await Promise.all([
