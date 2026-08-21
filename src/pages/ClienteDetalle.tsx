@@ -3,7 +3,7 @@ import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, Phone, Mail, MapPin, Route as RouteIcon, Sparkles, Loader2,
   TrendingUp, TrendingDown, Package, Plus, AlertTriangle, Target, MessageSquareQuote,
-  Truck, User, Info,
+  Truck, User, Info, ChevronDown,
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, Legend,
 } from "recharts";
@@ -21,10 +22,11 @@ import { toast } from "@/hooks/use-toast";
 import {
   useCliente, useClienteVentas, useClienteKpis, useClienteProductos, useClienteMix,
   useClienteVisitas, useMotivos, usePuedeVerMargen, useSituacionesVigentes, useClienteDocumentos, useVisitaBloques,
-  etiquetaCategoria, eur, num, eurK, fechaCorta, type DocumentoCliente,
+  etiquetaCategoria, eur, num, eurK, fechaCorta, type DocumentoCliente, type Visita,
 } from "@/hooks/useCrm";
 import { ClientePerfilTab } from "@/components/ClientePerfilTab";
 import { DocumentoLineasDialog } from "@/components/DocumentoLineasDialog";
+
 
 interface Insights {
   resumen: string;
@@ -599,7 +601,29 @@ export default function ClienteDetalle() {
                       ))
                     )}
                     {v.observaciones && <p className="whitespace-pre-wrap text-sm">{v.observaciones}</p>}
+                    {(v.transcripcion || (v.observaciones_original && v.observaciones_original !== v.observaciones)) && (
+                      <Collapsible>
+                        <CollapsibleTrigger className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                          <span>Ver texto original</span>
+                          <ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-180" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="mt-2 space-y-1.5">
+                          <p className="text-xs font-medium text-muted-foreground">
+                            {v.transcripcion ? "Transcripción original" : "Texto original de Gespromo"}
+                          </p>
+                          <p className="whitespace-pre-wrap rounded-md border bg-muted/40 p-2 text-xs text-muted-foreground">
+                            {v.transcripcion || v.observaciones_original}
+                          </p>
+                          {(v.analisis_modelo || v.analisis_prompt_version) && (
+                            <p className="text-[11px] text-muted-foreground">
+                              Analizada con {v.analisis_modelo ?? "—"} · {v.analisis_prompt_version ?? "—"}
+                            </p>
+                          )}
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )}
                     {v.origen === "gespromo" && <Badge variant="outline" className="text-xs">Importada de Gespromo</Badge>}
+
                   </CardContent>
                 </Card>
               );
