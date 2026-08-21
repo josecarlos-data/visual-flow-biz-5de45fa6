@@ -12,8 +12,8 @@ Cambios en `src/pages/ClienteDetalle.tsx` (pestaña `TabsContent value="visitas"
    - Si `bloques.length === 0`:
      - Renderizar `v.observaciones` como en la versión actual.
      - No renderizar el `Collapsible` en absoluto: sin análisis estructurado no hay nada que contrastar.
-2. Mantener la lógica del `Collapsible` sin cambios:
-   - Solo renderizar si hay contenido original: `v.transcripcion` con valor, o `v.observaciones_original` con valor distinto de `v.observaciones`.
+2. Mantener la lógica del `Collapsible` sin cambios, salvo la condición de renderizado:
+   - Renderizar el `Collapsible` si existe contenido original: `v.transcripcion` con valor, o `v.observaciones_original` con valor. Ya no se compara con `v.observaciones` porque, tras el punto 1, `v.observaciones` no se pinta cuando hay bloques, por lo que la duplicación que evitaba la comparación ya no puede producirse.
    - Etiquetas: "Transcripción original" si existe `v.transcripcion`; si no, "Texto original de Gespromo".
    - Conservar el estilo exacto y la trazabilidad de modelo/prompt.
 
