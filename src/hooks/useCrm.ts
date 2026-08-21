@@ -86,6 +86,7 @@ export interface Visita {
   user_id: string | null;
   transcripcion: string | null;
   observaciones: string | null;
+  observaciones_original: string | null;
   campos: Record<string, unknown>;
   estado: string;
   origen: string;
@@ -93,6 +94,7 @@ export interface Visita {
   analisis_prompt_version: string | null;
   created_at: string;
 }
+
 
 
 export interface Planificada {
