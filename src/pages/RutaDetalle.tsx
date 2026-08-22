@@ -66,6 +66,7 @@ export default function RutaDetalle() {
   const { user } = useAuth();
   const [soloActivos, setSoloActivos] = useState(true);
   const { data: clientes, isLoading } = useRutaClientes(ruta, soloActivos);
+  useScrollRestore(`ruta:${ruta}`, !isLoading);
   const planificar = usePlanificarRuta();
 
   const [orden, setOrden] = useState<Orden>("ventas");
