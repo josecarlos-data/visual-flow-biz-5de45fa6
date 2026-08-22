@@ -11,7 +11,7 @@ export const DATASETS: DatasetModule<any>[] = [
   maestroIsiDataset,
   visitasHistoricoDataset,
   bloquesExtraccionDataset,
-  comprasDataset,
+  
 ];
 
 export type { DatasetModule, UploadResult, UploadStageResult, DatasetOption, SummaryItem, RejectionRow } from "./types";
