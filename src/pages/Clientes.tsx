@@ -18,6 +18,7 @@ export default function Clientes() {
   const { mapa: situaciones } = useSituacionesVigentes();
   const [q, setQ] = useState("");
   const [ruta, setRuta] = useState("todas");
+  useScrollRestore("clientes", !isLoading);
 
   const rutas = useMemo(() => {
     const s = new Set<string>();
