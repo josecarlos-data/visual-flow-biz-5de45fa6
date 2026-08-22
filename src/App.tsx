@@ -10,7 +10,7 @@ import Auth from "./pages/Auth";
 import PendingApproval from "./pages/PendingApproval";
 import Ventas from "./pages/Ventas";
 import Dashboard from "./pages/Dashboard";
-import Compras from "./pages/Compras";
+
 import Clientes from "./pages/Clientes";
 import ClienteDetalle from "./pages/ClienteDetalle";
 import Visitas from "./pages/Visitas";
