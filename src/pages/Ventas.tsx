@@ -56,6 +56,7 @@ const num = (v: unknown) => Number(v ?? 0);
 export default function Ventas() {
   const { verMargen } = useAuth();
   const [loading, setLoading] = useState(true);
+  useScrollRestore("ventas", !loading);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [mensual, setMensual] = useState<MensualRow[]>([]);
   const [kpis, setKpis] = useState<KpiRow[]>([]);
