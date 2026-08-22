@@ -483,39 +483,6 @@ export type Database = {
         }
         Relationships: []
       }
-      compras: {
-        Row: {
-          categoria: string | null
-          created_at: string
-          fecha: string
-          id: string
-          importe: number
-          proveedor: string
-          referencia: string
-          updated_at: string
-        }
-        Insert: {
-          categoria?: string | null
-          created_at?: string
-          fecha: string
-          id?: string
-          importe?: number
-          proveedor: string
-          referencia: string
-          updated_at?: string
-        }
-        Update: {
-          categoria?: string | null
-          created_at?: string
-          fecha?: string
-          id?: string
-          importe?: number
-          proveedor?: string
-          referencia?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       dashboards: {
         Row: {
           created_at: string
