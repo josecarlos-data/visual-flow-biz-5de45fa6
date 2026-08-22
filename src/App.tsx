@@ -10,7 +10,7 @@ import Auth from "./pages/Auth";
 import PendingApproval from "./pages/PendingApproval";
 import Ventas from "./pages/Ventas";
 import Dashboard from "./pages/Dashboard";
-import Compras from "./pages/Compras";
+
 import Clientes from "./pages/Clientes";
 import ClienteDetalle from "./pages/ClienteDetalle";
 import Visitas from "./pages/Visitas";
@@ -121,7 +121,7 @@ const App = () => (
             <Route path="/pending" element={<PendingRoute><PendingApproval /></PendingRoute>} />
             <Route path="/" element={<ProtectedRoute dashboardKey="ventas"><Ventas /></ProtectedRoute>} />
             <Route path="/ventas-historico" element={<ProtectedRoute dashboardKey="ventas"><Dashboard /></ProtectedRoute>} />
-            <Route path="/compras" element={<ProtectedRoute dashboardKey="compras"><Compras /></ProtectedRoute>} />
+            
             <Route path="/clientes" element={<ProtectedRoute dashboardKey="clientes"><Clientes /></ProtectedRoute>} />
             <Route path="/clientes/:cod" element={<ProtectedRoute dashboardKey="clientes"><ClienteDetalle /></ProtectedRoute>} />
             <Route path="/visitas" element={<ProtectedRoute dashboardKey="visitas"><Visitas /></ProtectedRoute>} />

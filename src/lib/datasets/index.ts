@@ -1,5 +1,5 @@
 import { maestroIsiDataset } from "./maestroIsi";
-import { comprasDataset } from "./compras";
+
 import { visitasHistoricoDataset } from "./visitasHistorico";
 import { bloquesExtraccionDataset } from "./bloquesExtraccion";
 import type { DatasetModule } from "./types";
@@ -11,7 +11,7 @@ export const DATASETS: DatasetModule<any>[] = [
   maestroIsiDataset,
   visitasHistoricoDataset,
   bloquesExtraccionDataset,
-  comprasDataset,
+  
 ];
 
 export type { DatasetModule, UploadResult, UploadStageResult, DatasetOption, SummaryItem, RejectionRow } from "./types";
