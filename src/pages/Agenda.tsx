@@ -16,6 +16,7 @@ import {
   useReordenarAgenda,
   hoyISO,
 } from "@/hooks/useCrm";
+import { useScrollRestore } from "@/hooks/useScrollRestore";
 import { TramosMapaDialog } from "@/components/TramosMapaDialog";
 import { optimizarRuta, posicionActual, tramos, distanciaTotalKm } from "@/lib/maps";
 
