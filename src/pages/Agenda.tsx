@@ -31,6 +31,7 @@ export default function Agenda() {
   const { user } = useAuth();
   const [fecha, setFecha] = useState(hoyISO());
   const { data: plan } = useAgenda(fecha, fecha);
+  useScrollRestore("agenda", !!plan);
   const { add, update, remove } = useAgendaMutations();
   const { data: clientes } = useClientes();
   const [open, setOpen] = useState(false);
