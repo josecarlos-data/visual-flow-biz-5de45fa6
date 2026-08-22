@@ -17,6 +17,7 @@ import {
   useSituacionesMutations, useVisitaBloques, useBloqueMutations, useReanalizarVisita, fechaCorta, hoyISO,
   type Visita, type VisitaBloque,
 } from "@/hooks/useCrm";
+import { useScrollRestore } from "@/hooks/useScrollRestore";
 
 const ESTADOS = [
   { key: "pendiente", label: "Pendientes", icon: Clock },
