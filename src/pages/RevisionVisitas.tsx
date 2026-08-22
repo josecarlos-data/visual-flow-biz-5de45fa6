@@ -54,6 +54,7 @@ export default function RevisionVisitas() {
   const [params, setParams] = useSearchParams();
   const origen = (params.get("origen") ?? "app") as "app" | "gespromo" | "todas";
   const { data: visitas, isLoading } = useVisitasRevision(origen);
+  useScrollRestore("revision", !isLoading);
   const { data: motivos } = useMotivos();
   const { data: clientes } = useClientes(false, "alfabetico");
   const { revisar } = useRevisionMutations();
