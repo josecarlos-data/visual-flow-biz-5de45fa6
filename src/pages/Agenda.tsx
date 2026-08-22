@@ -16,6 +16,7 @@ import {
   useReordenarAgenda,
   hoyISO,
 } from "@/hooks/useCrm";
+import { useScrollRestore } from "@/hooks/useScrollRestore";
 import { TramosMapaDialog } from "@/components/TramosMapaDialog";
 import { optimizarRuta, posicionActual, tramos, distanciaTotalKm } from "@/lib/maps";
 
@@ -30,6 +31,7 @@ export default function Agenda() {
   const { user } = useAuth();
   const [fecha, setFecha] = useState(hoyISO());
   const { data: plan } = useAgenda(fecha, fecha);
+  useScrollRestore("agenda", !!plan);
   const { add, update, remove } = useAgendaMutations();
   const { data: clientes } = useClientes();
   const [open, setOpen] = useState(false);

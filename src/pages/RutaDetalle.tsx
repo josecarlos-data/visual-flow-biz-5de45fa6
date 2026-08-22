@@ -40,6 +40,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { SituacionBadge } from "@/components/SituacionBadge";
 import { TramosMapaDialog } from "@/components/TramosMapaDialog";
 import { useRutaClientes, usePlanificarRuta, tendencia, eur, fechaCorta, hoyISO, type RutaCliente } from "@/hooks/useCrm";
+import { useScrollRestore } from "@/hooks/useScrollRestore";
 import { urlCliente, tramos, tieneGeo, optimizarRuta, posicionActual, distanciaTotalKm, type Punto } from "@/lib/maps";
 
 
@@ -65,6 +66,7 @@ export default function RutaDetalle() {
   const { user } = useAuth();
   const [soloActivos, setSoloActivos] = useState(true);
   const { data: clientes, isLoading } = useRutaClientes(ruta, soloActivos);
+  useScrollRestore(`ruta:${ruta}`, !isLoading);
   const planificar = usePlanificarRuta();
 
   const [orden, setOrden] = useState<Orden>("ventas");

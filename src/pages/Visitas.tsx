@@ -8,9 +8,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useVisitas, useClientes, useMotivos, useVisitaBloques, fechaCorta } from "@/hooks/useCrm";
+import { useScrollRestore } from "@/hooks/useScrollRestore";
 
 export default function Visitas() {
   const { data: visitas, isLoading } = useVisitas(300);
+  useScrollRestore("visitas", !isLoading);
   const { data: clientes } = useClientes(false);
   const { data: motivos } = useMotivos();
   const [q, setQ] = useState("");

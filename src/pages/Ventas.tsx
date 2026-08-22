@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { eur } from "@/hooks/useCrm";
+import { useScrollRestore } from "@/hooks/useScrollRestore";
 import { getYearColor } from "@/lib/yearColors";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -56,6 +57,7 @@ const num = (v: unknown) => Number(v ?? 0);
 export default function Ventas() {
   const { verMargen } = useAuth();
   const [loading, setLoading] = useState(true);
+  useScrollRestore("ventas", !loading);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [mensual, setMensual] = useState<MensualRow[]>([]);
   const [kpis, setKpis] = useState<KpiRow[]>([]);
