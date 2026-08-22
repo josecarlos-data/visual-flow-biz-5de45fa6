@@ -40,6 +40,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { SituacionBadge } from "@/components/SituacionBadge";
 import { TramosMapaDialog } from "@/components/TramosMapaDialog";
 import { useRutaClientes, usePlanificarRuta, tendencia, eur, fechaCorta, hoyISO, type RutaCliente } from "@/hooks/useCrm";
+import { useScrollRestore } from "@/hooks/useScrollRestore";
 import { urlCliente, tramos, tieneGeo, optimizarRuta, posicionActual, distanciaTotalKm, type Punto } from "@/lib/maps";
 
 
