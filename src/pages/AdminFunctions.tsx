@@ -479,6 +479,31 @@ export default function AdminFunctions() {
         </p>
       </div>
 
+      <Card>
+        <CardContent className="flex flex-col items-start justify-between gap-3 py-4 sm:flex-row sm:items-center">
+          <div>
+            <p className="text-sm font-medium">Vista de documentos</p>
+            <p className="text-xs text-muted-foreground">
+              Refresca el resumen de documentos tras cargar nuevas ventas. Puede tardar unos segundos.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refreshDocumentos}
+            disabled={refreshingDocs}
+            className="shrink-0 gap-1"
+          >
+            {refreshingDocs ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            Refrescar documentos
+          </Button>
+        </CardContent>
+      </Card>
+
       <AppSettingsCard />
 
       {loading ? (
