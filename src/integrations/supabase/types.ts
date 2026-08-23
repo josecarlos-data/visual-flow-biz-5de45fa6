@@ -1624,6 +1624,26 @@ export type Database = {
       }
     }
     Views: {
+      documentos_resumen: {
+        Row: {
+          almacen: string | null
+          anio: number | null
+          canal: string | null
+          cliente: string | null
+          cod_cliente: number | null
+          fecha: string | null
+          hora: string | null
+          id_documento: string | null
+          importe: number | null
+          lineas: number | null
+          margen: number | null
+          operacion: string | null
+          registrado_por: string | null
+          tipo_documento: string | null
+          vendedor_linea: string | null
+        }
+        Relationships: []
+      }
       v_cliente_perfil_vigente: {
         Row: {
           atributo_key: string | null
@@ -2181,6 +2201,7 @@ export type Database = {
       puede_ver_margen: { Args: { _user_id: string }; Returns: boolean }
       quincena_corte: { Args: { _anio: number }; Returns: number }
       quincena_de: { Args: { _f: string }; Returns: number }
+      refrescar_documentos_resumen: { Args: never; Returns: undefined }
       refrescar_resumenes_admin: { Args: never; Returns: undefined }
       refrescar_resumenes_ventas: { Args: never; Returns: undefined }
       registrar_geo_cliente: {
