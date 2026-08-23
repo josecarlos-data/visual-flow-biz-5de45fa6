@@ -419,6 +419,7 @@ function DocCard({ titulo, doc }: { titulo: string; doc: Doc }) {
 export default function AdminFunctions() {
   const [functions, setFunctions] = useState<SystemFunction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshingDocs, setRefreshingDocs] = useState(false);
 
   useEffect(() => {
     loadFunctions();
@@ -436,6 +437,24 @@ export default function AdminFunctions() {
       setFunctions((data as SystemFunction[]) || []);
     }
     setLoading(false);
+  };
+
+  const refreshDocumentos = async () => {
+    setRefreshingDocs(true);
+    const { error } = await supabase.rpc("refrescar_documentos_resumen" as never);
+    setRefreshingDocs(false);
+    if (error) {
+      toast({
+        title: "Error al refrescar documentos",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Documentos actualizados",
+        description: "La vista de documentos se ha refrescado con los últimos datos.",
+      });
+    }
   };
 
   const handleSave = async (id: string, formula: string) => {
