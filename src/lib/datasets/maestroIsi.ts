@@ -355,7 +355,15 @@ export const maestroIsiDataset: DatasetModule<MaestroIsiParsed> = {
       stages.push({ name: "refrescar_resumenes_admin", success: 1, errors: 0 });
     }
 
-    const success = stages.reduce((acc, s) => acc + s.success, 0) - 2;
+    const { error: documentosError } = await supabase.rpc("refrescar_documentos_resumen" as never);
+    if (documentosError) {
+      console.error("refrescar_documentos_resumen error:", documentosError.message);
+      stages.push({ name: "refrescar_documentos_resumen", success: 0, errors: 1, message: documentosError.message });
+    } else {
+      stages.push({ name: "refrescar_documentos_resumen", success: 1, errors: 0 });
+    }
+
+    const success = stages.reduce((acc, s) => acc + s.success, 0) - 3;
     const errors = stages.reduce((acc, s) => acc + s.errors, 0);
     return {
       success: Math.max(0, success),

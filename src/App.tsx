@@ -26,6 +26,7 @@ import RevisionVisitas from "./pages/RevisionVisitas";
 import AdminSituaciones from "./pages/AdminSituaciones";
 import AdminObjetivos from "./pages/AdminObjetivos";
 import Objetivos from "./pages/Objetivos";
+import Documentos from "./pages/Documentos";
 
 import NotFound from "./pages/NotFound";
 
@@ -137,8 +138,7 @@ const App = () => (
             <Route path="/admin/situaciones" element={<ProtectedRoute adminOnly><AdminSituaciones /></ProtectedRoute>} />
             <Route path="/admin/objetivos" element={<ProtectedRoute adminOnly allowedRoles={["director_comercial"]}><AdminObjetivos /></ProtectedRoute>} />
             <Route path="/objetivos" element={<ProtectedRoute dashboardKey="objetivos"><Objetivos /></ProtectedRoute>} />
-
-
+            <Route path="/documentos" element={<ProtectedRoute dashboardKey="documentos"><Documentos /></ProtectedRoute>} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

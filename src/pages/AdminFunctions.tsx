@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Eye, Pencil, RotateCcw, Save, ChevronDown, AlertTriangle, Copy, Check } from "lucide-react";
+import { Eye, Pencil, RotateCcw, Save, ChevronDown, AlertTriangle, Copy, Check, RefreshCw } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import AppSettingsCard from "@/components/AppSettingsCard";
 
@@ -419,6 +419,7 @@ function DocCard({ titulo, doc }: { titulo: string; doc: Doc }) {
 export default function AdminFunctions() {
   const [functions, setFunctions] = useState<SystemFunction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshingDocs, setRefreshingDocs] = useState(false);
 
   useEffect(() => {
     loadFunctions();
@@ -436,6 +437,24 @@ export default function AdminFunctions() {
       setFunctions((data as SystemFunction[]) || []);
     }
     setLoading(false);
+  };
+
+  const refreshDocumentos = async () => {
+    setRefreshingDocs(true);
+    const { error } = await supabase.rpc("refrescar_documentos_resumen" as never);
+    setRefreshingDocs(false);
+    if (error) {
+      toast({
+        title: "Error al refrescar documentos",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Documentos actualizados",
+        description: "La vista de documentos se ha refrescado con los últimos datos.",
+      });
+    }
   };
 
   const handleSave = async (id: string, formula: string) => {
@@ -459,6 +478,31 @@ export default function AdminFunctions() {
           Cómo calcula el CRM cada indicador, con un ejemplo sencillo para poder explicarlo
         </p>
       </div>
+
+      <Card>
+        <CardContent className="flex flex-col items-start justify-between gap-3 py-4 sm:flex-row sm:items-center">
+          <div>
+            <p className="text-sm font-medium">Vista de documentos</p>
+            <p className="text-xs text-muted-foreground">
+              Refresca el resumen de documentos tras cargar nuevas ventas. Puede tardar unos segundos.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refreshDocumentos}
+            disabled={refreshingDocs}
+            className="shrink-0 gap-1"
+          >
+            {refreshingDocs ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            Refrescar documentos
+          </Button>
+        </CardContent>
+      </Card>
 
       <AppSettingsCard />
 
