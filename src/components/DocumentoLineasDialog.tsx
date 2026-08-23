@@ -64,7 +64,13 @@ export function DocumentoLineasDialog({
             )}
           </DialogDescription>
           <DialogDescription>
-            Emitido por {documento?.registrado_por ?? "—"} · comercial del cliente: {documento?.vendedor_linea ?? "—"}
+            {nombreCliente ? (
+              <>
+                {nombreCliente} · Emitido por {documento?.registrado_por ?? "—"}
+              </>
+            ) : (
+              <>Emitido por {documento?.registrado_por ?? "—"} · comercial del cliente: {documento?.vendedor_linea ?? "—"}</>
+            )}
           </DialogDescription>
         </DialogHeader>
 
