@@ -276,6 +276,65 @@ export interface DocumentoCliente {
   importe: number;
   margen: number;
   lineas: number;
+  cod_cliente?: number;
+  cliente?: string | null;
+}
+
+export interface DocumentoListado {
+  id_documento: string;
+  fecha: string;
+  hora: string | null;
+  tipo_documento: string | null;
+  operacion: string | null;
+  canal: string | null;
+  almacen: string | null;
+  vendedor_linea: string | null;
+  registrado_por: string | null;
+  importe: number;
+  margen: number;
+  lineas: number;
+  cod_cliente: number;
+  cliente: string;
+  total_filas: number;
+}
+
+export function useDocumentosListado(
+  anio: number | null,
+  importeMin: number,
+  pagina: number,
+  limite = 50,
+) {
+  return useQuery({
+    queryKey: ["crm_documentos_listado", anio, importeMin, pagina, limite],
+    enabled: anio != null,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("documentos_listado" as never, {
+        _anio: anio,
+        _importe_min: importeMin,
+        _limite: limite,
+        _offset: (pagina - 1) * limite,
+      } as never);
+      if (error) throw error;
+      const rows = ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
+        id_documento: String(r.id_documento ?? ""),
+        fecha: String(r.fecha ?? ""),
+        hora: (r.hora as string) ?? null,
+        tipo_documento: (r.tipo_documento as string) ?? null,
+        operacion: (r.operacion as string) ?? null,
+        canal: (r.canal as string) ?? null,
+        almacen: (r.almacen as string) ?? null,
+        vendedor_linea: (r.vendedor_linea as string) ?? null,
+        registrado_por: (r.registrado_por as string) ?? null,
+        importe: Number(r.importe ?? 0),
+        margen: Number(r.margen ?? 0),
+        lineas: Number(r.lineas ?? 0),
+        cod_cliente: Number(r.cod_cliente ?? 0),
+        cliente: String(r.cliente ?? ""),
+        total_filas: Number(r.total_filas ?? 0),
+      })) as DocumentoListado[];
+      return { rows, total: rows[0]?.total_filas ?? 0 };
+    },
+  });
 }
 
 export function useClienteDocumentos(cod: number | null, limite = 100) {
