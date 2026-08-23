@@ -1983,6 +1983,31 @@ export type Database = {
           vendedor: string
         }[]
       }
+      documentos_listado: {
+        Args: {
+          _anio: number
+          _importe_min?: number
+          _limite?: number
+          _offset?: number
+        }
+        Returns: {
+          almacen: string
+          canal: string
+          cliente: string
+          cod_cliente: number
+          fecha: string
+          hora: string
+          id_documento: string
+          importe: number
+          lineas: number
+          margen: number
+          operacion: string
+          registrado_por: string
+          tipo_documento: string
+          total_filas: number
+          vendedor_linea: string
+        }[]
+      }
       fecha_corte_datos: { Args: never; Returns: string }
       get_distinct_delegaciones: {
         Args: never
