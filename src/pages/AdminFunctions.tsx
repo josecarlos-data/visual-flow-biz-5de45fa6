@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Eye, Pencil, RotateCcw, Save, ChevronDown, AlertTriangle, Copy, Check } from "lucide-react";
+import { Eye, Pencil, RotateCcw, Save, ChevronDown, AlertTriangle, Copy, Check, RefreshCw } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import AppSettingsCard from "@/components/AppSettingsCard";
 
