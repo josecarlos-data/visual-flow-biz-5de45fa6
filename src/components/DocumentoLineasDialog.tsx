@@ -23,6 +23,7 @@ interface DocumentoLineasDialogProps {
   onOpenChange: (open: boolean) => void;
   codCliente: number;
   documento: DocumentoCliente | null;
+  nombreCliente?: string;
 }
 
 export function DocumentoLineasDialog({
@@ -30,6 +31,7 @@ export function DocumentoLineasDialog({
   onOpenChange,
   codCliente,
   documento,
+  nombreCliente,
 }: DocumentoLineasDialogProps) {
   const idDocumento = documento?.id_documento ?? null;
   const { data: lineas, isLoading, error } = useDocumentoLineas(codCliente, idDocumento);
