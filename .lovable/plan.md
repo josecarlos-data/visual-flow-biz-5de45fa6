@@ -19,6 +19,19 @@ Nueva RPC `public.documentos_listado(_anio integer, _importe_min numeric DEFAULT
 
 No se toca `cliente_documentos`, `ventas_diarias` ni ninguna política RLS.
 
+## 1.1 Concesión de accesos iniciales (run_sql)
+
+Tras insertar el panel `documentos`, conceder acceso a todos los usuarios que ya ven `ventas`:
+
+```sql
+INSERT INTO public.user_dashboard_access (user_id, dashboard_key)
+SELECT user_id, 'documentos' FROM public.user_dashboard_access
+WHERE dashboard_key = 'ventas'
+ON CONFLICT DO NOTHING;
+```
+
+La tabla tiene índice único sobre `(user_id, dashboard_key)`, por lo que `ON CONFLICT DO NOTHING` hace la operación idempotente.
+
 ## 2. Hook
 
 En `src/hooks/useCrm.ts`, nuevo `useDocumentosListado({ anio, importeMin, pagina })` que llama a la RPC y mapea filas (incluye `cod_cliente`, `cliente`, `total_filas`), siguiendo el patrón de `useClienteDocumentos`.
