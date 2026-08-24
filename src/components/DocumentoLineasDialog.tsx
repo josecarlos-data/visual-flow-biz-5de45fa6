@@ -24,6 +24,8 @@ interface DocumentoLineasDialogProps {
   codCliente: number;
   documento: DocumentoCliente | null;
   nombreCliente?: string;
+  motivoAbono?: string | null;
+  idDocEnlazado?: string | null;
 }
 
 export function DocumentoLineasDialog({
@@ -32,6 +34,8 @@ export function DocumentoLineasDialog({
   codCliente,
   documento,
   nombreCliente,
+  motivoAbono,
+  idDocEnlazado,
 }: DocumentoLineasDialogProps) {
   const idDocumento = documento?.id_documento ?? null;
   const { data: lineas, isLoading, error } = useDocumentoLineas(codCliente, idDocumento);
@@ -42,6 +46,7 @@ export function DocumentoLineasDialog({
   const tipoLabel = documento?.operacion ?? documento?.tipo_documento ?? "—";
   const esNegativo = documento ? documento.importe < 0 : false;
   const badgeVariant = tipoLabel === "—" ? "secondary" : esNegativo ? "destructive" : "default";
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
