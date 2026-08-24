@@ -2007,12 +2007,37 @@ export type Database = {
           vendedor: string
         }[]
       }
+      documentos_filtros_opciones: {
+        Args: { _anio: number }
+        Returns: {
+          almacenes: string[]
+          canales: string[]
+          delegaciones: string[]
+          motivos_abono: string[]
+          operaciones: string[]
+          registrados_por: string[]
+          vendedores: string[]
+        }[]
+      }
       documentos_listado: {
         Args: {
+          _almacen?: string
           _anio: number
+          _buscar?: string
+          _canal?: string
+          _delegacion?: string
+          _dir?: string
+          _fecha_desde?: string
+          _fecha_hasta?: string
+          _importe_max?: number
           _importe_min?: number
           _limite?: number
+          _motivo_abono?: string
           _offset?: number
+          _operacion?: string
+          _orden?: string
+          _registrado_por?: string
+          _vendedor?: string
         }
         Returns: {
           almacen: string
@@ -2021,10 +2046,12 @@ export type Database = {
           cod_cliente: number
           fecha: string
           hora: string
+          id_doc_enlazado: string
           id_documento: string
           importe: number
           lineas: number
           margen: number
+          motivo_abono: string
           operacion: string
           registrado_por: string
           tipo_documento: string
