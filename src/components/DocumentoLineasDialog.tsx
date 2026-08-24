@@ -78,6 +78,7 @@ export function DocumentoLineasDialog({
             ) : (
               <>Emitido por {documento?.registrado_por ?? "—"} · comercial del cliente: {documento?.vendedor_linea ?? "—"}</>
             )}
+          </DialogDescription>
           {idDocEnlazado && (
             <DialogDescription>
               Documento relacionado: <span className="font-mono">{idDocEnlazado}</span>
@@ -85,7 +86,6 @@ export function DocumentoLineasDialog({
           )}
         </DialogHeader>
 
-        </DialogHeader>
 
         <div className="overflow-x-auto">
           {isLoading ? (
