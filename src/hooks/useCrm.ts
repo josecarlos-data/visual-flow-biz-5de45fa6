@@ -290,6 +290,8 @@ export interface DocumentoListado {
   almacen: string | null;
   vendedor_linea: string | null;
   registrado_por: string | null;
+  motivo_abono: string | null;
+  id_doc_enlazado: string | null;
   importe: number;
   margen: number;
   lineas: number;
@@ -298,21 +300,61 @@ export interface DocumentoListado {
   total_filas: number;
 }
 
-export function useDocumentosListado(
-  anio: number | null,
-  importeMin: number,
-  pagina: number,
-  limite = 50,
-) {
+export type DocumentosOrden =
+  | "fecha"
+  | "importe"
+  | "lineas"
+  | "cliente"
+  | "operacion"
+  | "almacen"
+  | "registrado_por";
+
+export interface DocumentosFiltros {
+  anio: number | null;
+  pagina: number;
+  limite?: number;
+  importeMin: number;
+  importeMax?: number | null;
+  buscar?: string | null;
+  fechaDesde?: string | null;
+  fechaHasta?: string | null;
+  canal?: string | null;
+  almacen?: string | null;
+  registradoPor?: string | null;
+  operacion?: string | null;
+  motivoAbono?: string | null;
+  delegacion?: string | null;
+  vendedor?: string | null;
+  orden?: DocumentosOrden;
+  dir?: "asc" | "desc";
+}
+
+const vacio = (v: string | null | undefined) => (v && v.trim() !== "" ? v : null);
+
+export function useDocumentosListado(f: DocumentosFiltros) {
+  const limite = f.limite ?? 50;
   return useQuery({
-    queryKey: ["crm_documentos_listado", anio, importeMin, pagina, limite],
-    enabled: anio != null,
+    queryKey: ["crm_documentos_listado", { ...f, limite }],
+    enabled: f.anio != null,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("documentos_listado" as never, {
-        _anio: anio,
-        _importe_min: importeMin,
+        _anio: f.anio,
+        _importe_min: f.importeMin,
         _limite: limite,
-        _offset: (pagina - 1) * limite,
+        _offset: (f.pagina - 1) * limite,
+        _buscar: vacio(f.buscar),
+        _importe_max: f.importeMax ?? null,
+        _fecha_desde: vacio(f.fechaDesde),
+        _fecha_hasta: vacio(f.fechaHasta),
+        _canal: vacio(f.canal),
+        _almacen: vacio(f.almacen),
+        _registrado_por: vacio(f.registradoPor),
+        _operacion: vacio(f.operacion),
+        _motivo_abono: vacio(f.motivoAbono),
+        _delegacion: vacio(f.delegacion),
+        _vendedor: vacio(f.vendedor),
+        _orden: f.orden ?? "fecha",
+        _dir: f.dir ?? "desc",
       } as never);
       if (error) throw error;
       const rows = ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
@@ -325,6 +367,8 @@ export function useDocumentosListado(
         almacen: (r.almacen as string) ?? null,
         vendedor_linea: (r.vendedor_linea as string) ?? null,
         registrado_por: (r.registrado_por as string) ?? null,
+        motivo_abono: (r.motivo_abono as string) ?? null,
+        id_doc_enlazado: (r.id_doc_enlazado as string) ?? null,
         importe: Number(r.importe ?? 0),
         margen: Number(r.margen ?? 0),
         lineas: Number(r.lineas ?? 0),
@@ -336,6 +380,42 @@ export function useDocumentosListado(
     },
   });
 }
+
+export interface DocumentosOpciones {
+  canales: string[];
+  almacenes: string[];
+  registrados_por: string[];
+  operaciones: string[];
+  motivos_abono: string[];
+  delegaciones: string[];
+  vendedores: string[];
+}
+
+export function useDocumentosFiltrosOpciones(anio: number | null) {
+  return useQuery({
+    queryKey: ["crm_documentos_filtros_opciones", anio],
+    enabled: anio != null,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async (): Promise<DocumentosOpciones> => {
+      const { data, error } = await supabase.rpc("documentos_filtros_opciones" as never, {
+        _anio: anio,
+      } as never);
+      if (error) throw error;
+      const r = (((data ?? []) as unknown as Record<string, unknown>[])[0] ?? {}) as Record<string, unknown>;
+      const arr = (v: unknown) => ((v as string[]) ?? []).filter(Boolean);
+      return {
+        canales: arr(r.canales),
+        almacenes: arr(r.almacenes),
+        registrados_por: arr(r.registrados_por),
+        operaciones: arr(r.operaciones),
+        motivos_abono: arr(r.motivos_abono),
+        delegaciones: arr(r.delegaciones),
+        vendedores: arr(r.vendedores),
+      };
+    },
+  });
+}
+
 
 export function useClienteDocumentos(cod: number | null, limite = 100) {
   return useQuery({

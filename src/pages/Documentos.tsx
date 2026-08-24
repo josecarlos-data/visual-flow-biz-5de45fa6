@@ -1,28 +1,86 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { FileText, X, ChevronLeft, ChevronRight, Eye } from "lucide-react";
+import {
+  FileText,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  ChevronDown,
+  Eye,
+  SlidersHorizontal,
+} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DocumentoLineasDialog } from "@/components/DocumentoLineasDialog";
-import { useDocumentosListado, usePuedeVerMargen, type DocumentoListado, eur, num, fechaCorta } from "@/hooks/useCrm";
+import {
+  useDocumentosListado,
+  useDocumentosFiltrosOpciones,
+  usePuedeVerMargen,
+  type DocumentoListado,
+  type DocumentosOrden,
+  eur,
+  num,
+  fechaCorta,
+} from "@/hooks/useCrm";
 import { supabase } from "@/integrations/supabase/client";
 import { useScrollRestore } from "@/hooks/useScrollRestore";
 
 const LIMITE = 50;
 const UMBRAL_DEFAULT = 300;
+const TODOS = "__todos__";
+
+interface Filtros {
+  buscar: string;
+  fechaDesde: string;
+  fechaHasta: string;
+  importeMin: number;
+  importeMax: number | null;
+  canal: string | null;
+  almacen: string | null;
+  registradoPor: string | null;
+  operacion: string | null;
+  motivoAbono: string | null;
+  delegacion: string | null;
+  vendedor: string | null;
+}
+
+const FILTROS_INICIALES: Filtros = {
+  buscar: "",
+  fechaDesde: "",
+  fechaHasta: "",
+  importeMin: UMBRAL_DEFAULT,
+  importeMax: null,
+  canal: null,
+  almacen: null,
+  registradoPor: null,
+  operacion: null,
+  motivoAbono: null,
+  delegacion: null,
+  vendedor: null,
+};
 
 export default function Documentos() {
   const [anio, setAnio] = useState<string>("");
   const anioInicializado = useRef(false);
-  const [importeMin, setImporteMin] = useState<number>(UMBRAL_DEFAULT);
+  const [filtros, setFiltros] = useState<Filtros>(FILTROS_INICIALES);
+  const [orden, setOrden] = useState<DocumentosOrden>("fecha");
+  const [dir, setDir] = useState<"asc" | "desc">("desc");
   const [pagina, setPagina] = useState(1);
+  const [panelAbierto, setPanelAbierto] = useState(false);
   const [seleccionado, setSeleccionado] = useState<DocumentoListado | null>(null);
   const [dialogoOpen, setDialogoOpen] = useState(false);
+
+  const setFiltro = <K extends keyof Filtros>(key: K, valor: Filtros[K]) =>
+    setFiltros((f) => ({ ...f, [key]: valor }));
 
   const { data: ultimoAnio, isLoading: cargandoAnio } = useQuery({
     queryKey: ["documentos_ultimo_anio"],
@@ -51,7 +109,27 @@ export default function Documentos() {
   }, []);
 
   const anioNum = anio ? Number(anio) : null;
-  const { data, isLoading, error } = useDocumentosListado(anioNum, importeMin, pagina, LIMITE);
+
+  const { data, isLoading, error } = useDocumentosListado({
+    anio: anioNum,
+    pagina,
+    limite: LIMITE,
+    importeMin: filtros.importeMin,
+    importeMax: filtros.importeMax,
+    buscar: filtros.buscar,
+    fechaDesde: filtros.fechaDesde,
+    fechaHasta: filtros.fechaHasta,
+    canal: filtros.canal,
+    almacen: filtros.almacen,
+    registradoPor: filtros.registradoPor,
+    operacion: filtros.operacion,
+    motivoAbono: filtros.motivoAbono,
+    delegacion: filtros.delegacion,
+    vendedor: filtros.vendedor,
+    orden,
+    dir,
+  });
+  const { data: opciones } = useDocumentosFiltrosOpciones(anioNum);
   const { data: verMargen } = usePuedeVerMargen();
 
   useScrollRestore("documentos", !isLoading && !!data);
@@ -63,29 +141,107 @@ export default function Documentos() {
 
   useEffect(() => {
     setPagina(1);
-  }, [anio, importeMin]);
+  }, [anio, filtros, orden, dir]);
+
+  const ordenar = (col: DocumentosOrden) => {
+    if (orden === col) {
+      setDir((d) => (d === "desc" ? "asc" : "desc"));
+    } else {
+      setOrden(col);
+      setDir("desc");
+    }
+  };
 
   const abrirLineas = (doc: DocumentoListado) => {
     setSeleccionado(doc);
     setDialogoOpen(true);
   };
 
-  const documentoParaDialog = seleccionado
-    ? {
-        id_documento: seleccionado.id_documento,
-        fecha: seleccionado.fecha,
-        hora: seleccionado.hora,
-        tipo_documento: seleccionado.tipo_documento,
-        operacion: seleccionado.operacion,
-        canal: seleccionado.canal,
-        almacen: seleccionado.almacen,
-        vendedor_linea: seleccionado.vendedor_linea,
-        registrado_por: seleccionado.registrado_por,
-        importe: seleccionado.importe,
-        margen: seleccionado.margen,
-        lineas: seleccionado.lineas,
-      }
-    : null;
+  const chips: { key: string; label: string; quitar: () => void }[] = [];
+  if (filtros.importeMin > 0)
+    chips.push({
+      key: "min",
+      label: `Más de ${eur(filtros.importeMin, 0)}`,
+      quitar: () => setFiltro("importeMin", 0),
+    });
+  if (filtros.importeMax != null)
+    chips.push({
+      key: "max",
+      label: `Menos de ${eur(filtros.importeMax, 0)}`,
+      quitar: () => setFiltro("importeMax", null),
+    });
+  if (filtros.buscar.trim())
+    chips.push({ key: "buscar", label: `“${filtros.buscar.trim()}”`, quitar: () => setFiltro("buscar", "") });
+  if (filtros.fechaDesde)
+    chips.push({ key: "desde", label: `Desde ${filtros.fechaDesde}`, quitar: () => setFiltro("fechaDesde", "") });
+  if (filtros.fechaHasta)
+    chips.push({ key: "hasta", label: `Hasta ${filtros.fechaHasta}`, quitar: () => setFiltro("fechaHasta", "") });
+  const chipTexto = (key: keyof Filtros, prefijo: string) => {
+    const v = filtros[key] as string | null;
+    if (v) chips.push({ key: String(key), label: `${prefijo}: ${v}`, quitar: () => setFiltro(key, null as never) });
+  };
+  chipTexto("canal", "Canal");
+  chipTexto("almacen", "Almacén");
+  chipTexto("registradoPor", "Registrado por");
+  chipTexto("operacion", "Operación");
+  chipTexto("motivoAbono", "Motivo abono");
+  chipTexto("delegacion", "Delegación");
+  chipTexto("vendedor", "Comercial");
+
+  const numFiltros = chips.length;
+
+  const SelectFiltro = ({
+    label,
+    valor,
+    opts,
+    onChange,
+  }: {
+    label: string;
+    valor: string | null;
+    opts: string[];
+    onChange: (v: string | null) => void;
+  }) => (
+    <div className="space-y-1.5">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Select value={valor ?? TODOS} onValueChange={(v) => onChange(v === TODOS ? null : v)}>
+        <SelectTrigger>
+          <SelectValue placeholder="Todos" />
+        </SelectTrigger>
+        <SelectContent className="max-h-72">
+          <SelectItem value={TODOS}>Todos</SelectItem>
+          {opts.map((o) => (
+            <SelectItem key={o} value={o}>
+              {o}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  const Cabecera = ({
+    col,
+    children,
+    className,
+  }: {
+    col: DocumentosOrden;
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <TableHead className={className}>
+      <button
+        type="button"
+        onClick={() => ordenar(col)}
+        className={`inline-flex items-center gap-1 hover:text-foreground ${
+          orden === col ? "text-foreground font-medium" : ""
+        }`}
+      >
+        {children}
+        {orden === col &&
+          (dir === "desc" ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />)}
+      </button>
+    </TableHead>
+  );
 
   return (
     <div className="space-y-4">
@@ -94,7 +250,7 @@ export default function Documentos() {
         <p className="text-sm text-muted-foreground">Documentos de venta de tus clientes</p>
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <Select value={anio} onValueChange={setAnio} disabled={cargandoAnio}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Año" />
@@ -108,24 +264,147 @@ export default function Documentos() {
           </SelectContent>
         </Select>
 
-        {importeMin > 0 ? (
-          <Badge variant="secondary" className="h-9 gap-1 px-3 text-sm">
-            Más de {eur(importeMin, 0)}
-            <button
-              type="button"
-              onClick={() => setImporteMin(0)}
-              className="ml-1 rounded-full p-0.5 hover:bg-muted"
-              aria-label="Quitar filtro de importe mínimo"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </Badge>
-        ) : (
-          <Badge variant="outline" className="h-9 px-3 text-sm text-muted-foreground">
-            Todos los importes
-          </Badge>
-        )}
+        <Sheet open={panelAbierto} onOpenChange={setPanelAbierto}>
+          <SheetTrigger asChild>
+            <Button variant="outline" className="gap-2">
+              <SlidersHorizontal className="h-4 w-4" />
+              Filtros
+              {numFiltros > 0 && (
+                <Badge variant="secondary" className="ml-1 px-1.5">
+                  {numFiltros}
+                </Badge>
+              )}
+            </Button>
+          </SheetTrigger>
+          <SheetContent className="w-full overflow-y-auto sm:max-w-md">
+            <SheetHeader>
+              <SheetTitle>Filtros</SheetTitle>
+            </SheetHeader>
+            <div className="mt-4 space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Buscar cliente o código</Label>
+                <Input
+                  value={filtros.buscar}
+                  onChange={(e) => setFiltro("buscar", e.target.value)}
+                  placeholder="Nombre o código de cliente"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Desde</Label>
+                  <Input
+                    type="date"
+                    value={filtros.fechaDesde}
+                    onChange={(e) => setFiltro("fechaDesde", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Hasta</Label>
+                  <Input
+                    type="date"
+                    value={filtros.fechaHasta}
+                    onChange={(e) => setFiltro("fechaHasta", e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Importe mínimo (€)</Label>
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    value={filtros.importeMin}
+                    onChange={(e) => setFiltro("importeMin", Number(e.target.value) || 0)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Importe máximo (€)</Label>
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    value={filtros.importeMax ?? ""}
+                    placeholder="Sin límite"
+                    onChange={(e) =>
+                      setFiltro("importeMax", e.target.value === "" ? null : Number(e.target.value))
+                    }
+                  />
+                </div>
+              </div>
+
+              <SelectFiltro
+                label="Canal"
+                valor={filtros.canal}
+                opts={opciones?.canales ?? []}
+                onChange={(v) => setFiltro("canal", v)}
+              />
+              <SelectFiltro
+                label="Almacén"
+                valor={filtros.almacen}
+                opts={opciones?.almacenes ?? []}
+                onChange={(v) => setFiltro("almacen", v)}
+              />
+              <SelectFiltro
+                label="Registrado por"
+                valor={filtros.registradoPor}
+                opts={opciones?.registrados_por ?? []}
+                onChange={(v) => setFiltro("registradoPor", v)}
+              />
+              <SelectFiltro
+                label="Operación"
+                valor={filtros.operacion}
+                opts={opciones?.operaciones ?? []}
+                onChange={(v) => setFiltro("operacion", v)}
+              />
+              <SelectFiltro
+                label="Motivo de abono"
+                valor={filtros.motivoAbono}
+                opts={opciones?.motivos_abono ?? []}
+                onChange={(v) => setFiltro("motivoAbono", v)}
+              />
+              {(opciones?.delegaciones.length ?? 0) > 1 && (
+                <SelectFiltro
+                  label="Delegación"
+                  valor={filtros.delegacion}
+                  opts={opciones!.delegaciones}
+                  onChange={(v) => setFiltro("delegacion", v)}
+                />
+              )}
+              {(opciones?.vendedores.length ?? 0) > 1 && (
+                <SelectFiltro
+                  label="Comercial"
+                  valor={filtros.vendedor}
+                  opts={opciones!.vendedores}
+                  onChange={(v) => setFiltro("vendedor", v)}
+                />
+              )}
+
+              <Button variant="ghost" className="w-full" onClick={() => setFiltros(FILTROS_INICIALES)}>
+                Restablecer filtros
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
+
+      {chips.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {chips.map((c) => (
+            <Badge key={c.key} variant="secondary" className="gap-1 px-3 py-1 text-sm">
+              {c.label}
+              <button
+                type="button"
+                onClick={c.quitar}
+                className="ml-1 rounded-full p-0.5 hover:bg-muted"
+                aria-label={`Quitar filtro ${c.label}`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+      )}
 
       {error ? (
         <Card>
@@ -152,14 +431,18 @@ export default function Documentos() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Fecha</TableHead>
+                  <Cabecera col="fecha">Fecha</Cabecera>
                   <TableHead>Hora</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Tipo / Operación</TableHead>
-                  <TableHead>Almacén</TableHead>
-                  <TableHead>Registrado por</TableHead>
-                  <TableHead className="text-right">Líneas</TableHead>
-                  <TableHead className="text-right">Importe</TableHead>
+                  <Cabecera col="cliente">Cliente</Cabecera>
+                  <Cabecera col="operacion">Tipo / Operación</Cabecera>
+                  <Cabecera col="almacen">Almacén</Cabecera>
+                  <Cabecera col="registrado_por">Registrado por</Cabecera>
+                  <Cabecera col="lineas" className="text-right">
+                    Líneas
+                  </Cabecera>
+                  <Cabecera col="importe" className="text-right">
+                    Importe
+                  </Cabecera>
                   {verMargen && <TableHead className="text-right">Margen</TableHead>}
                   <TableHead className="w-16"></TableHead>
                 </TableRow>
@@ -185,8 +468,13 @@ export default function Documentos() {
                         </div>
                         <div className="text-xs text-muted-foreground">#{d.cod_cliente}</div>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap text-sm">
-                        {d.operacion ?? d.tipo_documento ?? "—"}
+                      <TableCell className="text-sm">
+                        <div className="whitespace-nowrap">{d.operacion ?? d.tipo_documento ?? "—"}</div>
+                        {negativo && d.motivo_abono && (
+                          <div className="max-w-[200px] truncate text-xs text-muted-foreground">
+                            {d.motivo_abono}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                         {d.almacen ?? "—"}
@@ -243,8 +531,27 @@ export default function Documentos() {
         open={dialogoOpen}
         onOpenChange={setDialogoOpen}
         codCliente={seleccionado?.cod_cliente ?? 0}
-        documento={documentoParaDialog}
+        documento={
+          seleccionado
+            ? {
+                id_documento: seleccionado.id_documento,
+                fecha: seleccionado.fecha,
+                hora: seleccionado.hora,
+                tipo_documento: seleccionado.tipo_documento,
+                operacion: seleccionado.operacion,
+                canal: seleccionado.canal,
+                almacen: seleccionado.almacen,
+                vendedor_linea: seleccionado.vendedor_linea,
+                registrado_por: seleccionado.registrado_por,
+                importe: seleccionado.importe,
+                margen: seleccionado.margen,
+                lineas: seleccionado.lineas,
+              }
+            : null
+        }
         nombreCliente={seleccionado?.cliente}
+        motivoAbono={seleccionado?.motivo_abono}
+        idDocEnlazado={seleccionado?.id_doc_enlazado}
       />
     </div>
   );

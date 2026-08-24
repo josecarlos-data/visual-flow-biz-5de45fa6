@@ -24,6 +24,8 @@ interface DocumentoLineasDialogProps {
   codCliente: number;
   documento: DocumentoCliente | null;
   nombreCliente?: string;
+  motivoAbono?: string | null;
+  idDocEnlazado?: string | null;
 }
 
 export function DocumentoLineasDialog({
@@ -32,6 +34,8 @@ export function DocumentoLineasDialog({
   codCliente,
   documento,
   nombreCliente,
+  motivoAbono,
+  idDocEnlazado,
 }: DocumentoLineasDialogProps) {
   const idDocumento = documento?.id_documento ?? null;
   const { data: lineas, isLoading, error } = useDocumentoLineas(codCliente, idDocumento);
@@ -43,6 +47,7 @@ export function DocumentoLineasDialog({
   const esNegativo = documento ? documento.importe < 0 : false;
   const badgeVariant = tipoLabel === "—" ? "secondary" : esNegativo ? "destructive" : "default";
 
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
@@ -52,7 +57,9 @@ export function DocumentoLineasDialog({
               {documento?.id_documento ?? "—"}
             </DialogTitle>
             <Badge variant={badgeVariant}>{tipoLabel}</Badge>
+            {motivoAbono && <Badge variant="outline">{motivoAbono}</Badge>}
           </div>
+
           <DialogDescription>
             {documento?.fecha ? (
               <>
@@ -72,7 +79,13 @@ export function DocumentoLineasDialog({
               <>Emitido por {documento?.registrado_por ?? "—"} · comercial del cliente: {documento?.vendedor_linea ?? "—"}</>
             )}
           </DialogDescription>
+          {idDocEnlazado && (
+            <DialogDescription>
+              Documento relacionado: <span className="font-mono">{idDocEnlazado}</span>
+            </DialogDescription>
+          )}
         </DialogHeader>
+
 
         <div className="overflow-x-auto">
           {isLoading ? (
