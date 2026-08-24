@@ -1631,15 +1631,19 @@ export type Database = {
           canal: string | null
           cliente: string | null
           cod_cliente: number | null
+          delegacion: string | null
           fecha: string | null
           hora: string | null
+          id_doc_enlazado: string | null
           id_documento: string | null
           importe: number | null
           lineas: number | null
           margen: number | null
+          motivo_abono: string | null
           operacion: string | null
           registrado_por: string | null
           tipo_documento: string | null
+          vendedor: string | null
           vendedor_linea: string | null
         }
         Relationships: []
