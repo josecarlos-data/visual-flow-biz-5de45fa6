@@ -4,12 +4,21 @@ La vista materializada `documentos_resumen` ya expone `delegacion`, `vendedor`, 
 
 ## 1. Base de datos (una migración)
 
-### `documentos_listado` (CREATE OR REPLACE, misma firma ampliada)
+### `documentos_listado` (drop y recreación)
 
-Parámetros nuevos, todos `DEFAULT NULL` salvo los indicados:
+`CREATE OR REPLACE` con parámetros nuevos crearía una sobrecarga y dejaría dos versiones conviviendo, así que la migración empieza eliminando la firma actual:
+
+```sql
+DROP FUNCTION IF EXISTS public.documentos_listado(integer, numeric, integer, integer);
+```
+
+y crea después la versión nueva. Al terminar se comprueba en `pg_proc` que solo existe una función con ese nombre.
+
+Parámetros: `_anio integer`, `_importe_min numeric DEFAULT 300`, `_limite integer DEFAULT 50`, `_offset integer DEFAULT 0` y, nuevos y todos `DEFAULT NULL` salvo los indicados:
 `_buscar text`, `_importe_max numeric`, `_fecha_desde date`, `_fecha_hasta date`, `_canal text`, `_almacen text`, `_registrado_por text`, `_operacion text`, `_motivo_abono text`, `_delegacion text`, `_vendedor text`, `_orden text DEFAULT 'fecha'`, `_dir text DEFAULT 'desc'`.
 
-- Se mantienen `_anio`, `_importe_min DEFAULT 300`, `_limite`, `_offset` y su posición; los nuevos van detrás para no romper llamadas existentes.
+- El único consumidor es `useDocumentosListado`, que se actualiza en el mismo cambio.
+
 - Cada filtro se aplica solo si no es nulo: `AND (_canal IS NULL OR d.canal = _canal)`, etc.
 - Búsqueda: `AND (_buscar IS NULL OR d.cliente ILIKE '%'||_buscar||'%' OR d.cod_cliente::text ILIKE '%'||_buscar||'%')`.
 - Importes sobre `ABS(d.importe)`: `>= _importe_min` y `(_importe_max IS NULL OR ABS(d.importe) <= _importe_max)`.
