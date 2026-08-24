@@ -57,7 +57,9 @@ export function DocumentoLineasDialog({
               {documento?.id_documento ?? "—"}
             </DialogTitle>
             <Badge variant={badgeVariant}>{tipoLabel}</Badge>
+            {motivoAbono && <Badge variant="outline">{motivoAbono}</Badge>}
           </div>
+
           <DialogDescription>
             {documento?.fecha ? (
               <>
