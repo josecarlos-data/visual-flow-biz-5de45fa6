@@ -50,7 +50,7 @@ export function DocumentoLineasDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl max-h-[85dvh] flex flex-col">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <DialogTitle className="font-mono text-lg">
@@ -87,7 +87,7 @@ export function DocumentoLineasDialog({
         </DialogHeader>
 
 
-        <div className="overflow-x-auto">
+        <div className="overflow-auto flex-1 min-h-0">
           {isLoading ? (
             <div className="space-y-2">
               <Skeleton className="h-8 w-full" />
