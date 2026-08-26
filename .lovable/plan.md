@@ -8,7 +8,7 @@ Ficheros afectados: `src/hooks/useCrm.ts` y `src/pages/ClienteDetalle.tsx`.
 - `useAgendaMutations().add`: ampliar el tipo del parámetro con `notas?: string | null` y pasarlo al insert. Sin más cambios (Agenda.tsx sigue igual).
 - Nuevo hook `useProximaPlanificada(codCliente)`: consulta `visitas_planificadas` con `cod_cliente` y `fecha >= hoyISO()`, orden ascendente por fecha, `limit 1`, devuelve la fila o `null`. `queryKey: ["crm_agenda", "proxima", codCliente]`.
 - En la ficha, junto a "Nueva visita", botón "Agendar" (`variant="outline"`, icono `CalendarPlus`) que abre un Dialog con:
-  - atajos Hoy / Mañana / Otra fecha (esta última revela un `<Input type="date">`),
+  - atajos Hoy / Mañana / Otra fecha. "Hoy" y "Mañana" usan el criterio local de `hoyISO()` en `useCrm.ts` (`getFullYear/getMonth/getDate` con `padStart`), no `toISOString()`. Para Mañana se parte de una fecha local y se le suma un día con `setDate(d.getDate() + 1)` antes de formatear. "Otra fecha" revela un `<Input type="date">`.
   - Textarea opcional "Motivo de la visita (opcional)" (`rows=3`) que se guarda en `notas`,
   - botón Guardar.
   - `user_id` desde `useAuth()`.
