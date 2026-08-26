@@ -347,7 +347,7 @@ export default function Ventas() {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
         <Card>
           <CardHeader><CardTitle>Mix por canal {anioActual}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
@@ -402,80 +402,77 @@ export default function Ventas() {
             </Tabs>
           </CardContent>
         </Card>
-      </div>
 
-
-
-      <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" /> Alertas comerciales</CardTitle>
-          <div className="inline-flex shrink-0 rounded-md border p-0.5">
-            {([
-              { key: "atencion", label: "Atención" },
-              { key: "justificadas", label: "Justificadas" },
-              { key: "todos", label: "Todos" },
-            ] as { key: VistaAlertas; label: string }[]).map((v) => (
-              <Button
-                key={v.key}
-                size="sm"
-                variant={vistaAlertas === v.key ? "secondary" : "ghost"}
-                className="h-7 px-3 text-xs"
-                onClick={() => setVistaAlertas(v.key)}
-              >
-                {v.label}
-              </Button>
-            ))}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {vistaAlertas !== "todos" && (ocultasPorSituacion > 0 || justificadas > 0) && (
-            <p className="mb-3 text-xs text-muted-foreground">
-              {[
-                ocultasPorSituacion > 0 ? `${ocultasPorSituacion} oculto${ocultasPorSituacion > 1 ? "s" : ""} por situación` : null,
-                justificadas > 0 ? `${justificadas} con caída justificada` : null,
-              ].filter(Boolean).join(" · ")}.{" "}
-              <button type="button" className="underline hover:text-foreground" onClick={() => setVistaAlertas("todos")}>Ver todos</button>
-            </p>
-          )}
-          <Tabs defaultValue="caida">
-            <TabsList className="mb-3">
-              <TabsTrigger value="caida">Caídas ({alertasPorTipo("caida").length})</TabsTrigger>
-              <TabsTrigger value="fuga">Riesgo fuga ({alertasPorTipo("fuga").length})</TabsTrigger>
-              {verMargen && <TabsTrigger value="margen_bajo">Margen bajo ({alertasPorTipo("margen_bajo").length})</TabsTrigger>}
-            </TabsList>
-
-
-            <TabsContent value="caida" className="space-y-2">
-              {alertasPorTipo("caida").length === 0 && <Vacio />}
-              {alertasPorTipo("caida").map((a) => (
-                <FilaAlerta key={`c-${a.cod_cliente}`} a={a}
-                  detalle={`${eur(a.valor)} vs ${eur(a.valor_ref)} el año pasado`}
-                  badge={<Badge variant="destructive" className="shrink-0"><TrendingDown className="mr-1 h-3 w-3" />{a.valor_ref > 0 ? `${(((a.valor - a.valor_ref) / a.valor_ref) * 100).toFixed(0)}%` : "—"}</Badge>} />
+        <Card className="lg:col-span-2 2xl:col-span-1">
+          <CardHeader className="flex flex-col gap-3">
+            <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" /> Alertas comerciales</CardTitle>
+            <div className="inline-flex shrink-0 rounded-md border p-0.5">
+              {([
+                { key: "atencion", label: "Atención" },
+                { key: "justificadas", label: "Justificadas" },
+                { key: "todos", label: "Todos" },
+              ] as { key: VistaAlertas; label: string }[]).map((v) => (
+                <Button
+                  key={v.key}
+                  size="sm"
+                  variant={vistaAlertas === v.key ? "secondary" : "ghost"}
+                  className="h-7 px-3 text-[11px]"
+                  onClick={() => setVistaAlertas(v.key)}
+                >
+                  {v.label}
+                </Button>
               ))}
-            </TabsContent>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {vistaAlertas !== "todos" && (ocultasPorSituacion > 0 || justificadas > 0) && (
+              <p className="mb-3 text-xs text-muted-foreground">
+                {[
+                  ocultasPorSituacion > 0 ? `${ocultasPorSituacion} oculto${ocultasPorSituacion > 1 ? "s" : ""} por situación` : null,
+                  justificadas > 0 ? `${justificadas} con caída justificada` : null,
+                ].filter(Boolean).join(" · ")}.{" "}
+                <button type="button" className="underline hover:text-foreground" onClick={() => setVistaAlertas("todos")}>Ver todos</button>
+              </p>
+            )}
+            <Tabs defaultValue="caida">
+              <TabsList className="mb-3">
+                <TabsTrigger value="caida">Caídas ({alertasPorTipo("caida").length})</TabsTrigger>
+                <TabsTrigger value="fuga">Riesgo fuga ({alertasPorTipo("fuga").length})</TabsTrigger>
+                {verMargen && <TabsTrigger value="margen_bajo">Margen bajo ({alertasPorTipo("margen_bajo").length})</TabsTrigger>}
+              </TabsList>
 
-            <TabsContent value="fuga" className="space-y-2">
-              {alertasPorTipo("fuga").length === 0 && <Vacio />}
-              {alertasPorTipo("fuga").map((a) => (
-                <FilaAlerta key={`f-${a.cod_cliente}`} a={a}
-                  detalle={`Histórico ${eur(a.valor)}`}
-                  badge={<Badge variant="outline" className="shrink-0">{a.dias} días sin comprar</Badge>} />
-              ))}
-            </TabsContent>
-
-            {verMargen && (
-              <TabsContent value="margen_bajo" className="space-y-2">
-                {alertasPorTipo("margen_bajo").length === 0 && <Vacio />}
-                {alertasPorTipo("margen_bajo").map((a) => (
-                  <FilaAlerta key={`m-${a.cod_cliente}`} a={a}
-                    detalle={`${eur(a.valor)} facturados`}
-                    badge={<Badge variant="secondary" className="shrink-0">{a.valor_ref.toFixed(1)}% margen</Badge>} />
+              <TabsContent value="caida" className="space-y-2">
+                {alertasPorTipo("caida").length === 0 && <Vacio />}
+                {alertasPorTipo("caida").map((a) => (
+                  <FilaAlerta key={`c-${a.cod_cliente}`} a={a}
+                    detalle={`${eur(a.valor)} vs ${eur(a.valor_ref)} el año pasado`}
+                    badge={<Badge variant="destructive" className="shrink-0"><TrendingDown className="mr-1 h-3 w-3" />{a.valor_ref > 0 ? `${(((a.valor - a.valor_ref) / a.valor_ref) * 100).toFixed(0)}%` : "—"}</Badge>} />
                 ))}
               </TabsContent>
-            )}
-          </Tabs>
-        </CardContent>
-      </Card>
+
+              <TabsContent value="fuga" className="space-y-2">
+                {alertasPorTipo("fuga").length === 0 && <Vacio />}
+                {alertasPorTipo("fuga").map((a) => (
+                  <FilaAlerta key={`f-${a.cod_cliente}`} a={a}
+                    detalle={`Histórico ${eur(a.valor)}`}
+                    badge={<Badge variant="outline" className="shrink-0">{a.dias} días sin comprar</Badge>} />
+                ))}
+              </TabsContent>
+
+              {verMargen && (
+                <TabsContent value="margen_bajo" className="space-y-2">
+                  {alertasPorTipo("margen_bajo").length === 0 && <Vacio />}
+                  {alertasPorTipo("margen_bajo").map((a) => (
+                    <FilaAlerta key={`m-${a.cod_cliente}`} a={a}
+                      detalle={`${eur(a.valor)} facturados`}
+                      badge={<Badge variant="secondary" className="shrink-0">{a.valor_ref.toFixed(1)}% margen</Badge>} />
+                  ))}
+                </TabsContent>
+              )}
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
