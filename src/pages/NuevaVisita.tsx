@@ -294,6 +294,42 @@ export default function NuevaVisita() {
     return camposVisibles(motivo.campos).filter((c) => c.requerido_validacion && !b.valores[c.campo_key]?.trim());
   };
 
+  /** Campos obligatorios del bloque que siguen vacíos (guardar los bloquea). */
+  const bloqueantesDe = (b: BloqueForm): MotivoCampo[] => {
+    const motivo = motivoDe(b.motivoKey);
+    if (!motivo) return [];
+    return camposVisibles(motivo.campos).filter((c) => c.is_required && !b.valores[c.campo_key]?.trim());
+  };
+
+  const hayConfianzaBaja = (b: BloqueForm): boolean => {
+    const motivo = motivoDe(b.motivoKey);
+    if (!motivo) return false;
+    return camposVisibles(motivo.campos).some((c) => b.meta[c.campo_key]?.confianza === "baja");
+  };
+
+  const atencionDe = (b: BloqueForm): MotivoCampo[] => {
+    const motivo = motivoDe(b.motivoKey);
+    if (!motivo) return [];
+    const bloqueantes = new Set(bloqueantesDe(b).map((c) => c.campo_key));
+    const pendientes = new Set(pendientesDe(b).map((c) => c.campo_key));
+    return camposVisibles(motivo.campos).filter(
+      (c) => bloqueantes.has(c.campo_key) || pendientes.has(c.campo_key) || b.meta[c.campo_key]?.confianza === "baja",
+    );
+  };
+
+  const otrosCamposDe = (b: BloqueForm): MotivoCampo[] => {
+    const motivo = motivoDe(b.motivoKey);
+    if (!motivo) return [];
+    const atencion = new Set(atencionDe(b).map((c) => c.campo_key));
+    return camposVisibles(motivo.campos).filter((c) => !atencion.has(c.campo_key));
+  };
+
+  const estadoDe = (b: BloqueForm): "listo" | "faltan" | "revisar" => {
+    if (bloqueantesDe(b).length > 0 || pendientesDe(b).length > 0) return "faltan";
+    if (hayConfianzaBaja(b)) return "revisar";
+    return "listo";
+  };
+
   const hayPendientes = esEfectiva && bloques.some((b) => pendientesDe(b).length > 0);
   const mostrarRepregunta = hayPendientes && !repreguntaHecha && (transcripcion !== "" || bloques.some((b) => Object.keys(b.valores).length));
 
