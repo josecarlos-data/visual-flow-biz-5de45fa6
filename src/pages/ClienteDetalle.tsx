@@ -656,24 +656,50 @@ export default function ClienteDetalle() {
           <Card>
             <CardHeader><CardTitle className="text-base">Datos de ficha</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-2 gap-x-4 gap-y-3 md:grid-cols-3 lg:grid-cols-4">
-              <Dato label="Comercial" value={cliente.vendedor ? `${cliente.vendedor}${cliente.cod_vendedor ? ` (${cliente.cod_vendedor})` : ""}` : null} />
+              <Dato label="Comercial" multilinea value={cliente.vendedor ? `${cliente.vendedor}${cliente.cod_vendedor ? ` (${cliente.cod_vendedor})` : ""}` : null} />
               <Dato label="Ruta comercial" value={cliente.ruta_comercial ?? cliente.ruta} />
               <Dato label="Ruta especial" value={cliente.ruta_especial} />
               <Dato label="Delegación" value={cliente.delegacion} />
               <Dato label="Tipo de cliente" value={cliente.cod_tipo_cliente} />
               <Dato label="Grupo" value={cliente.grupo} />
               <Dato label="Grupo rappel" value={cliente.grupo_rappel} />
-              <Dato label="Tramos rappel" value={cliente.tramos_rappel} />
-              <Dato label="Razón social" value={cliente.razon_social} />
+              {cliente.tramos_rappel && (
+                <div className="col-span-2 md:col-span-3 lg:col-span-4">
+                  <p className="text-xs text-muted-foreground">Tramos rappel</p>
+                  {(() => {
+                    const tramos = cliente.tramos_rappel.split("|").map((t) => t.trim()).filter(Boolean);
+                    if (tramos.length === 0) return null;
+                    if (tramos.length === 1) return <p className="text-sm break-words">{tramos[0]}</p>;
+                    return (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {tramos.map((t, i) => (
+                          <span key={i} className="inline-block rounded-md border px-2 py-0.5 text-xs">{t}</span>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+              <Dato label="Razón social" multilinea value={cliente.razon_social} />
               <Dato label="CIF" value={cliente.cif} />
-              <Dato label="Persona de contacto" value={cliente.persona_contacto} />
-              <Dato label="Teléfono" value={cliente.telefono} />
-              <Dato label="Teléfono 2" value={cliente.telefono2} />
-              <Dato label="Email" value={cliente.email} />
-              <Dato label="Web" value={cliente.web} />
-              <Dato label="Dirección" value={cliente.direccion} />
-              <Dato label="Población" value={[cliente.cod_postal, cliente.localidad, cliente.provincia].filter(Boolean).join(" · ") || null} />
-              <Dato label="Alta" value={antiguedad} />
+              <Dato label="Persona de contacto" multilinea value={cliente.persona_contacto} />
+              <Dato
+                label="Teléfono"
+                value={cliente.telefono ? <a href={`tel:${cliente.telefono.replace(/\s/g, "")}`} className="text-primary underline underline-offset-2">{cliente.telefono}</a> : null}
+              />
+              <Dato
+                label="Teléfono 2"
+                value={cliente.telefono2 ? <a href={`tel:${cliente.telefono2.replace(/\s/g, "")}`} className="text-primary underline underline-offset-2">{cliente.telefono2}</a> : null}
+              />
+              <Dato
+                label="Email"
+                multilinea
+                value={cliente.email ? <a href={`mailto:${cliente.email}`} className="text-primary underline underline-offset-2">{cliente.email}</a> : null}
+              />
+              <Dato label="Web" multilinea value={cliente.web} />
+              <Dato label="Dirección" multilinea value={cliente.direccion} />
+              <Dato label="Población" multilinea value={[cliente.cod_postal, cliente.localidad, cliente.provincia].filter(Boolean).join(" · ") || null} />
+              <Dato label="Alta" multilinea value={antiguedad} />
               <Dato label="Empleados taller" value={cliente.num_empleados_taller != null ? num(cliente.num_empleados_taller) : null} />
               <Dato label="Primera compra" value={kpis?.primera_compra ? fechaCorta(kpis.primera_compra) : null} />
               <Dato label="Ventas históricas" value={kpis ? eur(kpis.importe_total) : null} />
