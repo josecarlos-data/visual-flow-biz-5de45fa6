@@ -14,20 +14,20 @@ Hoy todo el contenido vive dentro de un único `grid items-start gap-4 lg:grid-c
 
 ### Fila A — tres columnas iguales
 ```text
-<div className="grid items-start gap-4 lg:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0 xl:h-[560px]">
+<div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0 xl:h-[560px]">
 ```
 
 | Columna | Contenido | Clases a añadir |
 | --- | --- | --- |
 | 1 | Card "Top 10 clientes" | `h-full flex flex-col` en `<Card>`; `flex-1 overflow-y-auto` en `CardContent` |
 | 2 | Card "Alertas comerciales" | `h-full flex flex-col` en `<Card>`; quitar `lg:col-span-2 2xl:col-span-1`; `flex-1 overflow-y-auto` en `CardContent` |
-| 3 | `<div>` contenedor de dos tarjetas apiladas | `grid gap-4 h-full flex-col` (o `grid gap-4 h-full flex`); `h-full flex flex-col` en cada Card |
+| 3 | `<div>` contenedor de dos tarjetas apiladas | `grid grid-rows-2 gap-4 h-full`; `h-full flex flex-col` en cada Card |
 | 3a | Card "Top familias" | `flex-1 min-h-[160px]` en `CardContent` (sustituye `h-[200px] 2xl:h-[240px]`) |
 | 3b | Card "Top marcas" | `flex-1 min-h-[160px]` en `CardContent` (sustituye `h-[200px] 2xl:h-[240px]`) |
 
 ### Fila B — dos columnas
 ```text
-<div className="grid items-start gap-4 xl:grid-cols-3 [&>*]:min-w-0">
+<div className="grid gap-4 xl:grid-cols-3 [&>*]:min-w-0 xl:h-[420px]">
 ```
 
 | Columna | Contenido | Clases a añadir |
@@ -43,10 +43,10 @@ Sustituir la rejilla única actual del skeleton por tres filas que reproduzcan l
 
 1. Fila A:
    ```text
-   <div className="grid items-start gap-4 lg:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0 xl:h-[560px]">
-     <Skeleton className="h-full" />   // Top 10 clientes
-     <Skeleton className="h-full" />   // Alertas comerciales
-     <div className="grid gap-4 h-full">
+   <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0 xl:h-[560px]">
+     <Skeleton className="h-full min-h-[260px]" />   // Top 10 clientes
+     <Skeleton className="h-full min-h-[260px]" />   // Alertas comerciales
+     <div className="grid grid-rows-2 gap-4 h-full min-h-[260px]">
        <Skeleton className="h-full" /> // Top familias
        <Skeleton className="h-full" /> // Top marcas
      </div>
@@ -54,7 +54,7 @@ Sustituir la rejilla única actual del skeleton por tres filas que reproduzcan l
    ```
 2. Fila B:
    ```text
-   <div className="grid items-start gap-4 xl:grid-cols-3 [&>*]:min-w-0">
+   <div className="grid gap-4 xl:grid-cols-3 [&>*]:min-w-0 xl:h-[420px]">
      <Skeleton className="h-full min-h-[260px]" /> // Mix por canal
      <Skeleton className="h-full min-h-[260px] xl:col-span-2" /> // Evolución mensual
    </div>
@@ -74,4 +74,4 @@ Sustituir la rejilla única actual del skeleton por tres filas que reproduzcan l
 ## Verificación
 1. `tsgo` limpio y `bun run build` exitoso.
 2. En 360 px de ancho: sin scroll horizontal; el orden vertical es exactamente objetivos/KPIs → Top 10 clientes → Alertas → Top familias → Top marcas → Mix por canal → Evolución mensual → Devoluciones.
-3. En `xl` y superiores: Fila A mide 560 px de alto y las tres columnas se alinean arriba (`items-start`); Fila B alinea Mix por canal y Evolución mensual arriba; Devoluciones ocupa todo el ancho.
+3. En `xl` y superiores: Fila A mide 560 px de alto y las tres columnas se estiran a la misma altura; Fila B mide 420 px de alto y Mix por canal se estira junto a Evolución mensual; Devoluciones ocupa todo el ancho. En resoluciones inferiores a `xl` las filas fluyen con `min-h-[260px]` y sin altura fija.
