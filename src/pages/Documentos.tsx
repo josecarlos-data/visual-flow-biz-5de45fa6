@@ -176,6 +176,11 @@ export default function Documentos() {
 
   useScrollRestore("documentos", !isLoading && !!data);
 
+  const volverRaw = searchParams.get("volver");
+  const volverTxtRaw = searchParams.get("volverTxt");
+  const volver = volverRaw && volverRaw.startsWith("/") && !volverRaw.startsWith("//") ? volverRaw : null;
+  const volverTxt = volverTxtRaw && volverTxtRaw.trim() ? decodeURIComponent(volverTxtRaw) : "Documentos";
+
   const totalPaginas = useMemo(() => {
     if (!data) return 0;
     return Math.max(1, Math.ceil(data.total / LIMITE));
