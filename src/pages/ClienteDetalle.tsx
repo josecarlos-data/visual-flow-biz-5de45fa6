@@ -52,6 +52,8 @@ interface Insights {
   generado_en?: string;
 }
 
+type CampoOrden = "referencia" | "familia" | "marca" | "unidades" | "importe" | "margen" | "ultima";
+
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
 function Dato({ label, value }: { label: string; value: React.ReactNode }) {
