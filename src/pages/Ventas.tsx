@@ -170,6 +170,10 @@ export default function Ventas() {
   const ytdPrevio = mensual
     .filter((m) => m.anio === anioActual - 1 && m.mes <= mesesConDatos)
     .reduce((s, m) => s + m.importe, 0);
+  const totalAnioPrevio = mensual
+    .filter((m) => m.anio === anioActual - 1)
+    .reduce((s, m) => s + m.importe, 0);
+  const proyeccion = ytdPrevio > 0 && kpiActual ? kpiActual.importe * (totalAnioPrevio / ytdPrevio) : null;
   const variacion = ytdPrevio > 0 && kpiActual ? ((kpiActual.importe - ytdPrevio) / ytdPrevio) * 100 : null;
   const margenPct = kpiActual && kpiActual.importe > 0 ? (kpiActual.margen / kpiActual.importe) * 100 : 0;
   const ticketVar =
@@ -191,6 +195,7 @@ export default function Ventas() {
       : null;
 
   const fmtShare = (v: number) => `${v.toFixed(1).replace(".", ",")} %`;
+  const fmtM = (v: number) => `${(v / 1_000_000).toFixed(1).replace(".", ",")} M €`;
 
 
 
@@ -215,19 +220,36 @@ export default function Ventas() {
 
   if (loading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 sm:space-y-6">
         <Skeleton className="h-10 w-64" />
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
-          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-24" />)}
+        <div className={`grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 ${verMargen ? "xl:grid-cols-6" : "xl:grid-cols-5"}`}>
+          {(verMargen ? [0, 1, 2, 3, 4, 5] : [0, 1, 2, 3, 4]).map((i) => <Skeleton key={i} className="h-24" />)}
         </div>
 
-        <Skeleton className="h-80" />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Skeleton className="h-[260px]" />
+          <Skeleton className="h-[260px]" />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64 lg:col-span-2 2xl:col-span-1" />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Skeleton className="h-96" />
+          <div className="grid gap-4">
+            <Skeleton className="h-[200px]" />
+            <Skeleton className="h-[200px]" />
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Panel de Ventas</h1>
         <p className="text-muted-foreground">Rendimiento, rentabilidad y alertas comerciales {anioActual}</p>
@@ -242,13 +264,17 @@ export default function Ventas() {
       <ResumenObjetivos />
 
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+      <div className={`grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 ${verMargen ? "xl:grid-cols-6" : "xl:grid-cols-5"}`}>
 
         <Kpi
           icon={<Euro className="h-4 w-4" />}
           label={`Facturación ${anioActual}`}
           value={eur(kpiActual?.importe ?? 0)}
-          hint={variacion !== null ? `${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}% vs ${anioActual - 1} YTD` : undefined}
+          hint={
+            variacion !== null
+              ? `${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}% vs ${anioActual - 1} YTD${proyeccion !== null ? ` · proyección ${fmtM(proyeccion)}` : ""}`
+              : undefined
+          }
           positive={variacion !== null ? variacion >= 0 : undefined}
         />
         {verMargen && (
@@ -262,7 +288,7 @@ export default function Ventas() {
         <Kpi icon={<Users className="h-4 w-4" />} label="Clientes activos" value={String(kpiActual?.clientes ?? 0)} hint={`${kpiPrevio?.clientes ?? 0} en ${anioActual - 1}`} />
         <Kpi
           icon={<Receipt className="h-4 w-4" />}
-          label="Transacciones"
+          label="Documentos"
           value={fnum(kpiActual?.documentos ?? 0)}
           hint={`${fnum(kpiActual?.abonos ?? 0)} abonos · ${fnum(kpiActual?.lineas ?? 0)} líneas`}
         />
@@ -283,43 +309,45 @@ export default function Ventas() {
 
       </div>
 
-      <Card>
-        <CardHeader><CardTitle>Evolución mensual</CardTitle></CardHeader>
-        <CardContent className="h-[320px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={serieMensual} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
-              <Tooltip formatter={(v) => eur(Number(v))} />
-              <Legend />
-              {anios.map((a) => (
-                <Line key={a} type="monotone" dataKey={String(a)} stroke={getYearColor(a, anioActual)} strokeWidth={a === anioActual ? 2.5 : 1.5} dot={false} />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle>Ticket medio por mes</CardTitle></CardHeader>
-        <CardContent className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={serieTicket} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => eur(Number(v))} width={70} />
-              <Tooltip formatter={(v) => eur(Number(v), 2)} />
-              <Legend />
-              {anios.map((a) => (
-                <Line key={a} type="monotone" dataKey={String(a)} stroke={getYearColor(a, anioActual)} strokeWidth={a === anioActual ? 2.5 : 1.5} dot={false} />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
       <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader><CardTitle>Evolución mensual</CardTitle></CardHeader>
+          <CardContent className="h-[240px] lg:h-[260px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={serieMensual} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
+                <Tooltip formatter={(v) => eur(Number(v))} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {anios.map((a) => (
+                  <Line key={a} type="monotone" dataKey={String(a)} stroke={getYearColor(a, anioActual)} strokeWidth={a === anioActual ? 2.5 : 1.5} dot={false} />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Ticket medio por mes</CardTitle></CardHeader>
+          <CardContent className="h-[240px] lg:h-[260px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={serieTicket} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => eur(Number(v))} width={55} />
+                <Tooltip formatter={(v) => eur(Number(v), 2)} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {anios.map((a) => (
+                  <Line key={a} type="monotone" dataKey={String(a)} stroke={getYearColor(a, anioActual)} strokeWidth={a === anioActual ? 2.5 : 1.5} dot={false} />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
         <Card>
           <CardHeader><CardTitle>Mix por canal {anioActual}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
@@ -374,80 +402,77 @@ export default function Ventas() {
             </Tabs>
           </CardContent>
         </Card>
-      </div>
 
-
-
-      <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" /> Alertas comerciales</CardTitle>
-          <div className="inline-flex shrink-0 rounded-md border p-0.5">
-            {([
-              { key: "atencion", label: "Atención" },
-              { key: "justificadas", label: "Justificadas" },
-              { key: "todos", label: "Todos" },
-            ] as { key: VistaAlertas; label: string }[]).map((v) => (
-              <Button
-                key={v.key}
-                size="sm"
-                variant={vistaAlertas === v.key ? "secondary" : "ghost"}
-                className="h-7 px-3 text-xs"
-                onClick={() => setVistaAlertas(v.key)}
-              >
-                {v.label}
-              </Button>
-            ))}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {vistaAlertas !== "todos" && (ocultasPorSituacion > 0 || justificadas > 0) && (
-            <p className="mb-3 text-xs text-muted-foreground">
-              {[
-                ocultasPorSituacion > 0 ? `${ocultasPorSituacion} oculto${ocultasPorSituacion > 1 ? "s" : ""} por situación` : null,
-                justificadas > 0 ? `${justificadas} con caída justificada` : null,
-              ].filter(Boolean).join(" · ")}.{" "}
-              <button type="button" className="underline hover:text-foreground" onClick={() => setVistaAlertas("todos")}>Ver todos</button>
-            </p>
-          )}
-          <Tabs defaultValue="caida">
-            <TabsList className="mb-3">
-              <TabsTrigger value="caida">Caídas ({alertasPorTipo("caida").length})</TabsTrigger>
-              <TabsTrigger value="fuga">Riesgo fuga ({alertasPorTipo("fuga").length})</TabsTrigger>
-              {verMargen && <TabsTrigger value="margen_bajo">Margen bajo ({alertasPorTipo("margen_bajo").length})</TabsTrigger>}
-            </TabsList>
-
-
-            <TabsContent value="caida" className="space-y-2">
-              {alertasPorTipo("caida").length === 0 && <Vacio />}
-              {alertasPorTipo("caida").map((a) => (
-                <FilaAlerta key={`c-${a.cod_cliente}`} a={a}
-                  detalle={`${eur(a.valor)} vs ${eur(a.valor_ref)} el año pasado`}
-                  badge={<Badge variant="destructive" className="shrink-0"><TrendingDown className="mr-1 h-3 w-3" />{a.valor_ref > 0 ? `${(((a.valor - a.valor_ref) / a.valor_ref) * 100).toFixed(0)}%` : "—"}</Badge>} />
+        <Card className="lg:col-span-2 2xl:col-span-1">
+          <CardHeader className="flex flex-col gap-3">
+            <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" /> Alertas comerciales</CardTitle>
+            <div className="inline-flex shrink-0 rounded-md border p-0.5">
+              {([
+                { key: "atencion", label: "Atención" },
+                { key: "justificadas", label: "Justificadas" },
+                { key: "todos", label: "Todos" },
+              ] as { key: VistaAlertas; label: string }[]).map((v) => (
+                <Button
+                  key={v.key}
+                  size="sm"
+                  variant={vistaAlertas === v.key ? "secondary" : "ghost"}
+                  className="h-7 px-3 text-[11px]"
+                  onClick={() => setVistaAlertas(v.key)}
+                >
+                  {v.label}
+                </Button>
               ))}
-            </TabsContent>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {vistaAlertas !== "todos" && (ocultasPorSituacion > 0 || justificadas > 0) && (
+              <p className="mb-3 text-xs text-muted-foreground">
+                {[
+                  ocultasPorSituacion > 0 ? `${ocultasPorSituacion} oculto${ocultasPorSituacion > 1 ? "s" : ""} por situación` : null,
+                  justificadas > 0 ? `${justificadas} con caída justificada` : null,
+                ].filter(Boolean).join(" · ")}.{" "}
+                <button type="button" className="underline hover:text-foreground" onClick={() => setVistaAlertas("todos")}>Ver todos</button>
+              </p>
+            )}
+            <Tabs defaultValue="caida">
+              <TabsList className="mb-3">
+                <TabsTrigger value="caida">Caídas ({alertasPorTipo("caida").length})</TabsTrigger>
+                <TabsTrigger value="fuga">Riesgo fuga ({alertasPorTipo("fuga").length})</TabsTrigger>
+                {verMargen && <TabsTrigger value="margen_bajo">Margen bajo ({alertasPorTipo("margen_bajo").length})</TabsTrigger>}
+              </TabsList>
 
-            <TabsContent value="fuga" className="space-y-2">
-              {alertasPorTipo("fuga").length === 0 && <Vacio />}
-              {alertasPorTipo("fuga").map((a) => (
-                <FilaAlerta key={`f-${a.cod_cliente}`} a={a}
-                  detalle={`Histórico ${eur(a.valor)}`}
-                  badge={<Badge variant="outline" className="shrink-0">{a.dias} días sin comprar</Badge>} />
-              ))}
-            </TabsContent>
-
-            {verMargen && (
-              <TabsContent value="margen_bajo" className="space-y-2">
-                {alertasPorTipo("margen_bajo").length === 0 && <Vacio />}
-                {alertasPorTipo("margen_bajo").map((a) => (
-                  <FilaAlerta key={`m-${a.cod_cliente}`} a={a}
-                    detalle={`${eur(a.valor)} facturados`}
-                    badge={<Badge variant="secondary" className="shrink-0">{a.valor_ref.toFixed(1)}% margen</Badge>} />
+              <TabsContent value="caida" className="space-y-2">
+                {alertasPorTipo("caida").length === 0 && <Vacio />}
+                {alertasPorTipo("caida").map((a) => (
+                  <FilaAlerta key={`c-${a.cod_cliente}`} a={a}
+                    detalle={`${eur(a.valor)} vs ${eur(a.valor_ref)} el año pasado`}
+                    badge={<Badge variant="destructive" className="shrink-0"><TrendingDown className="mr-1 h-3 w-3" />{a.valor_ref > 0 ? `${(((a.valor - a.valor_ref) / a.valor_ref) * 100).toFixed(0)}%` : "—"}</Badge>} />
                 ))}
               </TabsContent>
-            )}
-          </Tabs>
-        </CardContent>
-      </Card>
+
+              <TabsContent value="fuga" className="space-y-2">
+                {alertasPorTipo("fuga").length === 0 && <Vacio />}
+                {alertasPorTipo("fuga").map((a) => (
+                  <FilaAlerta key={`f-${a.cod_cliente}`} a={a}
+                    detalle={`Histórico ${eur(a.valor)}`}
+                    badge={<Badge variant="outline" className="shrink-0">{a.dias} días sin comprar</Badge>} />
+                ))}
+              </TabsContent>
+
+              {verMargen && (
+                <TabsContent value="margen_bajo" className="space-y-2">
+                  {alertasPorTipo("margen_bajo").length === 0 && <Vacio />}
+                  {alertasPorTipo("margen_bajo").map((a) => (
+                    <FilaAlerta key={`m-${a.cod_cliente}`} a={a}
+                      detalle={`${eur(a.valor)} facturados`}
+                      badge={<Badge variant="secondary" className="shrink-0">{a.valor_ref.toFixed(1)}% margen</Badge>} />
+                  ))}
+                </TabsContent>
+              )}
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
@@ -483,37 +508,38 @@ export default function Ventas() {
           </CardContent>
         </Card>
 
+        <div className="grid gap-4">
+          <Card>
+            <CardHeader><CardTitle>Top familias {anioActual}</CardTitle></CardHeader>
+            <CardContent className="h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topFamilias} layout="vertical" margin={{ top: 5, right: 20, left: 70, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
+                  <YAxis type="category" dataKey="familia" tick={{ fontSize: 11 }} width={70} />
+                  <Tooltip formatter={(v) => eur(Number(v))} />
+                  <Bar dataKey="importe" fill={getYearColor(anioActual, anioActual)} radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader><CardTitle>Top familias {anioActual}</CardTitle></CardHeader>
-          <CardContent className="h-[340px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topFamilias} layout="vertical" margin={{ top: 5, right: 20, left: 90, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
-                <YAxis type="category" dataKey="familia" tick={{ fontSize: 11 }} width={90} />
-                <Tooltip formatter={(v) => eur(Number(v))} />
-                <Bar dataKey="importe" fill={getYearColor(anioActual, anioActual)} radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader><CardTitle>Top marcas {anioActual}</CardTitle></CardHeader>
+            <CardContent className="h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topMarcas} layout="vertical" margin={{ top: 5, right: 20, left: 70, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
+                  <YAxis type="category" dataKey="marca" tick={{ fontSize: 11 }} width={70} />
+                  <Tooltip formatter={(v) => eur(Number(v))} />
+                  <Bar dataKey="importe" fill={getYearColor(anioActual - 1, anioActual)} radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-
-      <Card>
-        <CardHeader><CardTitle>Top marcas {anioActual}</CardTitle></CardHeader>
-        <CardContent className="h-[340px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={topMarcas} layout="vertical" margin={{ top: 5, right: 20, left: 90, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
-              <YAxis type="category" dataKey="marca" tick={{ fontSize: 11 }} width={90} />
-              <Tooltip formatter={(v) => eur(Number(v))} />
-              <Bar dataKey="importe" fill={getYearColor(anioActual - 1, anioActual)} radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
     </div>
   );
 }
