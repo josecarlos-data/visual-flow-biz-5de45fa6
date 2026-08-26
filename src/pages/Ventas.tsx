@@ -271,10 +271,7 @@ export default function Ventas() {
           {(verMargen ? [0, 1, 2, 3, 4, 5] : [0, 1, 2, 3, 4]).map((i) => <Skeleton key={i} className="h-24" />)}
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Skeleton className="h-[260px]" />
-          <Skeleton className="h-[260px]" />
-        </div>
+        <Skeleton className="h-[260px] sm:h-[300px]" />
 
         <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
           <Skeleton className="h-64" />
