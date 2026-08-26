@@ -1,50 +1,42 @@
-# Actividad interna: atribución real de abonos
+# Actividad interna: análisis por motivo de abono
 
-Amplía únicamente la sección Actividad interna. No se toca Documentos, ni el importador `maestroIsi.ts`, ni ninguna otra sección.
+Solo se amplía Actividad interna. No se crean tablas nuevas ni se toca Documentos ni el importador.
 
-## 1. Migración: columna de cruce en la vista de documentos
+## 1. RPC nueva: actividad_interna_motivos
 
-Recrear `public.documentos_resumen` (DROP sin CASCADE + CREATE) idéntica a la definición actual (mismas 19 columnas, mismo JOIN con clientes, mismo WHERE y GROUP BY) añadiendo una columna:
+`public.actividad_interna_motivos(_anio int, _almacen text DEFAULT NULL)`, plpgsql, STABLE, SECURITY DEFINER, `search_path = public`, con la misma comprobación de acceso como primera instrucción (rol admin o `user_dashboard_access` con `actividad_interna`) y `GRANT EXECUTE` a `authenticated`.
 
-- `doc_ref` = `regexp_replace(v.id_documento, '^[^|]*\|', '')`, agrupada junto a `id_documento`.
+Una fila por `motivo_abono` sobre los abonos del año (`operacion = 'Abono'`), filtrando por `almacen` cuando `_almacen` no es NULL. Motivo nulo o vacío se agrupa como `'SIN MOTIVO'`.
 
-En la misma migración, sin omitir nada de lo existente:
+Columnas: `motivo`, `n_abonos` (COUNT DISTINCT `id_documento`), `importe` (ABS de la suma), `pct_n` (% sobre el total de abonos del año/almacén), `pct_importe` (% sobre el importe abonado total), `tramitadores` (COUNT DISTINCT `registrado_por`), `clientes_distintos` (COUNT DISTINCT `cod_cliente`). Orden `n_abonos DESC`.
 
-- `SET LOCAL statement_timeout = '10min'` al inicio.
-- Índices recreados: `idx_documentos_resumen_pk` (UNIQUE sobre `anio, cod_cliente, id_documento`) e `idx_documentos_resumen_anio_importe` (sobre `anio, ABS(importe) DESC`).
-- Índice nuevo: `idx_documentos_resumen_doc_ref` sobre `(doc_ref)`.
-- Permisos: `REVOKE ALL ... FROM authenticated`, `REVOKE ALL ... FROM anon`, `GRANT ALL ... TO service_role`.
+## 2. Filtro de motivo en actividad_interna_usuarios
 
-## 2. Atribución de abonos en las RPC
+`DROP FUNCTION IF EXISTS public.actividad_interna_usuarios(integer, text)` antes de crear la nueva firma `(_anio int, _almacen text DEFAULT NULL, _motivo text DEFAULT NULL)`, para no dejar una sobrecarga.
 
-Ambas funciones necesitan `DROP FUNCTION` + `CREATE` (cambia la lista de columnas devueltas), manteniendo firma, `SECURITY DEFINER`, `STABLE`, `search_path = public`, la comprobación de acceso tal cual (admin o dashboard `actividad_interna`) y el `GRANT EXECUTE` a `authenticated`.
+El filtro de motivo aplica solo a los abonos:
 
-Tres columnas nuevas en `actividad_interna_usuarios` y en `actividad_interna_almacenes`:
+- `importe_vendido`, `docs_venta`, `clientes_distintos`, `ticket_medio`, `n_almacenes` y `almacen_principal` se calculan siempre sobre todas las ventas del año, ignorando `_motivo`.
+- `n_abonos`, `importe_abonado`, `abonos_ajenos`, `abonos_atribuidos` e `importe_atribuido` se restringen a los abonos de ese motivo (comparando `SIN MOTIVO` con motivo nulo o vacío).
+- `importe_neto` = `importe_vendido - importe_atribuido` (ya filtrado).
+- `pct_abonos` y `pct_importe_abonado` se mantienen en la RPC.
 
-- `abonos_atribuidos` (int): abonos del año cuya venta original fue registrada por ese usuario (o, en la vista por almacén, cuya venta original pertenece a ese almacén).
-- `importe_atribuido` (numeric): `ABS` del importe de esos abonos.
-- `importe_neto` (numeric): `importe_vendido - importe_atribuido`.
+Se conservan la atribución por LATERAL con `ORDER BY s.anio DESC, s.cod_cliente, s.id_documento LIMIT 1`, el FULL OUTER JOIN entre tramitados y atribuidos, y el orden por `importe_vendido DESC`.
 
-Resolución del enlace: para cada abono del año, `LEFT JOIN LATERAL (SELECT registrado_por, almacen FROM public.documentos_resumen s WHERE s.doc_ref = btrim(a.id_doc_enlazado) AND COALESCE(s.operacion,'Venta') <> 'Abono' LIMIT 1) ON TRUE`, sin filtrar el lado de la venta por `_anio` (la venta original puede ser de otro año) y sin JOIN directo, para no duplicar filas cuando `doc_ref` se repite entre clientes. Un abono sin enlace, o cuyo enlace no resuelve, no se atribuye a nadie y queda fuera de estas tres columnas.
+## 3. actividad_interna_filtros
 
-- `n_abonos` e `importe_abonado` se mantienen sin cambios en SQL (pasan a interpretarse como "tramitados").
-- `pct_abonos` y `pct_importe_abonado` pasan a calcularse sobre los atribuidos: `abonos_atribuidos / docs_venta * 100` e `importe_atribuido / importe_vendido * 100`.
-- Se mantiene `n_almacenes` y el resto de métricas y el orden por `importe_vendido DESC`.
+Se añade `motivos text[]` con los valores distintos de `motivo_abono` presentes en abonos, ordenados alfabéticamente.
 
-## 3. Frontend
+## 4. Frontend
 
-`src/hooks/useCrm.ts`: añadir `abonos_atribuidos`, `importe_atribuido` e `importe_neto` a `ActividadUsuario` y `ActividadAlmacen`. Sin cambios en los hooks.
+`src/hooks/useCrm.ts`: nuevo tipo `ActividadMotivo` y hook `useActividadMotivos(anio, almacen)`; `motivos` en el tipo de filtros; `useActividadUsuarios` acepta un tercer argumento `motivo` que va en la queryKey y en los parámetros de la RPC.
 
-`src/pages/ActividadInterna.tsx`, pestaña "Por usuario":
+`src/pages/ActividadInterna.tsx`:
 
-- Nueva columna "Neto" (importe_neto) justo después de "Vendido".
-- "Abonos" -> "Abonos tramitados"; "Importe abonado" -> "Imp. tramitado".
-- Nuevas columnas "Abonos s/ sus ventas" (abonos_atribuidos) e "Imp. atribuido" (importe_atribuido).
-- Cabecera de almacén renombrada a "Plaza (est.)" y eliminado el badge "+N" (el valor sigue siendo el almacén principal).
-- Todas las columnas nuevas ordenables con el mecanismo de ordenación local existente.
-
-Pestaña "Por almacén": se añaden las mismas columnas nuevas para mantener coherencia de lectura.
+- Tercera pestaña "Por motivo" con su propio selector de almacén y tabla ordenable (mecanismo local existente): Motivo, Abonos, Importe, % abonos, % importe, Tramitadores, Clientes.
+- En "Por usuario", selector "Motivo" junto al de almacén con "Todos los motivos" por defecto; con motivo activo se muestra bajo los filtros una línea de 13px en color secundario: "Las columnas de abonos están filtradas por motivo; las de venta no."
+- Se eliminan de la tabla "Por usuario" las columnas "% abonos" y "% imp. abonado".
 
 ## Fuera de alcance
 
-Clasificación operativo/funcional, comparativa anual, gráficos y exportación.
+Agrupación de motivos, comparativa anual, gráficos y exportación.
