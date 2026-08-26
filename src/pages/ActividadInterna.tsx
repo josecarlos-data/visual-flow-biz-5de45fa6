@@ -281,6 +281,9 @@ export default function ActividadInterna() {
                         <CabA col="importe_vendido" className="text-right">
                           Vendido
                         </CabA>
+                        <CabA col="importe_neto" className="text-right">
+                          Neto
+                        </CabA>
                         <CabA col="docs_venta" className="text-right">
                           Docs.
                         </CabA>
@@ -291,10 +294,16 @@ export default function ActividadInterna() {
                           Clientes
                         </CabA>
                         <CabA col="n_abonos" className="text-right">
-                          Abonos
+                          Abonos tramitados
                         </CabA>
                         <CabA col="importe_abonado" className="text-right">
-                          Importe abonado
+                          Imp. tramitado
+                        </CabA>
+                        <CabA col="abonos_atribuidos" className="text-right">
+                          Abonos s/ sus ventas
+                        </CabA>
+                        <CabA col="importe_atribuido" className="text-right">
+                          Imp. atribuido
                         </CabA>
                         <CabA col="pct_abonos" className="text-right">
                           % abonos
@@ -310,11 +319,14 @@ export default function ActividadInterna() {
                           <TableCell className="font-medium">{r.almacen}</TableCell>
                           <TableCell className="text-right">{num(r.n_usuarios)}</TableCell>
                           <TableCell className="text-right">{eur(r.importe_vendido, 0)}</TableCell>
+                          <TableCell className="text-right">{eur(r.importe_neto, 0)}</TableCell>
                           <TableCell className="text-right">{num(r.docs_venta)}</TableCell>
                           <TableCell className="text-right">{eur(r.ticket_medio, 0)}</TableCell>
                           <TableCell className="text-right">{num(r.clientes_distintos)}</TableCell>
                           <TableCell className="text-right">{num(r.n_abonos)}</TableCell>
                           <TableCell className="text-right">{eur(r.importe_abonado, 0)}</TableCell>
+                          <TableCell className="text-right">{num(r.abonos_atribuidos)}</TableCell>
+                          <TableCell className="text-right">{eur(r.importe_atribuido, 0)}</TableCell>
                           <TableCell className="text-right">{pct1(r.pct_abonos)}</TableCell>
                           <TableCell className="text-right">{pct1(r.pct_importe_abonado)}</TableCell>
                         </TableRow>
