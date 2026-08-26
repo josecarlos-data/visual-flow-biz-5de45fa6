@@ -91,6 +91,55 @@ export default function ClienteDetalle() {
   const anioProdInicializado = useRef(false);
   const [docSeleccionado, setDocSeleccionado] = useState<DocumentoCliente | null>(null);
   const [dialogoLineasOpen, setDialogoLineasOpen] = useState(false);
+  const [kpisAbiertos, setKpisAbiertos] = useState(false);
+
+  // --- Agendar visita ---
+  const { user } = useAuth();
+  const { add: addPlanificada } = useAgendaMutations();
+  const { data: proxima } = useProximaPlanificada(codNum);
+  const [agendarOpen, setAgendarOpen] = useState(false);
+  const [modoFecha, setModoFecha] = useState<"hoy" | "manana" | "otra">("hoy");
+  const [fechaOtra, setFechaOtra] = useState<string>(fechaHoy());
+  const [notasAgenda, setNotasAgenda] = useState("");
+  const [guardandoAgenda, setGuardandoAgenda] = useState(false);
+
+  const fechaElegida = modoFecha === "hoy" ? fechaHoy() : modoFecha === "manana" ? fechaManana() : fechaOtra;
+
+  const guardarAgenda = async () => {
+    if (!user || codNum == null || !fechaElegida) return;
+    setGuardandoAgenda(true);
+    try {
+      const { count, error: errCount } = await supabase
+        .from("visitas_planificadas")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("fecha", fechaElegida);
+      if (errCount) throw errCount;
+
+      await addPlanificada.mutateAsync({
+        user_id: user.id,
+        cod_cliente: codNum,
+        fecha: fechaElegida,
+        orden: (count ?? 0) + 1,
+        notas: notasAgenda.trim() ? notasAgenda.trim() : null,
+      });
+
+      toast({ title: "Visita agendada", description: `Añadida a tu agenda del ${fechaCorta(fechaElegida)}.` });
+      setAgendarOpen(false);
+      setNotasAgenda("");
+      setModoFecha("hoy");
+    } catch (e) {
+      const err = e as { code?: string; message?: string };
+      if (err?.code === "23505") {
+        toast({ title: `Este cliente ya está en tu agenda del ${fechaCorta(fechaElegida)}` });
+      } else {
+        toast({ title: "No se ha podido agendar", description: err?.message, variant: "destructive" });
+      }
+    } finally {
+      setGuardandoAgenda(false);
+    }
+  };
+
   const { data: productos, isLoading: cargandoProductos } = useClienteProductos(
     codNum,
     anioProd === "todos" ? null : Number(anioProd),
