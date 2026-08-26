@@ -418,7 +418,7 @@ export default function Ventas() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">
         <Card>
           <CardHeader><CardTitle>Mix por canal {anioActual}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
@@ -568,7 +568,7 @@ export default function Ventas() {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
         <Card>
           <CardHeader>
             <CardTitle>Top 10 clientes {anioActual}</CardTitle>
