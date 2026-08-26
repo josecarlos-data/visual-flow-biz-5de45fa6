@@ -68,13 +68,22 @@ function Dato({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default function ClienteDetalle() {
   const { cod } = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const codNum = cod ? Number(cod) : null;
 
   const volverRaw = searchParams.get("volver");
   const volverTxtRaw = searchParams.get("volverTxt");
   const volver = volverRaw && volverRaw.startsWith("/") && !volverRaw.startsWith("//") ? volverRaw : "/clientes";
   const volverTxt = volverTxtRaw && volverTxtRaw.trim() ? decodeURIComponent(volverTxtRaw) : "Clientes";
+
+  // Pestaña activa controlada desde la URL ("tab"), conservando el resto de parámetros.
+  const TABS_VALIDAS = ["resumen", "visitas", "productos", "documentos", "perfil", "ia"] as const;
+  const tabRaw = searchParams.get("tab");
+  const tab = (TABS_VALIDAS as readonly string[]).includes(tabRaw ?? "") ? (tabRaw as string) : "resumen";
+  const cambiarTab = (nueva: string) => {
+    const params = Object.fromEntries(searchParams.entries());
+    setSearchParams({ ...params, tab: nueva }, { replace: true });
+  };
 
   const { data: cliente, isLoading } = useCliente(codNum);
   const { data: ventas } = useClienteVentas(codNum);
@@ -510,7 +519,7 @@ export default function ClienteDetalle() {
       </div>
 
 
-      <Tabs defaultValue="resumen">
+      <Tabs value={tab} onValueChange={cambiarTab}>
         <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
           <TabsTrigger value="visitas">Visitas</TabsTrigger>

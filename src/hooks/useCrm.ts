@@ -940,6 +940,43 @@ export function useAgendaMutations() {
   return { add, update, remove };
 }
 
+/**
+ * Tras guardar una visita, marca la parada planificada de ese día como realizada.
+ * Solo actúa sobre la fecha EXACTA de la visita: si el cliente está planificado
+ * para otro día, esa parada no se toca. Nunca lanza: fallar aquí no debe romper
+ * el guardado de la visita.
+ */
+export async function marcarPlanificadaRealizada(
+  userId: string,
+  codCliente: number,
+  fecha: string,
+  visitaId: string,
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from("visitas_planificadas")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("cod_cliente", codCliente)
+      .eq("fecha", fecha)
+      .neq("estado", "realizada")
+      .limit(1);
+    if (error) throw error;
+    const fila = data?.[0];
+    if (!fila) return false;
+
+    const { error: errUpdate } = await supabase
+      .from("visitas_planificadas")
+      .update({ estado: "realizada", visita_id: visitaId })
+      .eq("id", fila.id);
+    if (errUpdate) throw errUpdate;
+    return true;
+  } catch (e) {
+    console.error("No se ha podido marcar la parada como realizada:", e);
+    return false;
+  }
+}
+
 export { eur, num, eurK, pct } from "@/lib/format";
 
 export const fechaCorta = (iso: string) =>

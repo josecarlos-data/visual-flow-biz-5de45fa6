@@ -15,7 +15,7 @@ import { CampoVisita } from "@/components/CampoVisita";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { useClientes, useMotivos, useCatalogos, hoyISO, crearBloques, type Motivo, type MotivoCampo } from "@/hooks/useCrm";
+import { useClientes, useMotivos, useCatalogos, hoyISO, crearBloques, marcarPlanificadaRealizada, type Motivo, type MotivoCampo } from "@/hooks/useCrm";
 import { camposVisibles, normalizarValoresNumericos } from "@/lib/motivoCampos";
 
 type Meta = Record<string, { cita?: string; confianza?: string }>;
@@ -384,7 +384,22 @@ export default function NuevaVisita() {
         _lng: pos.lng,
       } as never);
     }
-    toast({ title: "Visita guardada" });
+
+    // Si el cliente estaba planificado hoy en la agenda, marcamos la parada como realizada.
+    // Es un extra: cualquier fallo aquí nunca debe afectar al guardado de la visita.
+    let agendaMarcada = false;
+    try {
+      if (user?.id) {
+        agendaMarcada = await marcarPlanificadaRealizada(user.id, Number(codCliente), fecha, (creada as { id: string }).id);
+      }
+    } catch (e) {
+      console.error("No se ha podido actualizar la agenda:", e);
+    }
+
+    toast({
+      title: "Visita guardada",
+      description: agendaMarcada ? "Marcada como realizada en tu agenda." : undefined,
+    });
     navigate(`/clientes/${codCliente}`);
   };
 
