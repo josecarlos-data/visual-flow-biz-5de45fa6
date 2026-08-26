@@ -508,37 +508,38 @@ export default function Ventas() {
           </CardContent>
         </Card>
 
+        <div className="grid gap-4">
+          <Card>
+            <CardHeader><CardTitle>Top familias {anioActual}</CardTitle></CardHeader>
+            <CardContent className="h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topFamilias} layout="vertical" margin={{ top: 5, right: 20, left: 70, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
+                  <YAxis type="category" dataKey="familia" tick={{ fontSize: 11 }} width={70} />
+                  <Tooltip formatter={(v) => eur(Number(v))} />
+                  <Bar dataKey="importe" fill={getYearColor(anioActual, anioActual)} radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader><CardTitle>Top familias {anioActual}</CardTitle></CardHeader>
-          <CardContent className="h-[340px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topFamilias} layout="vertical" margin={{ top: 5, right: 20, left: 90, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
-                <YAxis type="category" dataKey="familia" tick={{ fontSize: 11 }} width={90} />
-                <Tooltip formatter={(v) => eur(Number(v))} />
-                <Bar dataKey="importe" fill={getYearColor(anioActual, anioActual)} radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader><CardTitle>Top marcas {anioActual}</CardTitle></CardHeader>
+            <CardContent className="h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topMarcas} layout="vertical" margin={{ top: 5, right: 20, left: 70, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
+                  <YAxis type="category" dataKey="marca" tick={{ fontSize: 11 }} width={70} />
+                  <Tooltip formatter={(v) => eur(Number(v))} />
+                  <Bar dataKey="importe" fill={getYearColor(anioActual - 1, anioActual)} radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-
-      <Card>
-        <CardHeader><CardTitle>Top marcas {anioActual}</CardTitle></CardHeader>
-        <CardContent className="h-[340px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={topMarcas} layout="vertical" margin={{ top: 5, right: 20, left: 90, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
-              <YAxis type="category" dataKey="marca" tick={{ fontSize: 11 }} width={90} />
-              <Tooltip formatter={(v) => eur(Number(v))} />
-              <Bar dataKey="importe" fill={getYearColor(anioActual - 1, anioActual)} radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
     </div>
   );
 }
