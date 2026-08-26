@@ -2214,6 +2214,7 @@ export type Database = {
       panel_devoluciones: {
         Args: { _anio: number; _limite?: number }
         Returns: {
+          descripcion: string
           etiqueta: string
           importe: number
           lineas: number
