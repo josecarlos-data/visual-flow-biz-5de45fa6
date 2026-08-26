@@ -262,20 +262,14 @@ export default function Ventas() {
           {(verMargen ? [0, 1, 2, 3, 4, 5] : [0, 1, 2, 3, 4]).map((i) => <Skeleton key={i} className="h-24" />)}
         </div>
 
-        <Skeleton className="h-[260px] sm:h-[300px]" />
-
-        <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+        <div className="grid items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">
+          <Skeleton className="h-[260px] sm:h-[300px] 2xl:h-[420px] lg:col-span-2 2xl:col-span-2" />
           <Skeleton className="h-64" />
           <Skeleton className="h-64" />
-          <Skeleton className="h-64 lg:col-span-2 2xl:col-span-1" />
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Skeleton className="h-96" />
-          <div className="grid gap-4">
-            <Skeleton className="h-[200px]" />
-            <Skeleton className="h-[200px]" />
-          </div>
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64 2xl:col-span-2" />
         </div>
       </div>
     );
@@ -342,172 +336,118 @@ export default function Ventas() {
 
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle>Evolución mensual</CardTitle>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="inline-flex shrink-0 rounded-md border p-0.5">
-              {([
-                { key: "ventas", label: "Ventas" },
-                { key: "ticket", label: "Ticket medio" },
-              ] as { key: "ventas" | "ticket"; label: string }[]).map((m) => (
-                <Button
-                  key={m.key}
-                  size="sm"
-                  variant={metrica === m.key ? "secondary" : "ghost"}
-                  className="h-7 px-3 text-[11px]"
-                  onClick={() => setMetrica(m.key)}
-                >
-                  {m.label}
-                </Button>
-              ))}
-            </div>
-            {metrica === "ventas" && (
+      <div className="grid items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">
+        <Card className="lg:col-span-2 2xl:col-span-2">
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle>Evolución mensual</CardTitle>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="inline-flex shrink-0 rounded-md border p-0.5">
                 {([
-                  { key: "mensual", label: "Mensual" },
-                  { key: "acumulada", label: "Acumulada" },
-                ] as { key: "mensual" | "acumulada"; label: string }[]).map((v) => (
+                  { key: "ventas", label: "Ventas" },
+                  { key: "ticket", label: "Ticket medio" },
+                ] as { key: "ventas" | "ticket"; label: string }[]).map((m) => (
                   <Button
-                    key={v.key}
+                    key={m.key}
                     size="sm"
-                    variant={vista === v.key ? "secondary" : "ghost"}
+                    variant={metrica === m.key ? "secondary" : "ghost"}
                     className="h-7 px-3 text-[11px]"
-                    onClick={() => setVista(v.key)}
+                    onClick={() => setMetrica(m.key)}
                   >
-                    {v.label}
+                    {m.label}
                   </Button>
                 ))}
               </div>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="h-[260px] sm:h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={datosGrafico} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-              {metrica === "ticket" ? (
-                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => eur(Number(v))} width={55} />
-              ) : (
-                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
-              )}
-              <Tooltip
-                formatter={(v, name) => [
-                  metrica === "ticket" ? eur(Number(v), 2) : eur(Number(v)),
-                  name === "proyeccion" ? "Proyección" : (name as string),
-                ]}
-              />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              {anios.map((a) => (
-                <Line key={a} type="monotone" dataKey={String(a)} stroke={getYearColor(a, anioActual)} strokeWidth={a === anioActual ? 2.5 : 1.5} dot={false} />
-              ))}
-              {metrica === "ventas" && factorProy !== null && (
-                <Line
-                  type="monotone"
-                  dataKey="proyeccion"
-                  stroke={getYearColor(anioActual, anioActual)}
-                  strokeWidth={2}
-                  strokeDasharray="5 4"
-                  dot={false}
-                  connectNulls
-                  legendType="none"
-                />
-              )}
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">
-        <Card>
-          <CardHeader><CardTitle>Mix por canal {anioActual}</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            {canales.length === 0 && <Vacio />}
-            {canales.map((c) => {
-              const total = canales.reduce((s, x) => s + x.importe, 0);
-              const share = total > 0 ? (c.importe / total) * 100 : 0;
-              const ancho = Math.max(0, Math.min(100, share));
-              const contenido = (
-                <>
-                  <div className="flex min-w-0 items-center justify-between gap-3">
-                    <span className="min-w-0 truncate font-medium">{c.canal}</span>
-                    <span className="shrink-0 font-medium">{eur(c.importe)}</span>
-                  </div>
-                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                    <div className={`h-full rounded-full ${share < 0 ? "bg-destructive" : "bg-primary"}`} style={{ width: `${ancho.toFixed(1)}%` }} />
-                  </div>
-                  <div className="mt-1 truncate text-xs text-muted-foreground">
-                    {pct(share)} · {fnum(c.documentos)} transacciones · ticket {eur(c.ticket_medio, 2)} · {fnum(c.clientes)} clientes
-                  </div>
-                </>
-              );
-              const esLink = !esSintetico(c.canal);
-              return esLink ? (
-                <Link key={c.canal} to={`/documentos?anio=${anioActual}&canal=${encodeURIComponent(c.canal)}&importeMin=0&volver=%2F&volverTxt=Ventas`} className="block rounded-md border p-2 text-sm transition-colors hover:bg-accent">
-                  {contenido}
-                </Link>
-              ) : (
-                <div key={c.canal} className="rounded-md border p-2 text-sm">
-                  {contenido}
+              {metrica === "ventas" && (
+                <div className="inline-flex shrink-0 rounded-md border p-0.5">
+                  {([
+                    { key: "mensual", label: "Mensual" },
+                    { key: "acumulada", label: "Acumulada" },
+                  ] as { key: "mensual" | "acumulada"; label: string }[]).map((v) => (
+                    <Button
+                      key={v.key}
+                      size="sm"
+                      variant={vista === v.key ? "secondary" : "ghost"}
+                      className="h-7 px-3 text-[11px]"
+                      onClick={() => setVista(v.key)}
+                    >
+                      {v.label}
+                    </Button>
+                  ))}
                 </div>
-              );
-            })}
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="h-[260px] sm:h-[300px] 2xl:h-[420px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={datosGrafico} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
+                {metrica === "ticket" ? (
+                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => eur(Number(v))} width={55} />
+                ) : (
+                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
+                )}
+                <Tooltip
+                  formatter={(v, name) => [
+                    metrica === "ticket" ? eur(Number(v), 2) : eur(Number(v)),
+                    name === "proyeccion" ? "Proyección" : (name as string),
+                  ]}
+                />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {anios.map((a) => (
+                  <Line key={a} type="monotone" dataKey={String(a)} stroke={getYearColor(a, anioActual)} strokeWidth={a === anioActual ? 2.5 : 1.5} dot={false} />
+                ))}
+                {metrica === "ventas" && factorProy !== null && (
+                  <Line
+                    type="monotone"
+                    dataKey="proyeccion"
+                    stroke={getYearColor(anioActual, anioActual)}
+                    strokeWidth={2}
+                    strokeDasharray="5 4"
+                    dot={false}
+                    connectNulls
+                    legendType="none"
+                  />
+                )}
+              </LineChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>Devoluciones {anioActual}</CardTitle></CardHeader>
-          <CardContent>
-            <Tabs defaultValue="motivo">
-              <TabsList className="mb-3">
-                <TabsTrigger value="motivo">Motivos</TabsTrigger>
-                <TabsTrigger value="referencia">Referencias</TabsTrigger>
-                <TabsTrigger value="vendedor">Vendedores</TabsTrigger>
-              </TabsList>
-              {["motivo", "referencia", "vendedor"].map((t) => {
-                const filas = devoluciones.filter((d) => d.tipo === t);
-                return (
-                  <TabsContent key={t} value={t} className="space-y-2">
-                    {filas.length === 0 && <Vacio />}
-                    {filas.map((d) => {
-                      const esLink = t === "motivo" && !esSintetico(d.etiqueta);
-                      const contenido = (
-                        <>
-                          {t === "referencia" ? (
-                            <span className="min-w-0">
-                              <span className="block truncate">{d.etiqueta}</span>
-                              {d.descripcion && d.descripcion.trim() !== "" && (
-                                <span className="block truncate text-xs text-muted-foreground">{d.descripcion}</span>
-                              )}
-                            </span>
-                          ) : (
-                            <span className="min-w-0 truncate">{d.etiqueta}</span>
-                          )}
-                          <span className="shrink-0 text-right">
-                            <span className="font-medium">{eur(d.importe)}</span>
-                            <span className="ml-2 text-xs text-muted-foreground">{fnum(d.lineas)} líneas</span>
-                          </span>
-                        </>
-                      );
-                      return esLink ? (
-                        <Link key={`${t}-${d.etiqueta}`} to={`/documentos?anio=${anioActual}&operacion=Abono&motivoAbono=${encodeURIComponent(d.etiqueta)}&importeMin=0&volver=%2F&volverTxt=Ventas`} className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
-                          {contenido}
-                        </Link>
-                      ) : (
-                        <div key={`${t}-${d.etiqueta}`} className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-2 text-sm">
-                          {contenido}
-                        </div>
-                      );
-                    })}
-                  </TabsContent>
-                );
-              })}
-            </Tabs>
+          <CardHeader>
+            <CardTitle>Top 10 clientes {anioActual}</CardTitle>
+            {shareTopClientes !== null && (
+              <CardDescription>
+                Estos {topClientes.length} clientes representan el {fmtShare(shareTopClientes)} de tu cartera
+              </CardDescription>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {topClientes.map((c, i) => (
+              <Link key={c.cod_cliente} to={`/clientes/${c.cod_cliente}?volver=${encodeURIComponent('/')}&volverTxt=${encodeURIComponent('Ventas')}`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="w-5 text-xs text-muted-foreground">{i + 1}</span>
+                  <span className="truncate">{c.cliente}</span>
+                </span>
+                <span className="shrink-0 text-right">
+                  <span className="font-medium">{eur(c.importe)}</span>
+                  {shareTopClientes !== null && (
+                    <span className="block text-xs text-muted-foreground">
+                      {fmtShare((c.importe / kpiActual!.importe) * 100)} de cartera
+                    </span>
+                  )}
+                  {verMargen && c.importe > 0 && (
+                    <span className="ml-2 text-xs text-muted-foreground">{((c.margen / c.importe) * 100).toFixed(1)}%</span>
+                  )}
+                </span>
+              </Link>
+            ))}
+            {topClientes.length === 0 && <Vacio />}
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2 2xl:col-span-1">
+        <Card>
           <CardHeader className="flex flex-col gap-3">
             <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" /> Alertas comerciales</CardTitle>
             <div className="inline-flex shrink-0 rounded-md border p-0.5">
@@ -576,73 +516,123 @@ export default function Ventas() {
             </Tabs>
           </CardContent>
         </Card>
-      </div>
 
-      <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
         <Card>
-          <CardHeader>
-            <CardTitle>Top 10 clientes {anioActual}</CardTitle>
-            {shareTopClientes !== null && (
-              <CardDescription>
-                Estos {topClientes.length} clientes representan el {fmtShare(shareTopClientes)} de tu cartera
-              </CardDescription>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {topClientes.map((c, i) => (
-              <Link key={c.cod_cliente} to={`/clientes/${c.cod_cliente}?volver=${encodeURIComponent('/')}&volverTxt=${encodeURIComponent('Ventas')}`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
-                <span className="flex min-w-0 items-center gap-2">
-                  <span className="w-5 text-xs text-muted-foreground">{i + 1}</span>
-                  <span className="truncate">{c.cliente}</span>
-                </span>
-                <span className="shrink-0 text-right">
-                  <span className="font-medium">{eur(c.importe)}</span>
-                  {shareTopClientes !== null && (
-                    <span className="block text-xs text-muted-foreground">
-                      {fmtShare((c.importe / kpiActual!.importe) * 100)} de cartera
-                    </span>
-                  )}
-                  {verMargen && c.importe > 0 && (
-                    <span className="ml-2 text-xs text-muted-foreground">{((c.margen / c.importe) * 100).toFixed(1)}%</span>
-                  )}
-                </span>
-              </Link>
-            ))}
-            {topClientes.length === 0 && <Vacio />}
+          <CardHeader><CardTitle>Top familias {anioActual}</CardTitle></CardHeader>
+          <CardContent className="h-[200px] 2xl:h-[240px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={topFamilias} layout="vertical" margin={{ top: 5, right: 20, left: 70, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
+                <YAxis type="category" dataKey="familia" tick={{ fontSize: 11 }} width={70} />
+                <Tooltip formatter={(v) => eur(Number(v))} />
+                <Bar dataKey="importe" fill={getYearColor(anioActual, anioActual)} radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        <div className="grid gap-4">
-          <Card>
-            <CardHeader><CardTitle>Top familias {anioActual}</CardTitle></CardHeader>
-            <CardContent className="h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topFamilias} layout="vertical" margin={{ top: 5, right: 20, left: 70, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
-                  <YAxis type="category" dataKey="familia" tick={{ fontSize: 11 }} width={70} />
-                  <Tooltip formatter={(v) => eur(Number(v))} />
-                  <Bar dataKey="importe" fill={getYearColor(anioActual, anioActual)} radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader><CardTitle>Top marcas {anioActual}</CardTitle></CardHeader>
+          <CardContent className="h-[200px] 2xl:h-[240px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={topMarcas} layout="vertical" margin={{ top: 5, right: 20, left: 70, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
+                <YAxis type="category" dataKey="marca" tick={{ fontSize: 11 }} width={70} />
+                <Tooltip formatter={(v) => eur(Number(v))} />
+                <Bar dataKey="importe" fill={getYearColor(anioActual - 1, anioActual)} radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader><CardTitle>Top marcas {anioActual}</CardTitle></CardHeader>
-            <CardContent className="h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topMarcas} layout="vertical" margin={{ top: 5, right: 20, left: 70, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
-                  <YAxis type="category" dataKey="marca" tick={{ fontSize: 11 }} width={70} />
-                  <Tooltip formatter={(v) => eur(Number(v))} />
-                  <Bar dataKey="importe" fill={getYearColor(anioActual - 1, anioActual)} radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
+        <Card>
+          <CardHeader><CardTitle>Mix por canal {anioActual}</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {canales.length === 0 && <Vacio />}
+            {canales.map((c) => {
+              const total = canales.reduce((s, x) => s + x.importe, 0);
+              const share = total > 0 ? (c.importe / total) * 100 : 0;
+              const ancho = Math.max(0, Math.min(100, share));
+              const contenido = (
+                <>
+                  <div className="flex min-w-0 items-center justify-between gap-3">
+                    <span className="min-w-0 truncate font-medium">{c.canal}</span>
+                    <span className="shrink-0 font-medium">{eur(c.importe)}</span>
+                  </div>
+                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                    <div className={`h-full rounded-full ${share < 0 ? "bg-destructive" : "bg-primary"}`} style={{ width: `${ancho.toFixed(1)}%` }} />
+                  </div>
+                  <div className="mt-1 truncate text-xs text-muted-foreground">
+                    {pct(share)} · {fnum(c.documentos)} transacciones · ticket {eur(c.ticket_medio, 2)} · {fnum(c.clientes)} clientes
+                  </div>
+                </>
+              );
+              const esLink = !esSintetico(c.canal);
+              return esLink ? (
+                <Link key={c.canal} to={`/documentos?anio=${anioActual}&canal=${encodeURIComponent(c.canal)}&importeMin=0&volver=%2F&volverTxt=Ventas`} className="block rounded-md border p-2 text-sm transition-colors hover:bg-accent">
+                  {contenido}
+                </Link>
+              ) : (
+                <div key={c.canal} className="rounded-md border p-2 text-sm">
+                  {contenido}
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+
+        <Card className="2xl:col-span-2">
+          <CardHeader><CardTitle>Devoluciones {anioActual}</CardTitle></CardHeader>
+          <CardContent>
+            <Tabs defaultValue="motivo">
+              <TabsList className="mb-3">
+                <TabsTrigger value="motivo">Motivos</TabsTrigger>
+                <TabsTrigger value="referencia">Referencias</TabsTrigger>
+                <TabsTrigger value="vendedor">Vendedores</TabsTrigger>
+              </TabsList>
+              {["motivo", "referencia", "vendedor"].map((t) => {
+                const filas = devoluciones.filter((d) => d.tipo === t);
+                return (
+                  <TabsContent key={t} value={t} className="space-y-2">
+                    {filas.length === 0 && <Vacio />}
+                    {filas.map((d) => {
+                      const esLink = t === "motivo" && !esSintetico(d.etiqueta);
+                      const contenido = (
+                        <>
+                          {t === "referencia" ? (
+                            <span className="min-w-0">
+                              <span className="block truncate">{d.etiqueta}</span>
+                              {d.descripcion && d.descripcion.trim() !== "" && (
+                                <span className="block truncate text-xs text-muted-foreground">{d.descripcion}</span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="min-w-0 truncate">{d.etiqueta}</span>
+                          )}
+                          <span className="shrink-0 text-right">
+                            <span className="font-medium">{eur(d.importe)}</span>
+                            <span className="ml-2 text-xs text-muted-foreground">{fnum(d.lineas)} líneas</span>
+                          </span>
+                        </>
+                      );
+                      return esLink ? (
+                        <Link key={`${t}-${d.etiqueta}`} to={`/documentos?anio=${anioActual}&operacion=Abono&motivoAbono=${encodeURIComponent(d.etiqueta)}&importeMin=0&volver=%2F&volverTxt=Ventas`} className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
+                          {contenido}
+                        </Link>
+                      ) : (
+                        <div key={`${t}-${d.etiqueta}`} className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-2 text-sm">
+                          {contenido}
+                        </div>
+                      );
+                    })}
+                  </TabsContent>
+                );
+              })}
+            </Tabs>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
