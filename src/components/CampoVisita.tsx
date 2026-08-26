@@ -262,12 +262,12 @@ export function CampoVisita(props: Props) {
         )}
       </Label>
       {control}
-      {meta?.cita && (
+      {meta?.cita && dudoso && (
         <p className={`text-xs italic ${dudoso ? "text-amber-700 dark:text-amber-500" : "text-muted-foreground"}`}>
           «{meta.cita}»
         </p>
       )}
-      {campo.ayuda && <p className="text-xs text-muted-foreground">{campo.ayuda}</p>}
+      {campo.ayuda && valor === "" && <p className="text-xs text-muted-foreground">{campo.ayuda}</p>}
     </div>
   );
 }
