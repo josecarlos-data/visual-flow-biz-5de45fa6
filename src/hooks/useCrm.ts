@@ -890,12 +890,31 @@ export function useAgenda(desde: string, hasta: string) {
   });
 }
 
+/** Próxima visita planificada (hoy o posterior) de un cliente. */
+export function useProximaPlanificada(codCliente: number | null) {
+  return useQuery({
+    queryKey: ["crm_agenda", "proxima", codCliente],
+    enabled: !!codCliente,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("visitas_planificadas")
+        .select("*")
+        .eq("cod_cliente", codCliente!)
+        .gte("fecha", hoyISO())
+        .order("fecha", { ascending: true })
+        .limit(1);
+      if (error) throw error;
+      return ((data?.[0] ?? null) as unknown) as Planificada | null;
+    },
+  });
+}
+
 export function useAgendaMutations() {
   const qc = useQueryClient();
   const invalidate = () => qc.invalidateQueries({ queryKey: ["crm_agenda"] });
 
   const add = useMutation({
-    mutationFn: async (p: { user_id: string; cod_cliente: number; fecha: string; orden: number }) => {
+    mutationFn: async (p: { user_id: string; cod_cliente: number; fecha: string; orden: number; notas?: string | null }) => {
       const { error } = await supabase.from("visitas_planificadas").insert(p);
       if (error) throw error;
     },

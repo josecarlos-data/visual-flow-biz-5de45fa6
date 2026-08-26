@@ -3,7 +3,7 @@ import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, Phone, Mail, MapPin, Route as RouteIcon, Sparkles, Loader2,
   TrendingUp, TrendingDown, Package, Plus, AlertTriangle, Target, MessageSquareQuote,
-  Truck, User, Info, ChevronDown,
+  Truck, User, Info, ChevronDown, CalendarPlus, CalendarCheck,
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -14,18 +14,34 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, Legend,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import {
   useCliente, useClienteVentas, useClienteKpis, useClienteProductos, useClienteMix,
   useClienteVisitas, useMotivos, usePuedeVerMargen, useSituacionesVigentes, useClienteDocumentos, useVisitaBloques,
+  useProximaPlanificada, useAgendaMutations,
   etiquetaCategoria, eur, num, eurK, fechaCorta, type DocumentoCliente, type Visita,
 } from "@/hooks/useCrm";
 import { ClientePerfilTab } from "@/components/ClientePerfilTab";
 import { DocumentoLineasDialog } from "@/components/DocumentoLineasDialog";
+
+/** Fecha local en formato ISO corto, mismo criterio que hoyISO() en useCrm. */
+const isoLocal = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const fechaHoy = () => isoLocal(new Date());
+const fechaManana = () => {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return isoLocal(d);
+};
 
 
 interface Insights {
@@ -75,6 +91,55 @@ export default function ClienteDetalle() {
   const anioProdInicializado = useRef(false);
   const [docSeleccionado, setDocSeleccionado] = useState<DocumentoCliente | null>(null);
   const [dialogoLineasOpen, setDialogoLineasOpen] = useState(false);
+  const [kpisAbiertos, setKpisAbiertos] = useState(false);
+
+  // --- Agendar visita ---
+  const { user } = useAuth();
+  const { add: addPlanificada } = useAgendaMutations();
+  const { data: proxima } = useProximaPlanificada(codNum);
+  const [agendarOpen, setAgendarOpen] = useState(false);
+  const [modoFecha, setModoFecha] = useState<"hoy" | "manana" | "otra">("hoy");
+  const [fechaOtra, setFechaOtra] = useState<string>(fechaHoy());
+  const [notasAgenda, setNotasAgenda] = useState("");
+  const [guardandoAgenda, setGuardandoAgenda] = useState(false);
+
+  const fechaElegida = modoFecha === "hoy" ? fechaHoy() : modoFecha === "manana" ? fechaManana() : fechaOtra;
+
+  const guardarAgenda = async () => {
+    if (!user || codNum == null || !fechaElegida) return;
+    setGuardandoAgenda(true);
+    try {
+      const { count, error: errCount } = await supabase
+        .from("visitas_planificadas")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("fecha", fechaElegida);
+      if (errCount) throw errCount;
+
+      await addPlanificada.mutateAsync({
+        user_id: user.id,
+        cod_cliente: codNum,
+        fecha: fechaElegida,
+        orden: (count ?? 0) + 1,
+        notas: notasAgenda.trim() ? notasAgenda.trim() : null,
+      });
+
+      toast({ title: "Visita agendada", description: `Añadida a tu agenda del ${fechaCorta(fechaElegida)}.` });
+      setAgendarOpen(false);
+      setNotasAgenda("");
+      setModoFecha("hoy");
+    } catch (e) {
+      const err = e as { code?: string; message?: string };
+      if (err?.code === "23505") {
+        toast({ title: `Este cliente ya está en tu agenda del ${fechaCorta(fechaElegida)}` });
+      } else {
+        toast({ title: "No se ha podido agendar", description: err?.message, variant: "destructive" });
+      }
+    } finally {
+      setGuardandoAgenda(false);
+    }
+  };
+
   const { data: productos, isLoading: cargandoProductos } = useClienteProductos(
     codNum,
     anioProd === "todos" ? null : Number(anioProd),
@@ -201,6 +266,27 @@ export default function ClienteDetalle() {
             )}
             {cliente.top_truck && <Badge className="gap-1"><Truck className="h-3 w-3" />Top Truck</Badge>}
           </div>
+          {proxima && (
+            <div className="mt-2">
+              <Badge variant="secondary" className="max-w-full gap-1">
+                <CalendarCheck className="h-3 w-3 shrink-0" />
+                <span className="truncate">
+                  Agendado para el {fechaCorta(proxima.fecha)}
+                  {proxima.notas ? ` · ${proxima.notas}` : ""}
+                </span>
+              </Badge>
+            </div>
+          )}
+          <div className="mt-3 flex w-full gap-2 sm:hidden">
+            <Button asChild className="flex-1">
+              <Link to={`/visitas/nueva?cliente=${cliente.cod_cliente}`}>
+                <Plus className="mr-2 h-4 w-4" /> Nueva visita
+              </Link>
+            </Button>
+            <Button variant="outline" className="flex-1" onClick={() => setAgendarOpen(true)}>
+              <CalendarPlus className="mr-2 h-4 w-4" /> Agendar
+            </Button>
+          </div>
           {situacion && (
             <div className="mt-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3">
               <p className="flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-400">
@@ -226,14 +312,64 @@ export default function ClienteDetalle() {
           )}
 
         </div>
-        <Button asChild className="shrink-0">
-          <Link to={`/visitas/nueva?cliente=${cliente.cod_cliente}`}>
-            <Plus className="mr-2 h-4 w-4" /> Nueva visita
-          </Link>
-        </Button>
+        <div className="hidden gap-2 sm:flex sm:w-auto sm:shrink-0">
+          <Button asChild className="sm:flex-none">
+            <Link to={`/visitas/nueva?cliente=${cliente.cod_cliente}`}>
+              <Plus className="mr-2 h-4 w-4" /> Nueva visita
+            </Link>
+          </Button>
+          <Button variant="outline" className="sm:flex-none" onClick={() => setAgendarOpen(true)}>
+            <CalendarPlus className="mr-2 h-4 w-4" /> Agendar
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+      <Dialog open={agendarOpen} onOpenChange={setAgendarOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Agendar visita</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-xs text-muted-foreground">Fecha</Label>
+              <div className="mt-2 flex gap-2">
+                <Button type="button" size="sm" variant={modoFecha === "hoy" ? "default" : "outline"} className="flex-1" onClick={() => setModoFecha("hoy")}>Hoy</Button>
+                <Button type="button" size="sm" variant={modoFecha === "manana" ? "default" : "outline"} className="flex-1" onClick={() => setModoFecha("manana")}>Mañana</Button>
+                <Button type="button" size="sm" variant={modoFecha === "otra" ? "default" : "outline"} className="flex-1" onClick={() => setModoFecha("otra")}>Otra fecha</Button>
+              </div>
+              {modoFecha === "otra" && (
+                <Input type="date" className="mt-2" value={fechaOtra} onChange={(e) => setFechaOtra(e.target.value)} />
+              )}
+            </div>
+            <div>
+              <Label htmlFor="notas-agenda" className="text-xs text-muted-foreground">Motivo de la visita (opcional)</Label>
+              <Textarea id="notas-agenda" rows={3} className="mt-2" value={notasAgenda} onChange={(e) => setNotasAgenda(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={guardarAgenda} disabled={guardandoAgenda || !fechaElegida}>
+              {guardandoAgenda && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Última compra</p>
+            <p className="mt-1 text-sm font-semibold">{kpis?.ultima_compra ? fechaCorta(kpis.ultima_compra) : "Sin compras"}</p>
+            <p className={`text-xs ${(kpis?.dias_sin_comprar ?? 0) > 90 ? "font-medium text-destructive" : "text-muted-foreground"}`}>
+              {kpis?.dias_sin_comprar != null ? `${num(kpis.dias_sin_comprar)} días sin comprar` : "—"}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Última visita</p>
+            <p className="mt-1 text-sm font-semibold">{visitas?.[0] ? fechaCorta(visitas[0].fecha) : "Sin visitas"}</p>
+            <p className="text-xs text-muted-foreground">{num(visitas?.length ?? 0)} registradas</p>
+          </CardContent>
+        </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Ventas {anioActual}</p>
@@ -254,90 +390,94 @@ export default function ClienteDetalle() {
             <p className="text-xs text-muted-foreground">{eur(kpis?.importe_anio_anterior_ytd ?? 0)} en {anioPrevio}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Ventas {anioPrevio} (año completo)</p>
-            <p className="mt-1 text-xl font-bold">{eur(kpis?.importe_anio_anterior ?? 0)}</p>
-          </CardContent>
-        </Card>
-        {verMargen && (
+
+        <button
+          type="button"
+          onClick={() => setKpisAbiertos((v) => !v)}
+          className="col-span-2 flex items-center justify-center gap-1 rounded-md border border-dashed py-2 text-xs font-medium text-muted-foreground sm:hidden"
+        >
+          Ver todas las métricas
+          <ChevronDown className={`h-4 w-4 transition-transform ${kpisAbiertos ? "rotate-180" : ""}`} />
+        </button>
+
+        <div className={kpisAbiertos ? "contents" : "hidden sm:contents"}>
           <Card>
             <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Margen {anioActual}</p>
-              <p className="mt-1 text-xl font-bold">{eur(kpis?.margen_anio_actual ?? 0)}</p>
-              <p className="text-xs text-muted-foreground">{pctMargen == null ? "—" : `${num(pctMargen, 1)}% sobre ventas`}</p>
+              <p className="text-xs text-muted-foreground">Ventas {anioPrevio} (año completo)</p>
+              <p className="mt-1 text-xl font-bold">{eur(kpis?.importe_anio_anterior ?? 0)}</p>
             </CardContent>
           </Card>
-        )}
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Transacciones {anioActual}</p>
-            <p className="mt-1 text-xl font-bold">{num(kpis?.num_documentos_actual ?? 0)}</p>
-            <p className="text-xs text-muted-foreground">{num(kpis?.num_documentos_anterior ?? 0)} en {anioPrevio}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Ticket medio {anioActual}</p>
-            <p className="mt-1 text-xl font-bold">{eur(kpis?.ticket_medio_actual ?? 0, 2)}</p>
-            <p className="text-xs text-muted-foreground">
-              {kpis?.ticket_medio_anterior ? `${eur(kpis.ticket_medio_anterior, 2)} en ${anioPrevio}` : "—"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Frecuencia de compra</p>
-            <p className="mt-1 text-xl font-bold">
-              {kpis?.frecuencia_compra_dias ? `${num(kpis.frecuencia_compra_dias, 1)} días` : "—"}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {num(kpis?.lineas_por_documento ?? 0, 1)} líneas por documento
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Referencias distintas</p>
-            <p className="mt-1 text-xl font-bold">{num(kpis?.num_referencias ?? 0)}</p>
-            <p className="text-xs text-muted-foreground">{num(kpis?.num_lineas ?? 0)} líneas</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Abonos</p>
-            <p className="mt-1 text-xl font-bold">{num(kpis?.num_abonos ?? 0)}</p>
-            <p className="text-xs text-muted-foreground">{eur(Math.abs(kpis?.importe_abonos ?? 0))} devueltos</p>
-          </CardContent>
-        </Card>
-        
-
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Última compra</p>
-            <p className="mt-1 text-sm font-semibold">{kpis?.ultima_compra ? fechaCorta(kpis.ultima_compra) : "Sin compras"}</p>
-            <p className={`text-xs ${(kpis?.dias_sin_comprar ?? 0) > 90 ? "font-medium text-destructive" : "text-muted-foreground"}`}>
-              {kpis?.dias_sin_comprar != null ? `${num(kpis.dias_sin_comprar)} días sin comprar` : "—"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Última visita</p>
-            <p className="mt-1 text-sm font-semibold">{visitas?.[0] ? fechaCorta(visitas[0].fecha) : "Sin visitas"}</p>
-            <p className="text-xs text-muted-foreground">{num(visitas?.length ?? 0)} registradas</p>
-          </CardContent>
-        </Card>
+          {verMargen && (
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground">Margen {anioActual}</p>
+                <p className="mt-1 text-xl font-bold">{eur(kpis?.margen_anio_actual ?? 0)}</p>
+                <p className="text-xs text-muted-foreground">{pctMargen == null ? "—" : `${num(pctMargen, 1)}% sobre ventas`}</p>
+              </CardContent>
+            </Card>
+          )}
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Transacciones {anioActual}</p>
+              <p className="mt-1 text-xl font-bold">{num(kpis?.num_documentos_actual ?? 0)}</p>
+              <p className="text-xs text-muted-foreground">{num(kpis?.num_documentos_anterior ?? 0)} en {anioPrevio}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Ticket medio {anioActual}</p>
+              <p className="mt-1 text-xl font-bold">{eur(kpis?.ticket_medio_actual ?? 0, 2)}</p>
+              <p className="text-xs text-muted-foreground">
+                {kpis?.ticket_medio_anterior ? `${eur(kpis.ticket_medio_anterior, 2)} en ${anioPrevio}` : "—"}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Frecuencia de compra</p>
+              <p className="mt-1 text-xl font-bold">
+                {kpis?.frecuencia_compra_dias ? `${num(kpis.frecuencia_compra_dias, 1)} días` : "—"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {num(kpis?.lineas_por_documento ?? 0, 1)} líneas por documento
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Referencias distintas</p>
+              <p className="mt-1 text-xl font-bold">{num(kpis?.num_referencias ?? 0)}</p>
+              <p className="text-xs text-muted-foreground">{num(kpis?.num_lineas ?? 0)} líneas</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Abonos</p>
+              <p className="mt-1 text-xl font-bold">{num(kpis?.num_abonos ?? 0)}</p>
+              <p className="text-xs text-muted-foreground">{eur(Math.abs(kpis?.importe_abonos ?? 0))} devueltos</p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
+
 
       <Tabs defaultValue="resumen">
         <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
-          <TabsTrigger value="productos">Productos</TabsTrigger>
-          <TabsTrigger value="documentos">Documentos</TabsTrigger>
           <TabsTrigger value="visitas">Visitas</TabsTrigger>
+          <TabsTrigger value="productos">
+            <span className="sm:hidden">Product.</span>
+            <span className="hidden sm:inline">Productos</span>
+          </TabsTrigger>
+          <TabsTrigger value="documentos">
+            <span className="sm:hidden">Docs.</span>
+            <span className="hidden sm:inline">Documentos</span>
+          </TabsTrigger>
           <TabsTrigger value="perfil">Perfil</TabsTrigger>
-          <TabsTrigger value="ia">Análisis IA</TabsTrigger>
+          <TabsTrigger value="ia">
+            <span className="sm:hidden">IA</span>
+            <span className="hidden sm:inline">Análisis IA</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="resumen" className="space-y-4">
@@ -447,114 +587,6 @@ export default function ClienteDetalle() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="productos">
-          <Card>
-            <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
-              <CardTitle className="flex items-center gap-2 text-base"><Package className="h-4 w-4" />Productos comprados</CardTitle>
-              <Select value={anioProd} onValueChange={setAnioProd}>
-                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos los años</SelectItem>
-                  {anios.map((a) => (
-                    <SelectItem key={a} value={String(a)}>{a}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </CardHeader>
-            <CardContent className="p-0">
-              {cargandoProductos ? (
-                <Skeleton className="m-4 h-64" />
-              ) : !productos || productos.length === 0 ? (
-                <p className="py-10 text-center text-sm text-muted-foreground">Sin compras registradas en el periodo.</p>
-              ) : (
-                <div className="max-h-[560px] overflow-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Referencia</TableHead>
-                        <TableHead className="hidden sm:table-cell">Familia</TableHead>
-                        <TableHead className="hidden md:table-cell">Marca</TableHead>
-                        <TableHead className="text-right">Uds.</TableHead>
-                        <TableHead className="text-right">Importe</TableHead>
-                        {verMargen && <TableHead className="hidden text-right md:table-cell">Margen</TableHead>}
-                        <TableHead className="hidden text-right sm:table-cell">Última</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {productos.map((p) => (
-                        <TableRow key={p.referencia}>
-                          <TableCell className="max-w-[220px]">
-                            <p className="truncate font-medium">{p.referencia}</p>
-                            {p.descripcion && <p className="truncate text-xs text-muted-foreground">{p.descripcion}</p>}
-                          </TableCell>
-                          <TableCell className="hidden text-muted-foreground sm:table-cell">{p.familia ?? "—"}</TableCell>
-                          <TableCell className="hidden text-muted-foreground md:table-cell">{p.marca ?? "—"}</TableCell>
-                          <TableCell className="text-right tabular-nums">{num(p.unidades)}</TableCell>
-                          <TableCell className="text-right tabular-nums">{eur(p.importe, 2)}</TableCell>
-                          {verMargen && <TableCell className="hidden text-right tabular-nums md:table-cell">{eur(p.margen, 2)}</TableCell>}
-                          <TableCell className="hidden text-right text-muted-foreground sm:table-cell">{p.ultima_compra ? fechaCorta(p.ultima_compra) : "—"}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="documentos" className="space-y-3">
-          <Card>
-            <CardHeader><CardTitle className="text-base">Últimos documentos</CardTitle></CardHeader>
-            <CardContent className="overflow-x-auto">
-              {(documentos?.length ?? 0) === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">Sin documentos registrados.</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Documento</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Canal</TableHead>
-                      <TableHead>Registrado por</TableHead>
-                      <TableHead className="text-right">Líneas</TableHead>
-                      <TableHead className="text-right">Importe</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {documentos!.map((d) => (
-                      <TableRow
-                        key={d.id_documento}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => {
-                          setDocSeleccionado(d);
-                          setDialogoLineasOpen(true);
-                        }}
-                      >
-                        <TableCell className="whitespace-nowrap">{fechaCorta(d.fecha)}{d.hora ? ` ${d.hora.slice(0, 5)}` : ""}</TableCell>
-                        <TableCell className="font-mono text-xs">{d.id_documento}</TableCell>
-                        <TableCell>{d.operacion ?? d.tipo_documento ?? "—"}</TableCell>
-                        <TableCell>{d.canal ?? "—"}</TableCell>
-                        <TableCell className="truncate">{d.registrado_por ?? "—"}</TableCell>
-                        <TableCell className="text-right">{num(d.lineas)}</TableCell>
-                        <TableCell className={`text-right font-medium ${d.importe < 0 ? "text-destructive" : ""}`}>{eur(d.importe, 2)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-
-          <DocumentoLineasDialog
-            open={dialogoLineasOpen}
-            onOpenChange={setDialogoLineasOpen}
-            codCliente={codNum!}
-            documento={docSeleccionado}
-          />
-        </TabsContent>
-
         <TabsContent value="visitas" className="space-y-3">
 
           {!visitas || visitas.length === 0 ? (
@@ -629,6 +661,120 @@ export default function ClienteDetalle() {
               );
             })
           )}
+        </TabsContent>
+
+        <TabsContent value="productos">
+          <Card>
+            <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+              <CardTitle className="flex items-center gap-2 text-base"><Package className="h-4 w-4" />Productos comprados</CardTitle>
+              <Select value={anioProd} onValueChange={setAnioProd}>
+                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos los años</SelectItem>
+                  {anios.map((a) => (
+                    <SelectItem key={a} value={String(a)}>{a}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardHeader>
+            <CardContent className="p-0">
+              {cargandoProductos ? (
+                <Skeleton className="m-4 h-64" />
+              ) : !productos || productos.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">Sin compras registradas en el periodo.</p>
+              ) : (
+                <div className="max-h-[560px] overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Referencia</TableHead>
+                        <TableHead className="hidden sm:table-cell">Familia</TableHead>
+                        <TableHead className="hidden md:table-cell">Marca</TableHead>
+                        <TableHead className="text-right">Uds.</TableHead>
+                        <TableHead className="text-right">Importe</TableHead>
+                        {verMargen && <TableHead className="hidden text-right md:table-cell">Margen</TableHead>}
+                        <TableHead className="hidden text-right sm:table-cell">Última</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {productos.map((p) => (
+                        <TableRow key={p.referencia}>
+                          <TableCell className="max-w-[220px]">
+                            <p className="truncate font-medium">{p.referencia}</p>
+                            {p.descripcion && <p className="truncate text-xs text-muted-foreground">{p.descripcion}</p>}
+                          </TableCell>
+                          <TableCell className="hidden text-muted-foreground sm:table-cell">{p.familia ?? "—"}</TableCell>
+                          <TableCell className="hidden text-muted-foreground md:table-cell">{p.marca ?? "—"}</TableCell>
+                          <TableCell className="text-right tabular-nums">{num(p.unidades)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{eur(p.importe, 2)}</TableCell>
+                          {verMargen && <TableCell className="hidden text-right tabular-nums md:table-cell">{eur(p.margen, 2)}</TableCell>}
+                          <TableCell className="hidden text-right text-muted-foreground sm:table-cell">{p.ultima_compra ? fechaCorta(p.ultima_compra) : "—"}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="documentos" className="space-y-3">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Últimos documentos</CardTitle></CardHeader>
+            <CardContent>
+              {(documentos?.length ?? 0) === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">Sin documentos registrados.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead className="hidden sm:table-cell">Documento</TableHead>
+                      <TableHead className="hidden sm:table-cell">Tipo</TableHead>
+                      <TableHead className="hidden sm:table-cell">Canal</TableHead>
+                      <TableHead className="hidden md:table-cell">Registrado por</TableHead>
+                      <TableHead className="hidden text-right md:table-cell">Líneas</TableHead>
+                      <TableHead className="text-right">Importe</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {documentos!.map((d) => (
+                      <TableRow
+                        key={d.id_documento}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => {
+                          setDocSeleccionado(d);
+                          setDialogoLineasOpen(true);
+                        }}
+                      >
+                        <TableCell>
+                          <span className="whitespace-nowrap">{fechaCorta(d.fecha)}{d.hora ? ` ${d.hora.slice(0, 5)}` : ""}</span>
+                          <span className="block text-xs text-muted-foreground sm:hidden">
+                            {[d.id_documento, d.operacion ?? d.tipo_documento, d.canal].filter(Boolean).join(" · ")}
+                          </span>
+                        </TableCell>
+                        <TableCell className="hidden font-mono text-xs sm:table-cell">{d.id_documento}</TableCell>
+                        <TableCell className="hidden sm:table-cell">{d.operacion ?? d.tipo_documento ?? "—"}</TableCell>
+                        <TableCell className="hidden sm:table-cell">{d.canal ?? "—"}</TableCell>
+                        <TableCell className="hidden truncate md:table-cell">{d.registrado_por ?? "—"}</TableCell>
+                        <TableCell className="hidden text-right md:table-cell">{num(d.lineas)}</TableCell>
+                        <TableCell className={`text-right font-medium ${d.importe < 0 ? "text-destructive" : ""}`}>{eur(d.importe, 2)}</TableCell>
+
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          <DocumentoLineasDialog
+            open={dialogoLineasOpen}
+            onOpenChange={setDialogoLineasOpen}
+            codCliente={codNum!}
+            documento={docSeleccionado}
+          />
         </TabsContent>
 
         <TabsContent value="perfil">
