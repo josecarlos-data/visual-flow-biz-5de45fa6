@@ -474,7 +474,16 @@ export default function Ventas() {
                       const esLink = t === "motivo" && !esSintetico(d.etiqueta);
                       const contenido = (
                         <>
-                          <span className="min-w-0 truncate">{d.etiqueta}</span>
+                          {t === "referencia" ? (
+                            <span className="min-w-0">
+                              <span className="block truncate">{d.etiqueta}</span>
+                              {d.descripcion && d.descripcion.trim() !== "" && (
+                                <span className="block truncate text-xs text-muted-foreground">{d.descripcion}</span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="min-w-0 truncate">{d.etiqueta}</span>
+                          )}
                           <span className="shrink-0 text-right">
                             <span className="font-medium">{eur(d.importe)}</span>
                             <span className="ml-2 text-xs text-muted-foreground">{fnum(d.lineas)} líneas</span>
