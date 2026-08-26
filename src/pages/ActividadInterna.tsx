@@ -385,6 +385,83 @@ export default function ActividadInterna() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="motivo" className="space-y-3">
+          {(filtros?.almacenes?.length ?? 0) > 1 && (
+            <Select
+              value={almacenMotivos ?? TODOS}
+              onValueChange={(v) => setAlmacenMotivos(v === TODOS ? null : v)}
+            >
+              <SelectTrigger className="w-full sm:w-64">
+                <SelectValue placeholder="Todos los almacenes" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value={TODOS}>Todos los almacenes</SelectItem>
+                {(filtros?.almacenes ?? []).map((a) => (
+                  <SelectItem key={a} value={a}>
+                    {a}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          <Card>
+            <CardContent className="p-0">
+              {motivos.isLoading ? (
+                <div className="space-y-2 p-4">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="h-8 w-full" />
+                  ))}
+                </div>
+              ) : ordM.datos.length === 0 ? (
+                <p className="p-6 text-sm text-muted-foreground">Sin abonos para este año.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <CabM col="motivo">Motivo</CabM>
+                        <CabM col="n_abonos" className="text-right">
+                          Abonos
+                        </CabM>
+                        <CabM col="importe" className="text-right">
+                          Importe
+                        </CabM>
+                        <CabM col="pct_n" className="text-right">
+                          % abonos
+                        </CabM>
+                        <CabM col="pct_importe" className="text-right">
+                          % importe
+                        </CabM>
+                        <CabM col="tramitadores" className="text-right">
+                          Tramitadores
+                        </CabM>
+                        <CabM col="clientes_distintos" className="text-right">
+                          Clientes
+                        </CabM>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {ordM.datos.map((r) => (
+                        <TableRow key={r.motivo}>
+                          <TableCell className="font-medium">{r.motivo}</TableCell>
+                          <TableCell className="text-right">{num(r.n_abonos)}</TableCell>
+                          <TableCell className="text-right">{eur(r.importe, 0)}</TableCell>
+                          <TableCell className="text-right">{pct1(r.pct_n)}</TableCell>
+                          <TableCell className="text-right">{pct1(r.pct_importe)}</TableCell>
+                          <TableCell className="text-right">{num(r.tramitadores)}</TableCell>
+                          <TableCell className="text-right">{num(r.clientes_distintos)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
       </Tabs>
     </div>
   );
