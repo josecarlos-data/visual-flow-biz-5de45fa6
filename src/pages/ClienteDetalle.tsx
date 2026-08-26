@@ -722,7 +722,7 @@ export default function ClienteDetalle() {
         <TabsContent value="documentos" className="space-y-3">
           <Card>
             <CardHeader><CardTitle className="text-base">Últimos documentos</CardTitle></CardHeader>
-            <CardContent className="overflow-x-auto">
+            <CardContent>
               {(documentos?.length ?? 0) === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">Sin documentos registrados.</p>
               ) : (
@@ -730,11 +730,11 @@ export default function ClienteDetalle() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Fecha</TableHead>
-                      <TableHead>Documento</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Canal</TableHead>
-                      <TableHead>Registrado por</TableHead>
-                      <TableHead className="text-right">Líneas</TableHead>
+                      <TableHead className="hidden sm:table-cell">Documento</TableHead>
+                      <TableHead className="hidden sm:table-cell">Tipo</TableHead>
+                      <TableHead className="hidden sm:table-cell">Canal</TableHead>
+                      <TableHead className="hidden md:table-cell">Registrado por</TableHead>
+                      <TableHead className="hidden text-right md:table-cell">Líneas</TableHead>
                       <TableHead className="text-right">Importe</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -748,13 +748,19 @@ export default function ClienteDetalle() {
                           setDialogoLineasOpen(true);
                         }}
                       >
-                        <TableCell className="whitespace-nowrap">{fechaCorta(d.fecha)}{d.hora ? ` ${d.hora.slice(0, 5)}` : ""}</TableCell>
-                        <TableCell className="font-mono text-xs">{d.id_documento}</TableCell>
-                        <TableCell>{d.operacion ?? d.tipo_documento ?? "—"}</TableCell>
-                        <TableCell>{d.canal ?? "—"}</TableCell>
-                        <TableCell className="truncate">{d.registrado_por ?? "—"}</TableCell>
-                        <TableCell className="text-right">{num(d.lineas)}</TableCell>
+                        <TableCell>
+                          <span className="whitespace-nowrap">{fechaCorta(d.fecha)}{d.hora ? ` ${d.hora.slice(0, 5)}` : ""}</span>
+                          <span className="block text-xs text-muted-foreground sm:hidden">
+                            {[d.id_documento, d.operacion ?? d.tipo_documento, d.canal].filter(Boolean).join(" · ")}
+                          </span>
+                        </TableCell>
+                        <TableCell className="hidden font-mono text-xs sm:table-cell">{d.id_documento}</TableCell>
+                        <TableCell className="hidden sm:table-cell">{d.operacion ?? d.tipo_documento ?? "—"}</TableCell>
+                        <TableCell className="hidden sm:table-cell">{d.canal ?? "—"}</TableCell>
+                        <TableCell className="hidden truncate md:table-cell">{d.registrado_por ?? "—"}</TableCell>
+                        <TableCell className="hidden text-right md:table-cell">{num(d.lineas)}</TableCell>
                         <TableCell className={`text-right font-medium ${d.importe < 0 ? "text-destructive" : ""}`}>{eur(d.importe, 2)}</TableCell>
+
                       </TableRow>
                     ))}
                   </TableBody>
