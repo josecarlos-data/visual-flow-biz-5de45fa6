@@ -292,6 +292,15 @@ export default function Documentos() {
 
   return (
     <div className="space-y-4">
+      {volver && (
+        <Link
+          to={volver}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" /> {volverTxt}
+        </Link>
+      )}
+
       <div>
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Documentos</h1>
         <p className="text-sm text-muted-foreground">Documentos de venta de tus clientes</p>
