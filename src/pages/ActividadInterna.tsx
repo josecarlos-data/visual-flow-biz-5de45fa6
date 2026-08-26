@@ -295,8 +295,6 @@ export default function ActividadInterna() {
                           <TableCell className="text-right">{eur(r.importe_abonado, 0)}</TableCell>
                           <TableCell className="text-right">{num(r.abonos_atribuidos)}</TableCell>
                           <TableCell className="text-right">{eur(r.importe_atribuido, 0)}</TableCell>
-                          <TableCell className="text-right">{pct1(r.pct_abonos)}</TableCell>
-                          <TableCell className="text-right">{pct1(r.pct_importe_abonado)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
