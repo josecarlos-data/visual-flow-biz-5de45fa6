@@ -1,28 +1,51 @@
-# Cerrar el bucle Agenda → Visita
+# Corregir representaciones engañosas en Resumen de ClienteDetalle
 
-Sin migraciones: `visitas_planificadas` ya tiene `visita_id`, `estado` y `notas`.
+## Objetivo
+Ajustar tres detalles de presentación en `src/pages/ClienteDetalle.tsx`, pestaña **Resumen**, para que los gráficos no muestren datos que no existen y los textos sean gramaticalmente correctos.
 
-## A) Planificar → Visitar
+## Cambios
 
-1. `useCrm.ts`: `useAgendaMutations().update` acepta además `visita_id?: string | null` (el patch ya es parcial; se amplía el tipo explícitamente).
-2. `useCrm.ts`: nueva función exportada `marcarPlanificadaRealizada(userId, codCliente, fecha, visitaId)`:
-   - Busca la parada con ese usuario, cliente y **fecha exacta**, con estado distinto de "realizada".
-   - Si existe: la pasa a "realizada" con `visita_id` y devuelve `true`; si no, devuelve `false`.
-   - Nunca lanza: cualquier error se registra en consola y devuelve `false`.
-3. `NuevaVisita.tsx`: tras guardar la visita y crear los bloques con éxito, llamada envuelta en try/catch. Si devuelve `true`, el toast de éxito añade "Marcada como realizada en tu agenda."
-4. `Agenda.tsx`: cada parada pendiente incorpora un botón "Registrar visita" con icono Mic que enlaza a `/visitas/nueva?cliente={cod}&volver=%2Fagenda&volverTxt=Agenda` (el formulario ya preselecciona el cliente). El botón general del final solo se muestra si el día no tiene ninguna parada pendiente... y si todas están hechas, no se muestra.
-5. Paradas con `visita_id`: enlace pequeño "Ver visita registrada" bajo el nombre. Ruta comprobada en `Visitas.tsx`: no existe pantalla de detalle de visita; el listado abre la ficha del cliente con `/clientes/{cod}?volver=…&volverTxt=…`, así que se usa esa misma ruta con volver a Agenda.
-6. El check manual sigue igual y permite desmarcar; al volver a "pendiente" no se toca `visita_id`, solo desaparecen el tachado y el badge "Hecha".
+### 1) Meses futuros como `null` en la serie actual
 
-## B) Notas del motivo en la parada
+En el `useMemo` `mensual` (línea ~252):
 
-1. Si `notas` tiene texto, se muestra bajo la localidad en un bloque `text-xs` con icono StickyNote, fondo `rounded bg-muted/50 px-2 py-1` y `break-words`. Vacío o null: no se renderiza.
-2. Botón de lápiz por parada que abre un diálogo con un textarea de 3 filas precargado y botón Guardar → `update.mutate({ id, notas })`. Textarea vacío guarda `null`.
+- Calcular `mesActual = new Date().getMonth() + 1` una sola vez fuera del bucle.
+- Cambiar el tipo de `actual` a `number | null`.
+- Inicializar `actual` con la regla:
+  - `0` si el mes ya ha transcurrido (`(i + 1) <= mesActual`).
+  - `null` si es un mes posterior (`(i + 1) > mesActual`).
+- Solo aplicar el corte cuando `anioActual === new Date().getFullYear()`. Si `anioActual` es un año histórico, todos los meses se inicializan a `0` (año completo).
+- Al acumular ventas del año actual, tratar `null` como `0` antes de sumar para evitar propagar `null`.
+- En el `<Line dataKey="actual">` añadir `connectNulls={false}` para que la línea se interrumpa limpiamente tras el último mes con datos.
 
-## Fuera de alcance
+### 2) Distinguir visualmente el año en curso en el gráfico de barras
 
-Optimización de recorrido, TramosMapaDialog, diálogo de añadir cliente y ficha de cliente quedan intactos. El contexto comercial de la parada y la vista semanal van en otra tanda.
+En el `useMemo` `porAnio` (línea ~246):
+
+- Añadir a cada fila un campo booleano `enCurso`, verdadero solo cuando `anio === new Date().getFullYear()`.
+- Importar `Cell` de `recharts` si aún no está importado.
+- En el `<Bar dataKey="total">`, renderizar un `<Cell>` por fila:
+  - `fill="hsl(var(--primary))"` para años cerrados.
+  - `fill="hsl(var(--primary) / 0.45)"` para el año en curso.
+- En el `<XAxis>` usar un `tickFormatter` que añada `" (en curso)"` al año en curso. En móvil, si la etiqueta queda muy larga, usar `" *"` y añadir debajo del gráfico una línea `<p className="text-xs text-muted-foreground">* Año en curso (datos parciales)</p>`.
+- No modificar Tooltip ni eje Y.
+
+### 3) Singular/plural de "días sin comprar"
+
+En la línea ~420, cambiar la interpolación para que:
+- `1 día sin comprar` cuando `kpis.dias_sin_comprar === 1`.
+- `N días sin comprar` en cualquier otro caso (incluido 0).
+
+## Restricciones
+
+- Único fichero modificado: `src/pages/ClienteDetalle.tsx`.
+- Sin migraciones, sin cambios en `supabase/`, `package.json`, hooks, RPCs ni RLS.
+- No tocar las pestañas Visitas, Productos, Documentos ni Perfil.
+- No tocar el bloque "Datos de ficha" ni los gráficos de Top familias / Top marcas.
 
 ## Verificación
 
-Typecheck y build limpios; prueba manual del ciclo agendar → registrar → parada tachada con enlace → desmarcar conservando el enlace.
+1. `tsgo` sin errores y build limpia.
+2. En un cliente con ventas en el año en curso, la línea del año actual termina en el mes actual y no desciende a cero en meses futuros.
+3. La barra del año en curso se visualiza con opacidad reducida frente a años completos.
+4. Un cliente con `dias_sin_comprar = 1` muestra "1 día sin comprar".
