@@ -1395,6 +1395,10 @@ export interface ActividadUsuario {
   docs_venta: number;
   n_abonos: number;
   importe_abonado: number;
+  abonos_ajenos: number;
+  abonos_atribuidos: number;
+  importe_atribuido: number;
+  importe_neto: number;
   clientes_distintos: number;
   ticket_medio: number | null;
   pct_abonos: number | null;
@@ -1407,6 +1411,9 @@ export interface ActividadAlmacen {
   docs_venta: number;
   n_abonos: number;
   importe_abonado: number;
+  abonos_atribuidos: number;
+  importe_atribuido: number;
+  importe_neto: number;
   clientes_distintos: number;
   ticket_medio: number | null;
   pct_abonos: number | null;
