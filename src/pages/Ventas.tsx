@@ -70,6 +70,8 @@ export default function Ventas() {
   const [canales, setCanales] = useState<CanalRow[]>([]);
   const [devoluciones, setDevoluciones] = useState<DevolucionRow[]>([]);
   const [vistaAlertas, setVistaAlertas] = useState<VistaAlertas>("atencion");
+  const [metrica, setMetrica] = useState<"ventas" | "ticket">("ventas");
+  const [vista, setVista] = useState<"mensual" | "acumulada">("mensual");
 
 
   const anioActual = useMemo(
