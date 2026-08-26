@@ -34,6 +34,7 @@ import {
 } from "@/hooks/useCrm";
 import { supabase } from "@/integrations/supabase/client";
 import { useScrollRestore } from "@/hooks/useScrollRestore";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const LIMITE = 50;
 const UMBRAL_DEFAULT = 300;
