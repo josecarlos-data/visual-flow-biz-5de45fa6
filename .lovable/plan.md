@@ -9,9 +9,10 @@ Solo jerarquía visual en `src/pages/NuevaVisita.tsx` (render de bloques, línea
   - `Listo` (variant secondary) si `pendientesDe(b).length === 0` y ningún campo visible tiene `b.meta[key]?.confianza === "baja"`.
   - `Faltan N` (ámbar) si `pendientesDe(b).length > 0`.
   - `Revisar` (ámbar) si no faltan pero hay confianza baja.
-- Helper local `estadoDe(b): "listo" | "faltan" | "revisar"` junto a `pendientesDe`, usado por el badge y por la apertura automática.
-- Se conserva el badge "Propuesta IA" en el trigger solo si `Object.keys(b.valores).length > 0`.
-- El botón `Trash2` pasa al final del `AccordionContent`, como botón ghost con texto "Quitar bloque", visible solo si `bloques.length > 1`.
+- Añadir helper `bloqueantesDe(b)` junto a `pendientesDe`, que filtre `camposVisibles(motivo.campos)` por `c.is_required && !b.valores[c.campo_key]?.trim()`.
+- Zona A = `bloqueantesDe(b) ∪ pendientesDe(b) ∪ campos con meta.confianza === "baja"`, sin duplicados y en el orden de `camposVisibles`.
+- `estadoDe` devuelve `"faltan"` si `bloqueantesDe(b).length > 0` o `pendientesDe(b).length > 0`, `"revisar"` si no faltan pero hay confianza baja, `"listo"` en caso contrario.
+- No se toca `pendientesDe` ni la lógica de `guardar`.
 
 ## 2. Apertura automática
 
@@ -22,8 +23,8 @@ Solo jerarquía visual en `src/pages/NuevaVisita.tsx` (render de bloques, línea
 
 ## 3. Dos zonas dentro del bloque
 
-- Zona A (siempre visible, sin cabecera): campos que necesitan atención = `pendientesDe(b)` más los campos visibles con `meta.confianza === "baja"`, en el orden de `camposVisibles`.
-- Zona B (plegada): el resto de campos visibles, dentro de un `Collapsible` con trigger de texto pequeño "Ver los N campos ya rellenos" y `ChevronDown` que rota.
+- Zona A (siempre visible, sin cabecera): campos que necesitan atención = `bloqueantesDe(b) ∪ pendientesDe(b) ∪ campos visibles con meta.confianza === "baja"`, sin duplicados, en el orden de `camposVisibles`.
+- Zona B (plegada): el resto de campos visibles, dentro de un `Collapsible` con trigger de texto pequeño "Ver los otros N campos" y `ChevronDown` que rota.
   - El `Select` de Motivo (+ `motivo.descripcion`) se mueve al principio de la Zona B.
   - Si Zona A está vacía, la Zona B arranca abierta (estado por uid en un `Record<string, boolean>` local del componente de página, inicializado según ese criterio).
 

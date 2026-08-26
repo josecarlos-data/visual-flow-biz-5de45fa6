@@ -84,6 +84,8 @@ export default function NuevaVisita() {
   const [detallesAbiertos, setDetallesAbiertos] = useState(false);
   const [chuletaAbierta, setChuletaAbierta] = useState(false);
   const [extrasAbiertos, setExtrasAbiertos] = useState(false);
+  const [bloquesAbiertos, setBloquesAbiertos] = useState<string[]>([]);
+  const [zonasBAbiertas, setZonasBAbiertas] = useState<Record<string, boolean>>({});
 
   const motivosActivos = useMemo(() => (motivos ?? []).filter((m) => m.is_active), [motivos]);
   const motivoDe = (key: string): Motivo | undefined => motivos?.find((m) => m.key === key);
@@ -107,6 +109,26 @@ export default function NuevaVisita() {
   useEffect(() => {
     if (resultado !== "efectiva") setDetallesAbiertos(true);
   }, [resultado]);
+
+  // Abre automáticamente los bloques que no están listos y los nuevos; respeta los ya vistos.
+  useEffect(() => {
+    setBloquesAbiertos((prev) => {
+      const setPrev = new Set(prev);
+      const abiertos = bloques
+        .filter((b) => (estadoDe(b) !== "listo" || setPrev.has(b.uid)) && !setPrev.has(b.uid))
+        .map((b) => b.uid);
+      return abiertos.length ? [...prev, ...abiertos] : prev;
+    });
+    setZonasBAbiertas((prev) => {
+      const next = { ...prev };
+      for (const b of bloques) {
+        if (!(b.uid in next)) {
+          next[b.uid] = atencionDe(b).length === 0;
+        }
+      }
+      return next;
+    });
+  }, [bloques]);
 
   const opciones = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
@@ -290,6 +312,42 @@ export default function NuevaVisita() {
     const motivo = motivoDe(b.motivoKey);
     if (!motivo) return [];
     return camposVisibles(motivo.campos).filter((c) => c.requerido_validacion && !b.valores[c.campo_key]?.trim());
+  };
+
+  /** Campos obligatorios del bloque que siguen vacíos (guardar los bloquea). */
+  const bloqueantesDe = (b: BloqueForm): MotivoCampo[] => {
+    const motivo = motivoDe(b.motivoKey);
+    if (!motivo) return [];
+    return camposVisibles(motivo.campos).filter((c) => c.is_required && !b.valores[c.campo_key]?.trim());
+  };
+
+  const hayConfianzaBaja = (b: BloqueForm): boolean => {
+    const motivo = motivoDe(b.motivoKey);
+    if (!motivo) return false;
+    return camposVisibles(motivo.campos).some((c) => b.meta[c.campo_key]?.confianza === "baja");
+  };
+
+  const atencionDe = (b: BloqueForm): MotivoCampo[] => {
+    const motivo = motivoDe(b.motivoKey);
+    if (!motivo) return [];
+    const bloqueantes = new Set(bloqueantesDe(b).map((c) => c.campo_key));
+    const pendientes = new Set(pendientesDe(b).map((c) => c.campo_key));
+    return camposVisibles(motivo.campos).filter(
+      (c) => bloqueantes.has(c.campo_key) || pendientes.has(c.campo_key) || b.meta[c.campo_key]?.confianza === "baja",
+    );
+  };
+
+  const otrosCamposDe = (b: BloqueForm): MotivoCampo[] => {
+    const motivo = motivoDe(b.motivoKey);
+    if (!motivo) return [];
+    const atencion = new Set(atencionDe(b).map((c) => c.campo_key));
+    return camposVisibles(motivo.campos).filter((c) => !atencion.has(c.campo_key));
+  };
+
+  const estadoDe = (b: BloqueForm): "listo" | "faltan" | "revisar" => {
+    if (bloqueantesDe(b).length > 0 || pendientesDe(b).length > 0) return "faltan";
+    if (hayConfianzaBaja(b)) return "revisar";
+    return "listo";
   };
 
   const hayPendientes = esEfectiva && bloques.some((b) => pendientesDe(b).length > 0);
@@ -686,65 +744,115 @@ export default function NuevaVisita() {
         </div>
       )}
 
-      {esEfectiva && bloques.map((b, i) => {
-        const motivo = motivoDe(b.motivoKey);
-        const hayResultado = Object.keys(b.valores).length > 0;
-        const faltan = pendientesDe(b);
-        return (
-          <Card key={b.uid}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="flex items-center gap-2 text-base">
-                Bloque {i + 1}
-                {hayResultado && <Badge variant="secondary" className="gap-1"><Wand2 className="h-3 w-3" />Propuesta IA</Badge>}
-              </CardTitle>
-              {bloques.length > 1 && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Quitar bloque ${i + 1}`}
-                  onClick={() => setBloques((bs) => bs.filter((x) => x.uid !== b.uid))}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Motivo</Label>
-                <Select
-                  value={b.motivoKey}
-                  onValueChange={(val) => actualizarBloque(b.uid, { motivoKey: val, valores: {}, meta: {} })}
-                >
-                  <SelectTrigger><SelectValue placeholder="Selecciona motivo" /></SelectTrigger>
-                  <SelectContent>
-                    {motivosActivos.map((m) => (
-                      <SelectItem key={m.key} value={m.key}>{m.nombre}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {motivo?.descripcion && <p className="text-xs text-muted-foreground">{motivo.descripcion}</p>}
-              </div>
+      {esEfectiva && (
+        <Accordion type="multiple" value={bloquesAbiertos} onValueChange={setBloquesAbiertos} className="w-full space-y-2">
+          {bloques.map((b) => {
+            const motivo = motivoDe(b.motivoKey);
+            const estado = estadoDe(b);
+            const hayResultado = Object.keys(b.valores).length > 0;
+            const atencion = atencionDe(b);
+            const otros = otrosCamposDe(b);
+            const zonaBAbierta = zonasBAbiertas[b.uid] ?? atencion.length === 0;
 
-              {camposVisibles(motivo?.campos ?? []).map((c) => (
-                <CampoVisita
-                  key={c.campo_key}
-                  campo={c}
-                  valores={b.valores}
-                  meta={b.meta[c.campo_key]}
-                  catalogos={catalogos}
-                  onChange={(patch) => actualizarBloque(b.uid, { valores: { ...b.valores, ...patch } })}
-                />
-              ))}
+            return (
+              <AccordionItem key={b.uid} value={b.uid} className="rounded-md border px-3 py-1">
+                <AccordionTrigger className="py-2 hover:no-underline">
+                  <div className="flex flex-1 items-center justify-between pr-2">
+                    <span className="text-sm font-medium">{motivo?.nombre ?? "Sin motivo"}</span>
+                    <div className="flex items-center gap-1.5">
+                      {hayResultado && (
+                        <Badge variant="secondary" className="gap-1 text-[10px]">
+                          <Wand2 className="h-3 w-3" />IA
+                        </Badge>
+                      )}
+                      {estado === "listo" && <Badge variant="secondary" className="text-[10px]">Listo</Badge>}
+                      {estado === "faltan" && (
+                        <Badge variant="outline" className="border-amber-500 text-amber-700 text-[10px] dark:text-amber-500">
+                          Faltan {bloqueantesDe(b).length + pendientesDe(b).length}
+                        </Badge>
+                      )}
+                      {estado === "revisar" && (
+                        <Badge variant="outline" className="border-amber-500 text-amber-700 text-[10px] dark:text-amber-500">
+                          Revisar
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="pb-2 pt-1">
+                  <div className="space-y-3">
+                    {atencion.length > 0 && (
+                      <div className="space-y-3">
+                        {atencion.map((c) => (
+                          <CampoVisita
+                            key={c.campo_key}
+                            campo={c}
+                            valores={b.valores}
+                            meta={b.meta[c.campo_key]}
+                            catalogos={catalogos}
+                            onChange={(patch) => actualizarBloque(b.uid, { valores: { ...b.valores, ...patch } })}
+                          />
+                        ))}
+                      </div>
+                    )}
 
-              {faltan.length > 0 && (
-                <p className="text-xs text-amber-600 dark:text-amber-500">
-                  Se puede guardar, pero para que el director la dé por válida faltan: {faltan.map((c) => c.label).join(", ")}.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
+                    {otros.length > 0 && (
+                      <Collapsible
+                        open={zonaBAbierta}
+                        onOpenChange={(open) => setZonasBAbiertas((prev) => ({ ...prev, [b.uid]: open }))}
+                      >
+                        <CollapsibleTrigger className="flex w-full items-center justify-between py-1 text-xs text-muted-foreground hover:text-foreground">
+                          <span>Ver los otros {otros.length} campos</span>
+                          <ChevronDown className={cn("h-4 w-4 transition-transform", zonaBAbierta && "rotate-180")} />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="space-y-3 pt-2">
+                          <div className="space-y-2">
+                            <Label className="text-sm">Motivo</Label>
+                            <Select
+                              value={b.motivoKey}
+                              onValueChange={(val) => actualizarBloque(b.uid, { motivoKey: val, valores: {}, meta: {} })}
+                            >
+                              <SelectTrigger><SelectValue placeholder="Selecciona motivo" /></SelectTrigger>
+                              <SelectContent>
+                                {motivosActivos.map((m) => (
+                                  <SelectItem key={m.key} value={m.key}>{m.nombre}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {motivo?.descripcion && <p className="text-xs text-muted-foreground">{motivo.descripcion}</p>}
+                          </div>
+                          {otros.map((c) => (
+                            <CampoVisita
+                              key={c.campo_key}
+                              campo={c}
+                              valores={b.valores}
+                              meta={b.meta[c.campo_key]}
+                              catalogos={catalogos}
+                              onChange={(patch) => actualizarBloque(b.uid, { valores: { ...b.valores, ...patch } })}
+                            />
+                          ))}
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )}
+
+                    {bloques.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-destructive hover:text-destructive"
+                        aria-label={`Quitar bloque ${motivo?.nombre ?? ""}`}
+                        onClick={() => setBloques((bs) => bs.filter((x) => x.uid !== b.uid))}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />Quitar bloque
+                      </Button>
+                    )}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
+        </Accordion>
+      )}
 
       {/* Repregunta: una sola tanda por los campos que el director exige */}
       {mostrarRepregunta && (
