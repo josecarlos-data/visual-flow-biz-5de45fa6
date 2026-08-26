@@ -61,6 +61,8 @@ export default function ActividadInterna() {
   const { data: filtros, isLoading: cargandoFiltros } = useActividadFiltros();
   const [anio, setAnio] = useState<string>("");
   const [almacen, setAlmacen] = useState<string | null>(null);
+  const [motivo, setMotivo] = useState<string | null>(null);
+  const [almacenMotivos, setAlmacenMotivos] = useState<string | null>(null);
   const anioInicializado = useRef(false);
 
   useEffect(() => {
@@ -73,13 +75,16 @@ export default function ActividadInterna() {
   }, [filtros]);
 
   const anioNum = anio ? Number(anio) : null;
-  const usuarios = useActividadUsuarios(anioNum, almacen);
+  const usuarios = useActividadUsuarios(anioNum, almacen, motivo);
   const almacenes = useActividadAlmacenes(anioNum);
+  const motivos = useActividadMotivos(anioNum, almacenMotivos);
 
   useScrollRestore("actividad-interna", !usuarios.isLoading);
 
   const ordU = useOrdenLocal<ActividadUsuario>(usuarios.data, "importe_vendido");
   const ordA = useOrdenLocal<ActividadAlmacen>(almacenes.data, "importe_vendido");
+  const ordM = useOrdenLocal<ActividadMotivo>(motivos.data, "n_abonos");
+
 
   const CabU = ({
     col,
