@@ -8,7 +8,7 @@ Ficheros afectados: `src/hooks/useCrm.ts` y `src/pages/ClienteDetalle.tsx`.
 - `useAgendaMutations().add`: ampliar el tipo del parámetro con `notas?: string | null` y pasarlo al insert. Sin más cambios (Agenda.tsx sigue igual).
 - Nuevo hook `useProximaPlanificada(codCliente)`: consulta `visitas_planificadas` con `cod_cliente` y `fecha >= hoyISO()`, orden ascendente por fecha, `limit 1`, devuelve la fila o `null`. `queryKey: ["crm_agenda", "proxima", codCliente]`.
 - En la ficha, junto a "Nueva visita", botón "Agendar" (`variant="outline"`, icono `CalendarPlus`) que abre un Dialog con:
-  - atajos Hoy / Mañana / Otra fecha (esta última revela un `<Input type="date">`),
+  - atajos Hoy / Mañana / Otra fecha. "Hoy" y "Mañana" usan el criterio local de `hoyISO()` en `useCrm.ts` (`getFullYear/getMonth/getDate` con `padStart`), no `toISOString()`. Para Mañana se parte de una fecha local y se le suma un día con `setDate(d.getDate() + 1)` antes de formatear. "Otra fecha" revela un `<Input type="date">`.
   - Textarea opcional "Motivo de la visita (opcional)" (`rows=3`) que se guarda en `notas`,
   - botón Guardar.
   - `user_id` desde `useAuth()`.
@@ -23,8 +23,10 @@ Los dos botones se agrupan en un div `flex w-full gap-2 sm:w-auto sm:shrink-0`, 
 ## C) Rejilla de KPIs
 
 - Orden nuevo: Última compra, Última visita, Ventas {anioActual}, Variación vs. {anioPrevio}, y el resto detrás en su orden actual.
-- De la quinta tarjeta en adelante van dentro de un `Collapsible` cerrado por defecto, con trigger de ancho completo "Ver todas las métricas" y `ChevronDown` que rota. El colapso solo actúa por debajo de `sm`: se resuelve con clases Tailwind (`sm:hidden` en el trigger, `hidden sm:contents` en el contenedor colapsado), no con `useIsMobile`.
+- Estado `kpisAbiertos` (useState, inicial `false`). Botón dentro del grid con `className="col-span-2 sm:hidden ..."`, texto "Ver todas las métricas" y `ChevronDown` que rota (`className={kpisAbiertos ? "rotate-180" : ""}`).
+- Tarjetas de la quinta en adelante envueltas en un div con `className={kpisAbiertos ? "contents" : "hidden sm:contents"}`. De esta manera siguen siendo hijas directas del grid y en `sm` y superiores se ven siempre.
 - Clases del grid: `grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6`.
+- No importar `Collapsible` para esta parte (se conserva el Collapsible de "Ver texto original" en la pestaña Visitas).
 
 ## D) Pestañas
 
