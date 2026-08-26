@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
+  ArrowLeft,
   FileText,
   X,
   ChevronLeft,
@@ -69,8 +70,10 @@ const FILTROS_INICIALES: Filtros = {
 };
 
 export default function Documentos() {
+  const [searchParams] = useSearchParams();
   const [anio, setAnio] = useState<string>("");
   const anioInicializado = useRef(false);
+  const filtrosInicializados = useRef(false);
   const [filtros, setFiltros] = useState<Filtros>(FILTROS_INICIALES);
   const [orden, setOrden] = useState<DocumentosOrden>("fecha");
   const [dir, setDir] = useState<"asc" | "desc">("desc");
@@ -95,6 +98,45 @@ export default function Documentos() {
       return data?.fecha ? new Date(data.fecha).getFullYear() : new Date().getFullYear();
     },
   });
+
+  // Hidratar filtros desde URL una sola vez al montar
+  useEffect(() => {
+    if (filtrosInicializados.current) return;
+
+    const getParam = (name: string) => {
+      const v = searchParams.get(name);
+      return v && v.trim() ? v.trim() : null;
+    };
+
+    const anioParam = getParam("anio");
+    const canal = getParam("canal");
+    const motivoAbono = getParam("motivoAbono");
+    const operacion = getParam("operacion");
+    const vendedor = getParam("vendedor");
+    const delegacion = getParam("delegacion");
+    const importeMinRaw = searchParams.get("importeMin");
+
+    const nuevosFiltros: Partial<Filtros> = {};
+    if (canal) nuevosFiltros.canal = canal;
+    if (motivoAbono) nuevosFiltros.motivoAbono = motivoAbono;
+    if (operacion) nuevosFiltros.operacion = operacion;
+    if (vendedor) nuevosFiltros.vendedor = vendedor;
+    if (delegacion) nuevosFiltros.delegacion = delegacion;
+
+    if (importeMinRaw !== null) {
+      const parsed = Number(importeMinRaw);
+      nuevosFiltros.importeMin = Number.isNaN(parsed) ? 0 : parsed;
+    }
+
+    setFiltros((f) => ({ ...f, ...nuevosFiltros }));
+
+    if (anioParam && /^\d{4}$/.test(anioParam)) {
+      setAnio(anioParam);
+    }
+
+    anioInicializado.current = true;
+    filtrosInicializados.current = true;
+  }, [searchParams]);
 
   useEffect(() => {
     if (ultimoAnio && !anioInicializado.current) {
@@ -133,6 +175,11 @@ export default function Documentos() {
   const { data: verMargen } = usePuedeVerMargen();
 
   useScrollRestore("documentos", !isLoading && !!data);
+
+  const volverRaw = searchParams.get("volver");
+  const volverTxtRaw = searchParams.get("volverTxt");
+  const volver = volverRaw && volverRaw.startsWith("/") && !volverRaw.startsWith("//") ? volverRaw : null;
+  const volverTxt = volverTxtRaw && volverTxtRaw.trim() ? decodeURIComponent(volverTxtRaw) : "Documentos";
 
   const totalPaginas = useMemo(() => {
     if (!data) return 0;
@@ -245,6 +292,15 @@ export default function Documentos() {
 
   return (
     <div className="space-y-4">
+      {volver && (
+        <Link
+          to={volver}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" /> {volverTxt}
+        </Link>
+      )}
+
       <div>
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Documentos</h1>
         <p className="text-sm text-muted-foreground">Documentos de venta de tus clientes</p>

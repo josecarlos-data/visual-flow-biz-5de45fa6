@@ -29,6 +29,8 @@ import { num as fnum, pct } from "@/lib/format";
 
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+const VALORES_SINTETICOS = new Set(["Sin canal", "Sin motivo", "Sin asignar"]);
+const esSintetico = (v: string | null) => !v || VALORES_SINTETICOS.has(v);
 
 interface MensualRow { anio: number; mes: number; importe: number; margen: number; unidades: number; documentos: number; ticket_medio: number }
 interface KpiRow { anio: number; importe: number; margen: number; unidades: number; clientes: number; lineas: number; documentos: number; abonos: number; importe_abonos: number; ticket_medio: number }
@@ -355,8 +357,8 @@ export default function Ventas() {
             {canales.map((c) => {
               const total = canales.reduce((s, x) => s + x.importe, 0);
               const share = total > 0 ? (c.importe / total) * 100 : 0;
-              return (
-                <div key={c.canal} className="rounded-md border p-2 text-sm">
+              const contenido = (
+                <>
                   <div className="flex items-center justify-between gap-3">
                     <span className="truncate font-medium">{c.canal}</span>
                     <span className="shrink-0 font-medium">{eur(c.importe)}</span>
@@ -367,6 +369,16 @@ export default function Ventas() {
                   <div className="mt-1 text-xs text-muted-foreground">
                     {pct(share)} · {fnum(c.documentos)} transacciones · ticket {eur(c.ticket_medio, 2)} · {fnum(c.clientes)} clientes
                   </div>
+                </>
+              );
+              const esLink = !esSintetico(c.canal);
+              return esLink ? (
+                <Link key={c.canal} to={`/documentos?anio=${anioActual}&canal=${encodeURIComponent(c.canal)}&importeMin=0&volver=%2F&volverTxt=Ventas`} className="block rounded-md border p-2 text-sm transition-colors hover:bg-accent">
+                  {contenido}
+                </Link>
+              ) : (
+                <div key={c.canal} className="rounded-md border p-2 text-sm">
+                  {contenido}
                 </div>
               );
             })}
@@ -387,15 +399,27 @@ export default function Ventas() {
                 return (
                   <TabsContent key={t} value={t} className="space-y-2">
                     {filas.length === 0 && <Vacio />}
-                    {filas.map((d) => (
-                      <div key={`${t}-${d.etiqueta}`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm">
-                        <span className="truncate">{d.etiqueta}</span>
-                        <span className="shrink-0 text-right">
-                          <span className="font-medium">{eur(d.importe)}</span>
-                          <span className="ml-2 text-xs text-muted-foreground">{fnum(d.lineas)} líneas</span>
-                        </span>
-                      </div>
-                    ))}
+                    {filas.map((d) => {
+                      const esLink = t === "motivo" && !esSintetico(d.etiqueta);
+                      const contenido = (
+                        <>
+                          <span className="truncate">{d.etiqueta}</span>
+                          <span className="shrink-0 text-right">
+                            <span className="font-medium">{eur(d.importe)}</span>
+                            <span className="ml-2 text-xs text-muted-foreground">{fnum(d.lineas)} líneas</span>
+                          </span>
+                        </>
+                      );
+                      return esLink ? (
+                        <Link key={`${t}-${d.etiqueta}`} to={`/documentos?anio=${anioActual}&operacion=Abono&motivoAbono=${encodeURIComponent(d.etiqueta)}&importeMin=0&volver=%2F&volverTxt=Ventas`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
+                          {contenido}
+                        </Link>
+                      ) : (
+                        <div key={`${t}-${d.etiqueta}`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm">
+                          {contenido}
+                        </div>
+                      );
+                    })}
                   </TabsContent>
                 );
               })}
@@ -554,7 +578,7 @@ function Kpi({ icon, label, value, hint, positive }: { icon: React.ReactNode; la
         </div>
         <div className="mt-1 truncate text-xl font-bold tracking-tight sm:text-2xl">{value}</div>
         {hint && (
-          <div className={`mt-0.5 truncate text-[11px] sm:text-xs ${positive === undefined ? "text-muted-foreground" : positive ? "text-primary" : "text-destructive"}`}>{hint}</div>
+          <div className={`mt-0.5 leading-tight text-[11px] sm:text-xs ${positive === undefined ? "text-muted-foreground" : positive ? "text-primary" : "text-destructive"}`}>{hint}</div>
         )}
       </CardContent>
     </Card>
