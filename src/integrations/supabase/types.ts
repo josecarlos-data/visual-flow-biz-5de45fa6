@@ -1931,6 +1931,44 @@ export type Database = {
       }
     }
     Functions: {
+      actividad_interna_almacenes: {
+        Args: { _anio: number }
+        Returns: {
+          almacen: string
+          clientes_distintos: number
+          docs_venta: number
+          importe_abonado: number
+          importe_vendido: number
+          n_abonos: number
+          n_usuarios: number
+          pct_abonos: number
+          pct_importe_abonado: number
+          ticket_medio: number
+        }[]
+      }
+      actividad_interna_filtros: {
+        Args: never
+        Returns: {
+          almacenes: string[]
+          anios: number[]
+        }[]
+      }
+      actividad_interna_usuarios: {
+        Args: { _almacen?: string; _anio: number }
+        Returns: {
+          almacen_principal: string
+          clientes_distintos: number
+          docs_venta: number
+          importe_abonado: number
+          importe_vendido: number
+          n_abonos: number
+          n_almacenes: number
+          pct_abonos: number
+          pct_importe_abonado: number
+          registrado_por: string
+          ticket_medio: number
+        }[]
+      }
       buscar_productos: {
         Args: { _limite?: number; _q: string }
         Returns: {
