@@ -174,6 +174,7 @@ export default function Documentos() {
   });
   const { data: opciones } = useDocumentosFiltrosOpciones(anioNum);
   const { data: verMargen } = usePuedeVerMargen();
+  const isMobile = useIsMobile();
 
   useScrollRestore("documentos", !isLoading && !!data);
 
