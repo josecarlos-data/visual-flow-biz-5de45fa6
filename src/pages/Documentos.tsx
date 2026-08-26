@@ -484,80 +484,166 @@ export default function Documentos() {
           </CardContent>
         </Card>
       ) : (
-        <>
-          <div className="overflow-x-auto rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <Cabecera col="fecha">Fecha</Cabecera>
-                  <TableHead>Hora</TableHead>
-                  <Cabecera col="cliente">Cliente</Cabecera>
-                  <Cabecera col="operacion">Tipo / Operación</Cabecera>
-                  <Cabecera col="almacen">Almacén</Cabecera>
-                  <Cabecera col="registrado_por">Registrado por</Cabecera>
-                  <Cabecera col="lineas" className="text-right">
-                    Líneas
-                  </Cabecera>
-                  <Cabecera col="importe" className="text-right">
-                    Importe
-                  </Cabecera>
-                  {verMargen && <TableHead className="text-right">Margen</TableHead>}
-                  <TableHead className="w-16"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+          <>
+            {isMobile && (
+              <div className="flex items-center gap-2">
+                <Select
+                  value={orden}
+                  onValueChange={(v) => {
+                    setOrden(v as DocumentosOrden);
+                    setDir("desc");
+                  }}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Ordenar por" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="fecha">Fecha</SelectItem>
+                    <SelectItem value="cliente">Cliente</SelectItem>
+                    <SelectItem value="operacion">Tipo / Operación</SelectItem>
+                    <SelectItem value="almacen">Almacén</SelectItem>
+                    <SelectItem value="registrado_por">Registrado por</SelectItem>
+                    <SelectItem value="lineas">Líneas</SelectItem>
+                    <SelectItem value="importe">Importe</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDir((d) => (d === "desc" ? "asc" : "desc"))}
+                >
+                  {dir === "desc" ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                </Button>
+              </div>
+            )}
+
+            {isMobile ? (
+              <div className="space-y-2">
                 {data.rows.map((d) => {
                   const negativo = d.importe < 0;
                   return (
-                    <TableRow key={d.id_documento} className="cursor-pointer" onClick={() => abrirLineas(d)}>
-                      <TableCell className="whitespace-nowrap">{fechaCorta(d.fecha)}</TableCell>
-                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                        {d.hora ? d.hora.slice(0, 5) : "—"}
-                      </TableCell>
-                      <TableCell>
-                        <div className="max-w-[200px] truncate text-sm font-medium">
-                          <Link
-                            to={`/clientes/${d.cod_cliente}?volver=/documentos&volverTxt=Documentos`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="hover:underline"
-                          >
-                            {d.cliente}
-                          </Link>
-                        </div>
-                        <div className="text-xs text-muted-foreground">#{d.cod_cliente}</div>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        <div className="whitespace-nowrap">{d.operacion ?? d.tipo_documento ?? "—"}</div>
+                    <div
+                      key={d.id_documento}
+                      className="cursor-pointer rounded-md border p-3"
+                      onClick={() => abrirLineas(d)}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-xs text-muted-foreground">
+                          {fechaCorta(d.fecha)} · {d.hora ? d.hora.slice(0, 5) : "—"}
+                        </p>
+                        <p
+                          className={`text-sm font-medium tabular-nums ${
+                            negativo ? "text-destructive" : ""
+                          }`}
+                        >
+                          {eur(d.importe, 2)}
+                        </p>
+                      </div>
+                      <div className="mt-1">
+                        <Link
+                          to={`/clientes/${d.cod_cliente}?volver=/documentos&volverTxt=Documentos`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="break-words text-sm font-medium hover:underline"
+                        >
+                          {d.cliente}
+                        </Link>
+                        <p className="text-xs text-muted-foreground">#{d.cod_cliente}</p>
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        <p className="break-words">
+                          {d.operacion ?? d.tipo_documento ?? "—"} · {d.almacen ?? "—"}
+                        </p>
                         {negativo && d.motivo_abono && (
-                          <div className="max-w-[200px] truncate text-xs text-muted-foreground">
-                            {d.motivo_abono}
-                          </div>
+                          <p className="break-words">{d.motivo_abono}</p>
                         )}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                        {d.almacen ?? "—"}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                        {d.registrado_por ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-sm">{num(d.lineas)}</TableCell>
-                      <TableCell className={`text-right tabular-nums text-sm font-medium ${negativo ? "text-destructive" : ""}`}>
-                        {eur(d.importe, 2)}
-                      </TableCell>
-                      {verMargen && (
-                        <TableCell className="text-right tabular-nums text-sm">{eur(d.margen, 2)}</TableCell>
-                      )}
-                      <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => abrirLineas(d)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Registrado por {d.registrado_por ?? "—"} · {num(d.lineas)} líneas
+                        {verMargen && ` · margen ${eur(d.margen, 2)}`}
+                      </p>
+                    </div>
                   );
                 })}
-              </TableBody>
-            </Table>
-          </div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <Cabecera col="fecha">Fecha</Cabecera>
+                      <TableHead>Hora</TableHead>
+                      <Cabecera col="cliente">Cliente</Cabecera>
+                      <Cabecera col="operacion">Tipo / Operación</Cabecera>
+                      <Cabecera col="almacen">Almacén</Cabecera>
+                      <Cabecera col="registrado_por">Registrado por</Cabecera>
+                      <Cabecera col="lineas" className="text-right">
+                        Líneas
+                      </Cabecera>
+                      <Cabecera col="importe" className="text-right">
+                        Importe
+                      </Cabecera>
+                      {verMargen && <TableHead className="text-right">Margen</TableHead>}
+                      <TableHead className="w-16"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {data.rows.map((d) => {
+                      const negativo = d.importe < 0;
+                      return (
+                        <TableRow key={d.id_documento} className="cursor-pointer" onClick={() => abrirLineas(d)}>
+                          <TableCell className="whitespace-nowrap">{fechaCorta(d.fecha)}</TableCell>
+                          <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                            {d.hora ? d.hora.slice(0, 5) : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="max-w-[200px] truncate text-sm font-medium">
+                              <Link
+                                to={`/clientes/${d.cod_cliente}?volver=/documentos&volverTxt=Documentos`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="hover:underline"
+                              >
+                                {d.cliente}
+                              </Link>
+                            </div>
+                            <div className="text-xs text-muted-foreground">#{d.cod_cliente}</div>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            <div className="whitespace-nowrap">{d.operacion ?? d.tipo_documento ?? "—"}</div>
+                            {negativo && d.motivo_abono && (
+                              <div className="max-w-[200px] truncate text-xs text-muted-foreground">
+                                {d.motivo_abono}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                            {d.almacen ?? "—"}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                            {d.registrado_por ?? "—"}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums text-sm">{num(d.lineas)}</TableCell>
+                          <TableCell
+                            className={`text-right tabular-nums text-sm font-medium ${
+                              negativo ? "text-destructive" : ""
+                            }`}
+                          >
+                            {eur(d.importe, 2)}
+                          </TableCell>
+                          {verMargen && (
+                            <TableCell className="text-right tabular-nums text-sm">{eur(d.margen, 2)}</TableCell>
+                          )}
+                          <TableCell>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => abrirLineas(d)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
 
           <div className="flex items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
