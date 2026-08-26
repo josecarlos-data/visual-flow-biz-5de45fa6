@@ -57,12 +57,18 @@ type CampoOrden = "referencia" | "familia" | "marca" | "unidades" | "importe" | 
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
-function Dato({ label, value }: { label: string; value: React.ReactNode }) {
+function Dato({ label, value, multilinea }: { label: string; value: React.ReactNode; multilinea?: boolean }) {
   if (value === null || value === undefined || value === "") return null;
+  const isText = typeof value === "string" || typeof value === "number";
   return (
     <div className="min-w-0">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="truncate text-sm font-medium">{value}</p>
+      <p
+        className={`text-sm font-medium ${multilinea ? "break-words" : "truncate"}`}
+        title={!multilinea && isText ? String(value) : undefined}
+      >
+        {value}
+      </p>
     </div>
   );
 }
