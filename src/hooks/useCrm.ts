@@ -1421,36 +1421,64 @@ export interface ActividadAlmacen {
   n_usuarios: number;
 }
 
+export interface ActividadMotivo {
+  motivo: string;
+  n_abonos: number;
+  importe: number;
+  pct_n: number | null;
+  pct_importe: number | null;
+  tramitadores: number;
+  clientes_distintos: number;
+}
+
 export function useActividadFiltros() {
   return useQuery({
     queryKey: ["actividad_interna_filtros"],
     staleTime: 5 * 60 * 1000,
-    queryFn: async (): Promise<{ anios: number[]; almacenes: string[] }> => {
+    queryFn: async (): Promise<{ anios: number[]; almacenes: string[]; motivos: string[] }> => {
       const { data, error } = await supabase.rpc("actividad_interna_filtros" as never);
       if (error) throw error;
       const r = (((data ?? []) as unknown as Record<string, unknown>[])[0] ?? {}) as Record<string, unknown>;
       return {
         anios: ((r.anios as number[]) ?? []).filter((v) => v != null),
         almacenes: ((r.almacenes as string[]) ?? []).filter(Boolean),
+        motivos: ((r.motivos as string[]) ?? []).filter(Boolean),
       };
     },
   });
 }
 
-export function useActividadUsuarios(anio: number | null, almacen: string | null) {
+export function useActividadUsuarios(anio: number | null, almacen: string | null, motivo: string | null = null) {
   return useQuery({
-    queryKey: ["actividad_interna_usuarios", anio, almacen],
+    queryKey: ["actividad_interna_usuarios", anio, almacen, motivo],
     enabled: anio != null,
     queryFn: async (): Promise<ActividadUsuario[]> => {
       const { data, error } = await supabase.rpc("actividad_interna_usuarios" as never, {
         _anio: anio,
         _almacen: almacen,
+        _motivo: motivo,
       } as never);
       if (error) throw error;
       return ((data ?? []) as unknown as ActividadUsuario[]);
     },
   });
 }
+
+export function useActividadMotivos(anio: number | null, almacen: string | null) {
+  return useQuery({
+    queryKey: ["actividad_interna_motivos", anio, almacen],
+    enabled: anio != null,
+    queryFn: async (): Promise<ActividadMotivo[]> => {
+      const { data, error } = await supabase.rpc("actividad_interna_motivos" as never, {
+        _anio: anio,
+        _almacen: almacen,
+      } as never);
+      if (error) throw error;
+      return ((data ?? []) as unknown as ActividadMotivo[]);
+    },
+  });
+}
+
 
 export function useActividadAlmacenes(anio: number | null) {
   return useQuery({
