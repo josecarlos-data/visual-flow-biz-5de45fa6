@@ -247,13 +247,17 @@ export default function Ventas() {
       <ResumenObjetivos />
 
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+      <div className={`grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 ${verMargen ? "xl:grid-cols-6" : "xl:grid-cols-5"}`}>
 
         <Kpi
           icon={<Euro className="h-4 w-4" />}
           label={`Facturación ${anioActual}`}
           value={eur(kpiActual?.importe ?? 0)}
-          hint={variacion !== null ? `${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}% vs ${anioActual - 1} YTD` : undefined}
+          hint={
+            variacion !== null
+              ? `${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}% vs ${anioActual - 1} YTD${proyeccion !== null ? ` · proyección ${fmtM(proyeccion)}` : ""}`
+              : undefined
+          }
           positive={variacion !== null ? variacion >= 0 : undefined}
         />
         {verMargen && (
@@ -267,7 +271,7 @@ export default function Ventas() {
         <Kpi icon={<Users className="h-4 w-4" />} label="Clientes activos" value={String(kpiActual?.clientes ?? 0)} hint={`${kpiPrevio?.clientes ?? 0} en ${anioActual - 1}`} />
         <Kpi
           icon={<Receipt className="h-4 w-4" />}
-          label="Transacciones"
+          label="Documentos"
           value={fnum(kpiActual?.documentos ?? 0)}
           hint={`${fnum(kpiActual?.abonos ?? 0)} abonos · ${fnum(kpiActual?.lineas ?? 0)} líneas`}
         />
