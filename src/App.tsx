@@ -140,6 +140,7 @@ const App = () => (
             <Route path="/admin/objetivos" element={<ProtectedRoute adminOnly allowedRoles={["director_comercial"]}><AdminObjetivos /></ProtectedRoute>} />
             <Route path="/objetivos" element={<ProtectedRoute dashboardKey="objetivos"><Objetivos /></ProtectedRoute>} />
             <Route path="/documentos" element={<ProtectedRoute dashboardKey="documentos"><Documentos /></ProtectedRoute>} />
+            <Route path="/actividad-interna" element={<ProtectedRoute dashboardKey="actividad_interna"><ActividadInterna /></ProtectedRoute>} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>
