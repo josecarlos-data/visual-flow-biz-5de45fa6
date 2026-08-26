@@ -483,7 +483,7 @@ export default function Ventas() {
                       const esLink = t === "motivo" && !esSintetico(d.etiqueta);
                       const contenido = (
                         <>
-                          <span className="truncate">{d.etiqueta}</span>
+                          <span className="min-w-0 truncate">{d.etiqueta}</span>
                           <span className="shrink-0 text-right">
                             <span className="font-medium">{eur(d.importe)}</span>
                             <span className="ml-2 text-xs text-muted-foreground">{fnum(d.lineas)} líneas</span>
@@ -491,11 +491,11 @@ export default function Ventas() {
                         </>
                       );
                       return esLink ? (
-                        <Link key={`${t}-${d.etiqueta}`} to={`/documentos?anio=${anioActual}&operacion=Abono&motivoAbono=${encodeURIComponent(d.etiqueta)}&importeMin=0&volver=%2F&volverTxt=Ventas`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
+                        <Link key={`${t}-${d.etiqueta}`} to={`/documentos?anio=${anioActual}&operacion=Abono&motivoAbono=${encodeURIComponent(d.etiqueta)}&importeMin=0&volver=%2F&volverTxt=Ventas`} className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
                           {contenido}
                         </Link>
                       ) : (
-                        <div key={`${t}-${d.etiqueta}`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm">
+                        <div key={`${t}-${d.etiqueta}`} className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-2 text-sm">
                           {contenido}
                         </div>
                       );
