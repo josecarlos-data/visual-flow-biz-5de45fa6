@@ -353,12 +353,11 @@ export default function Ventas() {
         <Card>
           <CardHeader><CardTitle>Mix por canal {anioActual}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            {canales.length === 0 && <Vacio />}
             {canales.map((c) => {
               const total = canales.reduce((s, x) => s + x.importe, 0);
               const share = total > 0 ? (c.importe / total) * 100 : 0;
-              return (
-                <div key={c.canal} className="rounded-md border p-2 text-sm">
+              const contenido = (
+                <>
                   <div className="flex items-center justify-between gap-3">
                     <span className="truncate font-medium">{c.canal}</span>
                     <span className="shrink-0 font-medium">{eur(c.importe)}</span>
@@ -369,6 +368,16 @@ export default function Ventas() {
                   <div className="mt-1 text-xs text-muted-foreground">
                     {pct(share)} · {fnum(c.documentos)} transacciones · ticket {eur(c.ticket_medio, 2)} · {fnum(c.clientes)} clientes
                   </div>
+                </>
+              );
+              const esLink = !esSintetico(c.canal);
+              return esLink ? (
+                <Link key={c.canal} to={`/documentos?anio=${anioActual}&canal=${encodeURIComponent(c.canal)}&importeMin=0&volver=%2F&volverTxt=Ventas`} className="block rounded-md border p-2 text-sm transition-colors hover:bg-accent">
+                  {contenido}
+                </Link>
+              ) : (
+                <div key={c.canal} className="rounded-md border p-2 text-sm">
+                  {contenido}
                 </div>
               );
             })}
