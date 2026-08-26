@@ -152,6 +152,39 @@ export default function ClienteDetalle() {
     anioProd === "todos" ? null : Number(anioProd),
   );
 
+  const normalizarBusqueda = (s: string) =>
+    s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+  const productosFiltradosOrdenados = useMemo(() => {
+    if (!productos) return [] as ProductoCliente[];
+    let list = [...productos];
+    const texto = normalizarBusqueda(busquedaProductos).trim();
+    if (texto) {
+      list = list.filter((p) =>
+        normalizarBusqueda([p.referencia, p.descripcion ?? ""].join(" ")).includes(texto)
+      );
+    }
+    const { campo, dir } = ordenProductos;
+    const numOrDate = ["unidades", "importe", "margen", "ultima"].includes(campo);
+    list.sort((a, b) => {
+      const va = a[campo];
+      const vb = b[campo];
+      const na = va == null || va === "";
+      const nb = vb == null || vb === "";
+      if (na && nb) return 0;
+      if (na) return 1;
+      if (nb) return -1;
+      let cmp = 0;
+      if (numOrDate) {
+        cmp = Number(new Date(va as string).getTime()) - Number(new Date(vb as string).getTime());
+      } else {
+        cmp = String(va).localeCompare(String(vb), "es");
+      }
+      return dir === "asc" ? cmp : -cmp;
+    });
+    return list;
+  }, [productos, busquedaProductos, ordenProductos]);
+
   const { data: cached } = useQuery({
     queryKey: ["crm_insights", codNum],
     enabled: codNum != null,
