@@ -171,11 +171,12 @@ export default function ClienteDetalle() {
       );
     }
     const { campo, dir } = ordenProductos;
+    const campoReal = campo === "ultima" ? "ultima_compra" : campo;
     const esNumero = ["unidades", "importe", "margen"].includes(campo);
     const esFecha = campo === "ultima";
     list.sort((a, b) => {
-      const va = a[campo];
-      const vb = b[campo];
+      const va = (a as any)[campoReal];
+      const vb = (b as any)[campoReal];
       const na = va == null || va === "";
       const nb = vb == null || vb === "";
       if (na && nb) return 0;
