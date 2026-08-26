@@ -220,13 +220,30 @@ export default function Ventas() {
 
   if (loading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 sm:space-y-6">
         <Skeleton className="h-10 w-64" />
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
-          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-24" />)}
+        <div className={`grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 ${verMargen ? "xl:grid-cols-6" : "xl:grid-cols-5"}`}>
+          {(verMargen ? [0, 1, 2, 3, 4, 5] : [0, 1, 2, 3, 4]).map((i) => <Skeleton key={i} className="h-24" />)}
         </div>
 
-        <Skeleton className="h-80" />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Skeleton className="h-[260px]" />
+          <Skeleton className="h-[260px]" />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64 lg:col-span-2 2xl:col-span-1" />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Skeleton className="h-96" />
+          <div className="grid gap-4">
+            <Skeleton className="h-[200px]" />
+            <Skeleton className="h-[200px]" />
+          </div>
+        </div>
       </div>
     );
   }
