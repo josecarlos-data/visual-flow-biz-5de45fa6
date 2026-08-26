@@ -28,7 +28,7 @@ import {
   useCliente, useClienteVentas, useClienteKpis, useClienteProductos, useClienteMix,
   useClienteVisitas, useMotivos, usePuedeVerMargen, useSituacionesVigentes, useClienteDocumentos, useVisitaBloques,
   useProximaPlanificada, useAgendaMutations,
-  etiquetaCategoria, eur, num, eurK, fechaCorta, type DocumentoCliente, type Visita,
+  etiquetaCategoria, eur, num, eurK, fechaCorta, type DocumentoCliente, type Visita, type ProductoCliente,
 } from "@/hooks/useCrm";
 import { ClientePerfilTab } from "@/components/ClientePerfilTab";
 import { DocumentoLineasDialog } from "@/components/DocumentoLineasDialog";
