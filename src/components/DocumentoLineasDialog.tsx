@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDocumentoLineas, type DocumentoCliente } from "@/hooks/useCrm";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { eur, num, fechaCorta } from "@/lib/format";
 
 interface DocumentoLineasDialogProps {
@@ -42,15 +43,18 @@ export function DocumentoLineasDialog({
 
   const total = (lineas ?? []).reduce((acc, l) => acc + l.importe, 0);
   const unidadesTotales = (lineas ?? []).reduce((acc, l) => acc + l.unidades, 0);
+  const totalDiferencia = documento ? Math.abs(documento.importe - total) : 0;
+  const muestraDiferencia = documento && totalDiferencia > 0.01;
 
   const tipoLabel = documento?.operacion ?? documento?.tipo_documento ?? "—";
   const esNegativo = documento ? documento.importe < 0 : false;
   const badgeVariant = tipoLabel === "—" ? "secondary" : esNegativo ? "destructive" : "default";
+  const isMobile = useIsMobile();
 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85dvh] flex flex-col">
+      <DialogContent className="max-w-3xl max-h-[85dvh] flex flex-col w-[calc(100%-2rem)]">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <DialogTitle className="font-mono text-lg">
@@ -73,10 +77,10 @@ export function DocumentoLineasDialog({
           <DialogDescription>
             {nombreCliente ? (
               <>
-                {nombreCliente} · Emitido por {documento?.registrado_por ?? "—"}
+                {nombreCliente} · Registrado por {documento?.registrado_por ?? "—"}
               </>
             ) : (
-              <>Emitido por {documento?.registrado_por ?? "—"} · comercial del cliente: {documento?.vendedor_linea ?? "—"}</>
+              <>Registrado por {documento?.registrado_por ?? "—"} · Comercial: {documento?.vendedor_linea ?? "—"}</>
             )}
           </DialogDescription>
           {idDocEnlazado && (
@@ -87,7 +91,7 @@ export function DocumentoLineasDialog({
         </DialogHeader>
 
 
-        <div className="overflow-auto flex-1 min-h-0">
+        <div className={`flex-1 min-h-0 ${isMobile ? "overflow-y-auto" : "overflow-y-auto overflow-x-auto"}`}>
           {isLoading ? (
             <div className="space-y-2">
               <Skeleton className="h-8 w-full" />
@@ -102,6 +106,30 @@ export function DocumentoLineasDialog({
             <p className="py-8 text-center text-sm text-muted-foreground">
               Sin líneas para este documento.
             </p>
+          ) : isMobile ? (
+            <div className="space-y-2">
+              {lineas!.map((l, i) => {
+                const precioUd = l.unidades ? l.importe / l.unidades : null;
+                const lineaNegativa = l.importe < 0;
+                return (
+                  <div key={`${l.referencia}-${i}`} className="rounded-md border p-3">
+                    <div className="font-mono text-xs">{l.referencia}</div>
+                    <div className="mt-0.5 break-words text-sm font-medium">{l.descripcion ?? "—"}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {l.marca ?? "Sin marca"} · {l.familia ?? "Sin familia"}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <span className="text-sm text-muted-foreground">
+                        {num(l.unidades)} ud. × {precioUd != null ? eur(precioUd, 2) : "—"}
+                      </span>
+                      <span className={`text-base font-semibold tabular-nums ${lineaNegativa ? "text-destructive" : ""}`}>
+                        {eur(l.importe, 2)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           ) : (
             <Table>
               <TableHeader>
@@ -109,7 +137,7 @@ export function DocumentoLineasDialog({
                   <TableHead>Referencia</TableHead>
                   <TableHead>Descripción</TableHead>
                   <TableHead className="text-right">Uds.</TableHead>
-                  <TableHead className="text-right">Precio ud.</TableHead>
+                  <TableHead className="text-right">Precio medio ud.</TableHead>
                   <TableHead className="text-right">Importe</TableHead>
                 </TableRow>
               </TableHeader>
@@ -141,7 +169,7 @@ export function DocumentoLineasDialog({
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t pt-4 text-sm">
+        <div className="flex items-start justify-between border-t pt-4 text-sm">
           <span className="text-muted-foreground">
             {lineas?.length ?? 0} líneas · {num(unidadesTotales)} unidades
           </span>
@@ -153,6 +181,12 @@ export function DocumentoLineasDialog({
               </span>
             </div>
             <span className="text-xs text-muted-foreground">Importes sin IVA (base imponible)</span>
+            <span className="text-xs text-muted-foreground">Precio unitario medio tras descuentos</span>
+            {muestraDiferencia && (
+              <div className="text-right text-xs text-destructive">
+                El total del documento es {eur(documento!.importe, 2)}; las líneas mostradas suman {eur(total, 2)}.
+              </div>
+            )}
           </div>
         </div>
       </DialogContent>

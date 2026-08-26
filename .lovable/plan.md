@@ -10,7 +10,8 @@ Mejorar la lectura de `src/components/DocumentoLineasDialog.tsx` en vista móvil
    - Cuando `isMobile` sea true, omitir la `Table` y renderizar una lista de tarjetas (una por línea) en un contenedor `space-y-2`.
    - Cada tarjeta mostrará:
      - Referencia en `font-mono text-xs`.
-     - Descripción con truncado controlado y un segundo renglón con marca/familia.
+     - Descripción con `className="mt-0.5 break-words text-sm font-medium"`, **sin `truncate` ni `max-w`** para que se lea completa en varias líneas.
+     - Un segundo renglón con marca/familia.
      - Fila inferior con unidades × precio medio ud. y el importe total formateado.
    - Aplicar `text-destructive` al importe cuando la línea sea negativa, igual que la tabla actual.
    - En escritorio (`isMobile === false`) se conserva la `Table` existente sin modificaciones.
@@ -46,6 +47,6 @@ Mejorar la lectura de `src/components/DocumentoLineasDialog.tsx` en vista móvil
 
 ## Verificación
 1. `tsgo` limpio y build correcto.
-2. A 360 px, cada línea se lee completa sin scroll horizontal; descripciones largas se truncan dentro de su tarjeta.
+2. A 360 px, cada línea se lee completa sin scroll horizontal; las descripciones largas se muestran completas, envolviendo a varias líneas dentro de su tarjeta.
 3. En escritorio la tabla y el layout se mantienen igual que hoy.
 4. El modal abierto desde `/documentos` sigue funcionando igual.
