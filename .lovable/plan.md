@@ -1,56 +1,49 @@
-# Rediseño de layout móvil en NuevaVisita.tsx
+# Fase 2 del rediseño móvil: bloques de visita
 
-Objetivo: eliminar las 5-6 pantallas de scroll antes del micrófono en móvil. Solo estructura visual y jerarquía — no se toca lógica de estado, guardado, análisis IA, repregunta ni validaciones.
+Solo jerarquía visual en `src/pages/NuevaVisita.tsx` (render de bloques, líneas ~689-747) y dos recortes en `src/components/CampoVisita.tsx`. Sin tocar guardado, análisis IA, repregunta ni validaciones.
 
-## Cambios
+## 1. Bloques como acordeón
 
-### 1. Cabecera (líneas ~414-459)
-- Eliminar la Card "1. Datos de la visita" como bloque expandido.
-- Bajo el título, directamente el selector de cliente actual: el buscador con su lista cuando no hay cliente; la fila nombre/#código/Cambiar cuando lo hay. Sin Card ni Label "Cliente".
-- Subtítulo acortado a: "Cuéntala y la IA la reparte en bloques".
+- Sustituir el `bloques.map` de Cards por un único `<Accordion type="multiple" value={bloquesAbiertos} onValueChange={setBloquesAbiertos}>`, un `AccordionItem` por bloque con `value={b.uid}`.
+- Trigger: `motivoDe(b.motivoKey)?.nombre` (fallback "Sin motivo") + `Badge` de estado a la derecha:
+  - `Listo` (variant secondary) si `pendientesDe(b).length === 0` y ningún campo visible tiene `b.meta[key]?.confianza === "baja"`.
+  - `Faltan N` (ámbar) si `pendientesDe(b).length > 0`.
+  - `Revisar` (ámbar) si no faltan pero hay confianza baja.
+- Helper local `estadoDe(b): "listo" | "faltan" | "revisar"` junto a `pendientesDe`, usado por el badge y por la apertura automática.
+- Se conserva el badge "Propuesta IA" en el trigger solo si `Object.keys(b.valores).length > 0`.
+- El botón `Trash2` pasa al final del `AccordionContent`, como botón ghost con texto "Quitar bloque", visible solo si `bloques.length > 1`.
 
-### 2. Tipo / Resultado / Fecha → resumen plegado
-- Envolver los tres campos en un `Collapsible` cerrado por defecto (`open` controlado por estado nuevo `detallesAbiertos`).
-- Trigger: una fila de texto pequeño con los valores actuales separados por "·", p.ej. "Cliente · Efectiva · hoy", con `ChevronDown` a la derecha que rota al abrir.
-- La fecha muestra "hoy" si `fecha === hoyISO()`; si no, formato dd/MM.
-- Al abrir: los tres campos tal como están hoy (grid Tipo/Resultado, aviso de "sin bloques", input Fecha).
-- Auto-apertura: si `resultado !== "efectiva"`, el Collapsible se abre solo (`detallesAbiertos = true`). Al volver a "efectiva" no se cierra lo que el usuario haya abierto. El aviso "se registra sin bloques" queda visible.
+## 2. Apertura automática
 
-### 3. Micrófono primero
-- Mover el bloque `{esEfectiva && (…)}` del VoiceRecorder (líneas 569-649) inmediatamente después del Collapsible de detalles y del aviso `avisoCliente`, antes de la chuleta.
-- Quitar el CardHeader "2. Cuenta la visita" y la numeración: ya no hay pasos.
-- El VoiceRecorder queda como elemento suelto centrado, sin Card contenedora, con algo más de aire vertical (py-2).
-- "Lo que he entendido", `errorExtraccion` y `avisosRef` siguen justo debajo, sin cambios de contenido.
+- Estado nuevo `bloquesAbiertos: string[]`.
+- En los dos puntos donde la IA fija bloques (`analizarTranscripcion`, línea ~209, y el reintento del bloque de transcripción, línea ~624), tras `setBloques(...)` fijar `setBloquesAbiertos` con los uid cuyo `estadoDe` no sea `"listo"`.
+- Al crear bloque a mano (`nuevoBloque`, botones "Añadir bloque a mano" / "Añadir otro bloque" y fallback de error), añadir su uid a `bloquesAbiertos`.
+- Al borrar un bloque, quitar su uid de la lista.
 
-### 4. Chuleta → Sheet lateral
-- Eliminar el bloque Card+Collapsible "Antes de grabar: qué no dejarte" (líneas 535-567).
-- Sustituir por un `Button variant="ghost" size="sm"` con icono `Lightbulb` y texto "Qué pide el director", centrado bajo el micrófono. Solo visible si `esEfectiva`.
-- Abre un `<Sheet side="bottom">` (shadcn) con estado `chuletaAbierta`.
-- Dentro del Sheet: el párrafo introductorio actual, y los `motivosActivos` como `<Accordion type="single" collapsible>`: un item por motivo, trigger = `m.nombre`, contenido = `m.descripcion` + lista de campos `requerido_validacion`. Todos cerrados al abrir el Sheet. Contenido con scroll si excede (max-h).
+## 3. Dos zonas dentro del bloque
 
-### 5. Observaciones y "Añadir bloque"
-- Si `esEfectiva` y `bloques.length === 0`: el botón "Añadir bloque a mano" se muestra siempre visible (no va tras "+ Añadir detalle"). Guardar está deshabilitado sin bloques y esconderlo deja al usuario sin salida cuando la IA falla.
-- Si `esEfectiva` y `bloques.length >= 1`: ocultar el botón "Añadir otro bloque" y la sección de Observaciones tras un único botón ghost "+ Añadir detalle" al final. Al pulsarlo (`extrasAbiertos = true`) se despliega en su sitio: el botón "Añadir otro bloque" y el Textarea de Observaciones sin Card, con Label pequeño.
-- Si NO `esEfectiva`: el Textarea de Observaciones se muestra siempre, expandido, sin botón intermedio (es el único campo que queda). Sin Card, con Label pequeño.
+- Zona A (siempre visible, sin cabecera): campos que necesitan atención = `pendientesDe(b)` más los campos visibles con `meta.confianza === "baja"`, en el orden de `camposVisibles`.
+- Zona B (plegada): el resto de campos visibles, dentro de un `Collapsible` con trigger de texto pequeño "Ver los N campos ya rellenos" y `ChevronDown` que rota.
+  - El `Select` de Motivo (+ `motivo.descripcion`) se mueve al principio de la Zona B.
+  - Si Zona A está vacía, la Zona B arranca abierta (estado por uid en un `Record<string, boolean>` local del componente de página, inicializado según ese criterio).
 
-### 6. General
-- `space-y-4` → `space-y-3` en el contenedor raíz.
-- Barra fija inferior de Guardar sin cambios.
-- Sin cambios de colores ni tema.
+## 4. Aviso redundante
 
-## Estado nuevo (solo presentacional)
-- `detallesAbiertos: boolean` (Collapsible tipo/resultado/fecha).
-- `chuletaAbierta: boolean` (Sheet).
-- `extrasAbiertos: boolean` (bloque "+ Añadir detalle").
+Eliminar el párrafo "Se puede guardar, pero para que el director la dé por válida faltan: …" (líneas 739-743). El badge del trigger ya lo comunica. La tarjeta de repregunta queda intacta.
 
-## Imports nuevos
-- `Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger` de `@/components/ui/sheet`.
-- `Accordion, AccordionContent, AccordionItem, AccordionTrigger` de `@/components/ui/accordion`.
-- `ChevronDown` de lucide-react. Quitar `Card`/`CardHeader`/`CardTitle` si dejan de usarse (los bloques de visita y repregunta siguen usando Card).
+## 5. CampoVisita.tsx
 
-## Intocable
-- Toda la lógica de estado de voz (`procesarVisita`, `analizarTranscripcion`, `responderRepregunta`), `guardar`, validaciones, `marcarPlanificadaRealizada`, y el contenido interno de bloques/repregunta.
+- `campo.ayuda` solo se renderiza si `valor === ""`.
+- La cita `«…»` solo se renderiza si `dudoso` (confianza baja); con confianza normal sigue accesible en el `title` del badge "IA · …".
+- Nada más cambia en ese fichero.
+
+## Detalles técnicos
+
+- Reutilizar `Accordion*` y `Collapsible*` ya importados en el fichero.
+- `estadoDe` y la lista de campos "de atención" se calculan en render, sin memo nuevo, igual que hoy `pendientesDe`.
+- `Card`/`CardHeader`/`CardTitle` siguen usándose en la repregunta, así que los imports se mantienen.
 
 ## Verificación
+
 - `tsgo` + build.
-- Playwright a 360-411px: captura inicial mostrando cliente + resumen plegado + micrófono visibles sin scroll; Collapsible abierto; Sheet de chuleta abierto; resultado "cliente_ausente" con textarea visible y Collapsible auto-abierto.
+- Playwright a 411 px con tres bloques simulados (uno completo, uno con campos requeridos vacíos y uno con confianza baja): captura mostrando que solo los dos últimos aparecen abiertos, con badges "Listo" / "Faltan N" / "Revisar" correctos y sin scroll horizontal.
