@@ -3,7 +3,7 @@ import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, Phone, Mail, MapPin, Route as RouteIcon, Sparkles, Loader2,
   TrendingUp, TrendingDown, Package, Plus, AlertTriangle, Target, MessageSquareQuote,
-  Truck, User, Info, ChevronDown,
+  Truck, User, Info, ChevronDown, CalendarPlus, CalendarCheck,
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -14,18 +14,34 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, Legend,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import {
   useCliente, useClienteVentas, useClienteKpis, useClienteProductos, useClienteMix,
   useClienteVisitas, useMotivos, usePuedeVerMargen, useSituacionesVigentes, useClienteDocumentos, useVisitaBloques,
+  useProximaPlanificada, useAgendaMutations,
   etiquetaCategoria, eur, num, eurK, fechaCorta, type DocumentoCliente, type Visita,
 } from "@/hooks/useCrm";
 import { ClientePerfilTab } from "@/components/ClientePerfilTab";
 import { DocumentoLineasDialog } from "@/components/DocumentoLineasDialog";
+
+/** Fecha local en formato ISO corto, mismo criterio que hoyISO() en useCrm. */
+const isoLocal = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const fechaHoy = () => isoLocal(new Date());
+const fechaManana = () => {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return isoLocal(d);
+};
 
 
 interface Insights {
