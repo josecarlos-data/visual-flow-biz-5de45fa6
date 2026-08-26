@@ -464,11 +464,20 @@ export default function ClienteDetalle() {
       <Tabs defaultValue="resumen">
         <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
-          <TabsTrigger value="productos">Productos</TabsTrigger>
-          <TabsTrigger value="documentos">Documentos</TabsTrigger>
           <TabsTrigger value="visitas">Visitas</TabsTrigger>
+          <TabsTrigger value="productos">
+            <span className="sm:hidden">Product.</span>
+            <span className="hidden sm:inline">Productos</span>
+          </TabsTrigger>
+          <TabsTrigger value="documentos">
+            <span className="sm:hidden">Docs.</span>
+            <span className="hidden sm:inline">Documentos</span>
+          </TabsTrigger>
           <TabsTrigger value="perfil">Perfil</TabsTrigger>
-          <TabsTrigger value="ia">Análisis IA</TabsTrigger>
+          <TabsTrigger value="ia">
+            <span className="sm:hidden">IA</span>
+            <span className="hidden sm:inline">Análisis IA</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="resumen" className="space-y-4">
