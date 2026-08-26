@@ -27,6 +27,7 @@ import AdminSituaciones from "./pages/AdminSituaciones";
 import AdminObjetivos from "./pages/AdminObjetivos";
 import Objetivos from "./pages/Objetivos";
 import Documentos from "./pages/Documentos";
+import ActividadInterna from "./pages/ActividadInterna";
 
 import NotFound from "./pages/NotFound";
 
