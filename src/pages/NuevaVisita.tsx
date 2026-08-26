@@ -400,7 +400,9 @@ export default function NuevaVisita() {
       title: "Visita guardada",
       description: agendaMarcada ? "Marcada como realizada en tu agenda." : undefined,
     });
-    navigate(`/clientes/${codCliente}`);
+    const volverRaw = params.get("volver");
+    const volver = volverRaw && volverRaw.startsWith("/") && !volverRaw.startsWith("//") ? volverRaw : `/clientes/${codCliente}`;
+    navigate(volver);
   };
 
   return (
