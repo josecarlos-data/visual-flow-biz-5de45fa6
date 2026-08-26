@@ -22,7 +22,8 @@ A2. La rama sin dato (botón "Añadir") usa el mismo contenedor derecho ya modif
 
 B1. Cabecera de la tarjeta "Productos comprados":
 - La cabecera pasa de `flex-row items-center justify-between gap-2 space-y-0` a `flex-col gap-2 space-y-0 sm:flex-row sm:items-center sm:justify-between`.
-- Se añade un `<Input>` con `placeholder="Buscar referencia o descripción"` e icono `Search` de lucide-react (posicionado absoluto a la izquierda del input). En móvil ocupa una segunda línea a ancho completo (`w-full sm:w-64` o similar), separado del `Select` por el `gap-2` de la cabecera.
+- Se añade un `<Input>` con `placeholder="Buscar referencia o descripción"`. El input va envuelto en un `div` con `relative w-full sm:w-64`, el icono `Search` de lucide-react se coloca dentro con `absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none`, y el `Input` lleva `pl-8` para dejar hueco al icono.
+- En móvil el buscador ocupa una segunda línea a ancho completo, separado del `Select` por el `gap-2` de la cabecera.
 
 B2. Filtro en memoria sobre el array `productos` (sin nueva consulta):
 - Coincidencia por inclusión contra `referencia` y `descripcion`.
@@ -31,8 +32,9 @@ B2. Filtro en memoria sobre el array `productos` (sin nueva consulta):
 
 B3. Ordenación por columna, en memoria:
 - `useState<{ campo, dir }>` inicializado en `{ campo: "importe", dir: "desc" }` (orden de llegada actual).
-- Columnas ordenables: Referencia (texto), Familia (texto), Marca (texto), Uds. (numérico), Importe (numérico), Margen (numérico, solo si `verMargen`), Última (fecha).
-- Cada `TableHead` ordenable contiene un botón que alterna asc/desc; al cambiar de columna arranca en `desc` para numéricos/fecha y en `asc` para texto.
+- Columnas ordenables: Referencia (texto), Familia (texto), Marca (texto), Uds. (numérico), Importe (numérico), Margen (numérico, solo si `verMargen`) y Última (fecha).
+- Cada `TableHead` ordenable contiene un `<button>` que alterna asc/desc; al cambiar de columna arranca en `desc` para numéricos/fecha y en `asc` para texto.
+- En columnas alineadas a la derecha (Uds., Importe, Margen, Última), el botón lleva `ml-auto flex items-center gap-1` para que la cabecera siga alineada con sus celdas. En columnas de texto (Referencia, Familia, Marca), el botón lleva `flex items-center gap-1`.
 - La columna activa muestra `ChevronUp` o `ChevronDown` (`h-3.5 w-3.5`) según la dirección; las demás no muestran icono.
 - Los nulos van siempre al final, en ambas direcciones (comparador que los desvía antes de comparar valores).
 - Se mantienen intactas las clases `hidden sm:table-cell` / `hidden md:table-cell` de las cabeceras: la ordenación no cambia la visibilidad responsive.
