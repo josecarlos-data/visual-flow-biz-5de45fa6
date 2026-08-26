@@ -110,6 +110,26 @@ export default function NuevaVisita() {
     if (resultado !== "efectiva") setDetallesAbiertos(true);
   }, [resultado]);
 
+  // Abre automáticamente los bloques que no están listos y los nuevos; respeta los ya vistos.
+  useEffect(() => {
+    setBloquesAbiertos((prev) => {
+      const setPrev = new Set(prev);
+      const abiertos = bloques
+        .filter((b) => (estadoDe(b) !== "listo" || setPrev.has(b.uid)) && !setPrev.has(b.uid))
+        .map((b) => b.uid);
+      return abiertos.length ? [...prev, ...abiertos] : prev;
+    });
+    setZonasBAbiertas((prev) => {
+      const next = { ...prev };
+      for (const b of bloques) {
+        if (!(b.uid in next)) {
+          next[b.uid] = atencionDe(b).length === 0;
+        }
+      }
+      return next;
+    });
+  }, [bloques]);
+
   const opciones = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
     const list = clientes ?? [];
