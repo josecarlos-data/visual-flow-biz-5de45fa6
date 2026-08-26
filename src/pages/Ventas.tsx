@@ -658,7 +658,7 @@ function Kpi({ icon, label, value, hint, positive }: { icon: React.ReactNode; la
         </div>
         <div className="mt-1 truncate text-xl font-bold tracking-tight sm:text-2xl">{value}</div>
         {hint && (
-          <div className={`mt-0.5 leading-tight text-[11px] sm:text-xs ${positive === undefined ? "text-muted-foreground" : positive ? "text-primary" : "text-destructive"}`}>{hint}</div>
+          <div className={`mt-0.5 whitespace-normal break-words leading-tight text-[11px] sm:text-xs ${positive === undefined ? "text-muted-foreground" : positive ? "text-primary" : "text-destructive"}`}>{hint}</div>
         )}
       </CardContent>
     </Card>
