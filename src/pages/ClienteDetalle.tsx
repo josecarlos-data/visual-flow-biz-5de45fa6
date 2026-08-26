@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, Phone, Mail, MapPin, Route as RouteIcon, Sparkles, Loader2,
@@ -19,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, Legend,
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, Legend, Cell,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -71,6 +72,7 @@ export default function ClienteDetalle() {
   const [searchParams, setSearchParams] = useSearchParams();
   const codNum = cod ? Number(cod) : null;
 
+  const isMobile = useIsMobile();
   const volverRaw = searchParams.get("volver");
   const volverTxtRaw = searchParams.get("volverTxt");
   const volver = volverRaw && volverRaw.startsWith("/") && !volverRaw.startsWith("//") ? volverRaw : "/clientes";
@@ -243,22 +245,35 @@ export default function ClienteDetalle() {
   const anioActual = anios[0] ?? new Date().getFullYear();
   const anioPrevio = anioActual - 1;
 
+  const anioNaturalActual = new Date().getFullYear();
+  const mesActualNatural = new Date().getMonth() + 1;
+
   const porAnio = useMemo(() => {
     const map = new Map<number, number>();
     for (const v of ventas ?? []) map.set(v.anio, (map.get(v.anio) ?? 0) + Number(v.importe ?? 0));
-    return Array.from(map.entries()).sort((a, b) => a[0] - b[0]).map(([anio, total]) => ({ anio: String(anio), total }));
-  }, [ventas]);
+    return Array.from(map.entries()).sort((a, b) => a[0] - b[0]).map(([anio, total]) => ({
+      anio: String(anio),
+      total,
+      enCurso: anio === anioNaturalActual,
+    }));
+  }, [ventas, anioNaturalActual]);
 
   const mensual = useMemo(() => {
-    const base = MESES.map((m, i) => ({ mes: m, actual: 0, anterior: 0, _i: i + 1 }));
+    const aplicarCorte = anioActual === anioNaturalActual;
+    const base = MESES.map((m, i) => ({
+      mes: m,
+      actual: aplicarCorte && (i + 1) > mesActualNatural ? null : 0,
+      anterior: 0,
+      _i: i + 1,
+    }));
     for (const v of ventas ?? []) {
       const row = base[v.mes - 1];
       if (!row) continue;
-      if (v.anio === anioActual) row.actual += Number(v.importe ?? 0);
+      if (v.anio === anioActual) row.actual = (row.actual ?? 0) + Number(v.importe ?? 0);
       if (v.anio === anioPrevio) row.anterior += Number(v.importe ?? 0);
     }
     return base;
-  }, [ventas, anioActual, anioPrevio]);
+  }, [ventas, anioActual, anioPrevio, anioNaturalActual, mesActualNatural]);
 
   const variacionYtd = useMemo(() => {
     if (!kpis || !kpis.importe_anio_anterior_ytd) return null;
@@ -417,7 +432,9 @@ export default function ClienteDetalle() {
             <p className="text-xs text-muted-foreground">Última compra</p>
             <p className="mt-1 text-sm font-semibold">{kpis?.ultima_compra ? fechaCorta(kpis.ultima_compra) : "Sin compras"}</p>
             <p className={`text-xs ${(kpis?.dias_sin_comprar ?? 0) > 90 ? "font-medium text-destructive" : "text-muted-foreground"}`}>
-              {kpis?.dias_sin_comprar != null ? `${num(kpis.dias_sin_comprar)} días sin comprar` : "—"}
+              {kpis?.dias_sin_comprar != null
+                ? `${num(kpis.dias_sin_comprar)} ${kpis.dias_sin_comprar === 1 ? "día" : "días"} sin comprar`
+                : "—"}
             </p>
           </CardContent>
         </Card>
@@ -549,15 +566,35 @@ export default function ClienteDetalle() {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={porAnio} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
-                      <XAxis dataKey="anio" tickLine={false} axisLine={false} className="text-xs" />
+                      <XAxis
+                        dataKey="anio"
+                        tickLine={false}
+                        axisLine={false}
+                        className="text-xs"
+                        tickFormatter={(v: string) =>
+                          v === String(anioNaturalActual) ? (isMobile ? `${v} *` : `${v} (en curso)`) : v
+                        }
+                      />
                       <YAxis tickFormatter={eurK} tickLine={false} axisLine={false} className="text-xs" width={54} />
                       <Tooltip
                         formatter={(v: number) => eur(v)}
                         contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
                       />
-                      <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="total" radius={[4, 4, 0, 0]}>
+                        {porAnio.map((entry) => (
+                          <Cell
+                            key={entry.anio}
+                            fill={entry.enCurso ? "hsl(var(--primary) / 0.45)" : "hsl(var(--primary))"}
+                          />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
+                )}
+                {porAnio.some((d) => d.enCurso) && (
+                  <p className="mt-1 text-center text-xs text-muted-foreground">
+                    {isMobile ? "* Año en curso (parcial)" : "El año en curso incluye datos parciales"}
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -576,7 +613,7 @@ export default function ClienteDetalle() {
                     />
                     <Legend />
                     <Line type="monotone" dataKey="anterior" name={String(anioPrevio)} stroke="hsl(var(--muted-foreground))" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="actual" name={String(anioActual)} stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="actual" name={String(anioActual)} stroke="hsl(var(--primary))" strokeWidth={2} dot={false} connectNulls={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
