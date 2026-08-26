@@ -170,6 +170,10 @@ export default function Ventas() {
   const ytdPrevio = mensual
     .filter((m) => m.anio === anioActual - 1 && m.mes <= mesesConDatos)
     .reduce((s, m) => s + m.importe, 0);
+  const totalAnioPrevio = mensual
+    .filter((m) => m.anio === anioActual - 1)
+    .reduce((s, m) => s + m.importe, 0);
+  const proyeccion = ytdPrevio > 0 && kpiActual ? kpiActual.importe * (totalAnioPrevio / ytdPrevio) : null;
   const variacion = ytdPrevio > 0 && kpiActual ? ((kpiActual.importe - ytdPrevio) / ytdPrevio) * 100 : null;
   const margenPct = kpiActual && kpiActual.importe > 0 ? (kpiActual.margen / kpiActual.importe) * 100 : 0;
   const ticketVar =
