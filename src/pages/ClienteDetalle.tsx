@@ -165,7 +165,8 @@ export default function ClienteDetalle() {
       );
     }
     const { campo, dir } = ordenProductos;
-    const numOrDate = ["unidades", "importe", "margen", "ultima"].includes(campo);
+    const esNumero = ["unidades", "importe", "margen"].includes(campo);
+    const esFecha = campo === "ultima";
     list.sort((a, b) => {
       const va = a[campo];
       const vb = b[campo];
@@ -175,11 +176,9 @@ export default function ClienteDetalle() {
       if (na) return 1;
       if (nb) return -1;
       let cmp = 0;
-      if (numOrDate) {
-        cmp = Number(new Date(va as string).getTime()) - Number(new Date(vb as string).getTime());
-      } else {
-        cmp = String(va).localeCompare(String(vb), "es");
-      }
+      if (esNumero) cmp = Number(va) - Number(vb);
+      else if (esFecha) cmp = new Date(va as string).getTime() - new Date(vb as string).getTime();
+      else cmp = String(va).localeCompare(String(vb), "es");
       return dir === "asc" ? cmp : -cmp;
     });
     return list;
