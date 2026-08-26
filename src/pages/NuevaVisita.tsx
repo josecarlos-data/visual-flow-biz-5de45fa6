@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import { ArrowLeft, Save, Loader2, Wand2, FileText, Plus, Trash2, Lightbulb, AlertTriangle, Mic } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Wand2, FileText, Plus, Trash2, Lightbulb, AlertTriangle, Mic, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { VoiceRecorder } from "@/components/VoiceRecorder";
@@ -17,6 +19,7 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useClientes, useMotivos, useCatalogos, hoyISO, crearBloques, marcarPlanificadaRealizada, type Motivo, type MotivoCampo } from "@/hooks/useCrm";
 import { camposVisibles, normalizarValoresNumericos } from "@/lib/motivoCampos";
+import { cn } from "@/lib/utils";
 
 type Meta = Record<string, { cita?: string; confianza?: string }>;
 
@@ -35,6 +38,20 @@ const nuevoBloque = (motivoKey: string): BloqueForm => ({
 });
 
 const RESULTADOS = ["efectiva", "cliente_ausente", "cerrado", "sin_acceso"];
+
+const ETIQUETA_RESULTADO: Record<string, string> = {
+  efectiva: "Efectiva",
+  cliente_ausente: "Cliente ausente",
+  cerrado: "Cerrado",
+  sin_acceso: "Sin acceso",
+};
+
+const ETIQUETA_TIPO: Record<string, string> = {
+  cliente: "Cliente",
+  ruta: "Ruta",
+  llamada: "Llamada",
+  agenda: "Agenda",
+};
 
 export default function NuevaVisita() {
   const [params] = useSearchParams();
@@ -64,6 +81,9 @@ export default function NuevaVisita() {
   const [avisoCliente, setAvisoCliente] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [detallesAbiertos, setDetallesAbiertos] = useState(false);
+  const [chuletaAbierta, setChuletaAbierta] = useState(false);
+  const [extrasAbiertos, setExtrasAbiertos] = useState(false);
 
   const motivosActivos = useMemo(() => (motivos ?? []).filter((m) => m.is_active), [motivos]);
   const motivoDe = (key: string): Motivo | undefined => motivos?.find((m) => m.key === key);
@@ -84,7 +104,9 @@ export default function NuevaVisita() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [codCliente]);
 
-
+  useEffect(() => {
+    if (resultado !== "efectiva") setDetallesAbiertos(true);
+  }, [resultado]);
 
   const opciones = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
@@ -101,6 +123,8 @@ export default function NuevaVisita() {
   /** Solo las visitas efectivas llevan bloques; el resto son intentos fallidos. */
   const esEfectiva = resultado === "efectiva";
   const requiereGeo = tipo !== "llamada";
+
+  const fechaLabel = fecha === hoyISO() ? "hoy" : fecha.split("-").reverse().join("/");
 
   // ---------------------------------------------------------------- referencias
 
@@ -224,7 +248,6 @@ export default function NuevaVisita() {
     setTranscripcion(texto);
     await analizarTranscripcion(texto, codCliente, cliente?.cliente ?? "");
   };
-
 
   /** Segunda tanda: el comercial contesta por voz a los campos que faltan de un bloque. */
   const responderRepregunta = async (uid: string, blob: Blob) => {
@@ -406,58 +429,67 @@ export default function NuevaVisita() {
   };
 
   return (
-    <div className="space-y-4 pb-24">
+    <div className="space-y-3 pb-24">
       <Link to="/visitas" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> Visitas
       </Link>
 
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Registrar visita</h1>
-        <p className="text-sm text-muted-foreground">Cuenta la visita entera de una vez y la IA la reparte en bloques</p>
+        <p className="text-sm text-muted-foreground">Cuéntala y la IA la reparte en bloques</p>
       </div>
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">1. Datos de la visita</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Cliente</Label>
-            {cliente ? (
-              <div className="flex items-center justify-between gap-2 rounded-md border p-3">
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{cliente.cliente}</p>
-                  <p className="text-xs text-muted-foreground">#{cliente.cod_cliente} · {cliente.localidad ?? "—"}</p>
-                </div>
-                <Button variant="ghost" size="sm" onClick={() => { setCodCliente(""); setBusqueda(""); }}>
-                  Cambiar
-                </Button>
-              </div>
-            ) : (
-              <>
-                <Input
-                  value={busqueda}
-                  onChange={(e) => setBusqueda(e.target.value)}
-                  placeholder="Buscar cliente por nombre o código…"
-                />
-                <div className="max-h-56 space-y-1 overflow-auto rounded-md border p-1">
-                  {opciones.map((c) => (
-                    <button
-                      key={c.cod_cliente}
-                      type="button"
-                      onClick={() => setCodCliente(String(c.cod_cliente))}
-                      className="w-full rounded px-3 py-2 text-left text-sm hover:bg-accent"
-                    >
-                      <span className="font-medium">{c.cliente}</span>
-                      <span className="ml-2 text-xs text-muted-foreground">#{c.cod_cliente}</span>
-                    </button>
-                  ))}
-                  {opciones.length === 0 && (
-                    <p className="p-3 text-sm text-muted-foreground">Sin resultados.</p>
-                  )}
-                </div>
-              </>
+      {/* Selector de cliente directamente en la cabecera */}
+      {cliente ? (
+        <div className="flex items-center justify-between gap-2 rounded-md border p-3">
+          <div className="min-w-0">
+            <p className="truncate font-medium">{cliente.cliente}</p>
+            <p className="text-xs text-muted-foreground">#{cliente.cod_cliente} · {cliente.localidad ?? "—"}</p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => { setCodCliente(""); setBusqueda(""); }}>
+            Cambiar
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <Input
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar cliente por nombre o código…"
+          />
+          <div className="max-h-56 space-y-1 overflow-auto rounded-md border p-1">
+            {opciones.map((c) => (
+              <button
+                key={c.cod_cliente}
+                type="button"
+                onClick={() => setCodCliente(String(c.cod_cliente))}
+                className="w-full rounded px-3 py-2 text-left text-sm hover:bg-accent"
+              >
+                <span className="font-medium">{c.cliente}</span>
+                <span className="ml-2 text-xs text-muted-foreground">#{c.cod_cliente}</span>
+              </button>
+            ))}
+            {opciones.length === 0 && (
+              <p className="p-3 text-sm text-muted-foreground">Sin resultados.</p>
             )}
           </div>
+        </div>
+      )}
 
+      {/* Resumen plegado de tipo, resultado y fecha */}
+      <Collapsible open={detallesAbiertos} onOpenChange={setDetallesAbiertos}>
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex w-full items-center justify-between rounded-md border p-3 text-left text-sm text-muted-foreground"
+          >
+            <span>
+              {ETIQUETA_TIPO[tipo] ?? tipo} · {ETIQUETA_RESULTADO[resultado] ?? resultado} · {fechaLabel}
+            </span>
+            <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", detallesAbiertos && "rotate-180")} />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-4 pt-3">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Tipo</Label>
@@ -494,8 +526,8 @@ export default function NuevaVisita() {
             <Label>Fecha</Label>
             <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
           </div>
-        </CardContent>
-      </Card>
+        </CollapsibleContent>
+      </Collapsible>
 
       {avisoCliente && (
         <div className="flex items-start gap-2 rounded-md border border-amber-400/70 bg-amber-50/60 p-3 text-sm dark:bg-amber-500/10">
@@ -532,120 +564,126 @@ export default function NuevaVisita() {
         </div>
       )}
 
-      {/* Chuleta previa: recordatorio, no obliga a elegir motivo */}
-
+      {/* Micrófono: elemento principal, sin Card */}
       {esEfectiva && (
-        <Card>
-          <Collapsible defaultOpen={!transcripcion}>
-            <CollapsibleTrigger className="flex w-full items-center gap-2 p-4 text-left">
-              <Lightbulb className="h-4 w-4 text-primary" />
-              <span className="text-base font-semibold">Antes de grabar: qué no dejarte</span>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-3 px-4 pb-4">
-              <p className="text-xs text-muted-foreground">
-                No hace falta elegir motivo: cuenta la visita y la IA lo reparte. Esto es solo un recordatorio de lo que
-                el director exige en cada tipo de asunto.
-              </p>
-              {motivosActivos.map((m) => {
-                const clave = camposVisibles(m.campos).filter((c) => c.requerido_validacion).map((c) => c.label);
-                return (
-                  <div key={m.key} className="rounded-md border p-3">
-                    <p className="text-sm font-medium">{m.nombre}</p>
-                    {m.descripcion && <p className="text-xs text-muted-foreground">{m.descripcion}</p>}
-                    {clave.length > 0 && (
-                      <p className="mt-1 text-xs">
-                        <span className="text-muted-foreground">Imprescindible: </span>
-                        {clave.join(" · ")}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-            </CollapsibleContent>
-          </Collapsible>
-        </Card>
-      )}
-
-      {esEfectiva && (
-        <Card>
-          <CardHeader><CardTitle className="text-base">2. Cuenta la visita</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
+        <div className="space-y-4 py-2">
+          <div className="flex justify-center">
             <VoiceRecorder
               onAudio={(blob) => procesarVisita(blob)}
               disabled={!codCliente || transcribiendo || extrayendo}
               processing={transcribiendo}
               hasResult={transcripcion !== ""}
             />
+          </div>
 
-            {transcripcion && (
-              <div className="space-y-2 rounded-md border bg-muted/40 p-3">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <FileText className="h-4 w-4" /> Lo que he entendido
-                  {extrayendo && (
-                    <Badge variant="secondary" className="gap-1">
-                      <Loader2 className="h-3 w-3 animate-spin" /> rellenando campos…
-                    </Badge>
-                  )}
-                </div>
-                <Textarea
-                  rows={6}
-                  value={transcripcion}
-                  onChange={(e) => setTranscripcion(e.target.value)}
-                  className="bg-background text-sm"
-                />
+          {transcripcion && (
+            <div className="space-y-2 rounded-md border bg-muted/40 p-3">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <FileText className="h-4 w-4" /> Lo que he entendido
+                {extrayendo && (
+                  <Badge variant="secondary" className="gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" /> rellenando campos…
+                  </Badge>
+                )}
+              </div>
+              <Textarea
+                rows={6}
+                value={transcripcion}
+                onChange={(e) => setTranscripcion(e.target.value)}
+                className="bg-background text-sm"
+              />
+              <p className="text-xs text-muted-foreground">
+                Léela mientras se preparan los bloques. Puedes corregirla: se guarda con la visita.
+              </p>
+            </div>
+          )}
+
+          {errorExtraccion && (
+            <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm">
+              <AlertTriangle className="mt-0.5 h-4 w-4 text-destructive" />
+              <div className="space-y-2">
+                <p>No se han podido preparar los bloques ({errorExtraccion}). La transcripción está guardada; rellena la visita a mano.</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={extrayendo}
+                  onClick={async () => {
+                    setExtrayendo(true);
+                    setErrorExtraccion(null);
+                    try {
+                      const { data, error } = await supabase.functions.invoke("visita-voz", {
+                        body: { transcripcion, cliente_nombre: cliente?.cliente ?? "" },
+                      });
+                      if (error) throw new Error(error.message);
+                      const res = data as { bloques?: { motivo_key: string; campos: Record<string, string>; campos_meta: Meta }[]; error?: string };
+                      if (res.error) throw new Error(res.error);
+                      const propuestos: BloqueForm[] = (res.bloques ?? [])
+                        .filter((b) => motivoDe(b.motivo_key))
+                        .map((b) => ({ uid: crypto.randomUUID(), motivoKey: b.motivo_key, valores: { ...b.campos }, meta: { ...(b.campos_meta ?? {}) } }));
+                      setAvisosRef(await resolverReferencias(propuestos));
+                      if (propuestos.length) setBloques(propuestos);
+                    } catch (e) {
+                      setErrorExtraccion((e as Error).message);
+                    } finally {
+                      setExtrayendo(false);
+                    }
+                  }}
+                >
+                  Reintentar el análisis
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {avisosRef.length > 0 && (
+            <div className="rounded-md border border-amber-400/70 bg-amber-50/60 p-3 text-sm dark:bg-amber-500/10">
+              <p className="mb-1 font-medium">Referencias sin confirmar</p>
+              <ul className="list-disc pl-5 text-xs">
+                {avisosRef.map((a, i) => <li key={i}>{a}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {/* Chuleta: botón que abre Sheet inferior */}
+          <div className="flex justify-center">
+            <Button variant="ghost" size="sm" onClick={() => setChuletaAbierta(true)}>
+              <Lightbulb className="mr-1 h-4 w-4 text-primary" /> Qué pide el director
+            </Button>
+          </div>
+
+          <Sheet open={chuletaAbierta} onOpenChange={setChuletaAbierta}>
+            <SheetContent side="bottom">
+              <SheetHeader>
+                <SheetTitle>Qué pide el director</SheetTitle>
+              </SheetHeader>
+              <div className="max-h-[70vh] space-y-3 overflow-y-auto pt-2">
                 <p className="text-xs text-muted-foreground">
-                  Léela mientras se preparan los bloques. Puedes corregirla: se guarda con la visita.
+                  No hace falta elegir motivo: cuenta la visita y la IA lo reparte. Esto es solo un recordatorio de lo que
+                  el director exige en cada tipo de asunto.
                 </p>
+                <Accordion type="single" collapsible className="w-full">
+                  {motivosActivos.map((m) => {
+                    const clave = camposVisibles(m.campos).filter((c) => c.requerido_validacion).map((c) => c.label);
+                    return (
+                      <AccordionItem key={m.key} value={m.key}>
+                        <AccordionTrigger>{m.nombre}</AccordionTrigger>
+                        <AccordionContent>
+                          {m.descripcion && <p className="text-sm text-muted-foreground">{m.descripcion}</p>}
+                          {clave.length > 0 && (
+                            <p className="mt-2 text-xs">
+                              <span className="text-muted-foreground">Imprescindible: </span>
+                              {clave.join(" · ")}
+                            </p>
+                          )}
+                        </AccordionContent>
+                      </AccordionItem>
+                    );
+                  })}
+                </Accordion>
               </div>
-            )}
-
-            {errorExtraccion && (
-              <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm">
-                <AlertTriangle className="mt-0.5 h-4 w-4 text-destructive" />
-                <div className="space-y-2">
-                  <p>No se han podido preparar los bloques ({errorExtraccion}). La transcripción está guardada; rellena la visita a mano.</p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={extrayendo}
-                    onClick={async () => {
-                      setExtrayendo(true);
-                      setErrorExtraccion(null);
-                      try {
-                        const { data, error } = await supabase.functions.invoke("visita-voz", {
-                          body: { transcripcion, cliente_nombre: cliente?.cliente ?? "" },
-                        });
-                        if (error) throw new Error(error.message);
-                        const res = data as { bloques?: { motivo_key: string; campos: Record<string, string>; campos_meta: Meta }[]; error?: string };
-                        if (res.error) throw new Error(res.error);
-                        const propuestos: BloqueForm[] = (res.bloques ?? [])
-                          .filter((b) => motivoDe(b.motivo_key))
-                          .map((b) => ({ uid: crypto.randomUUID(), motivoKey: b.motivo_key, valores: { ...b.campos }, meta: { ...(b.campos_meta ?? {}) } }));
-                        setAvisosRef(await resolverReferencias(propuestos));
-                        if (propuestos.length) setBloques(propuestos);
-                      } catch (e) {
-                        setErrorExtraccion((e as Error).message);
-                      } finally {
-                        setExtrayendo(false);
-                      }
-                    }}
-                  >
-                    Reintentar el análisis
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {avisosRef.length > 0 && (
-              <div className="rounded-md border border-amber-400/70 bg-amber-50/60 p-3 text-sm dark:bg-amber-500/10">
-                <p className="mb-1 font-medium">Referencias sin confirmar</p>
-                <ul className="list-disc pl-5 text-xs">
-                  {avisosRef.map((a, i) => <li key={i}>{a}</li>)}
-                </ul>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </SheetContent>
+          </Sheet>
+        </div>
       )}
 
       {esEfectiva && bloques.map((b, i) => {
@@ -751,28 +789,59 @@ export default function NuevaVisita() {
         </Card>
       )}
 
-      {esEfectiva && (
+      {/* Cuando no hay bloques efectivos, dar salida manual visible siempre */}
+      {esEfectiva && bloques.length === 0 && (
         <Button
           variant="outline"
           className="w-full"
           onClick={() => setBloques((bs) => [...bs, nuevoBloque(motivosActivos[0]?.key ?? "")])}
           disabled={!motivosActivos.length}
         >
-          <Plus className="mr-2 h-4 w-4" /> Añadir otro bloque
+          <Plus className="mr-2 h-4 w-4" /> Añadir bloque a mano
         </Button>
       )}
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">Observaciones</CardTitle></CardHeader>
-        <CardContent>
+      {/* Con bloques efectivos, extras ocultos tras el toggle */}
+      {esEfectiva && bloques.length >= 1 && (
+        extrasAbiertos ? (
+          <div className="space-y-3">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setBloques((bs) => [...bs, nuevoBloque(motivosActivos[0]?.key ?? "")])}
+              disabled={!motivosActivos.length}
+            >
+              <Plus className="mr-2 h-4 w-4" /> Añadir otro bloque
+            </Button>
+            <div className="space-y-2">
+              <Label className="text-sm">Observaciones</Label>
+              <Textarea
+                rows={3}
+                placeholder="Observaciones adicionales de la visita…"
+                value={observaciones}
+                onChange={(e) => setObservaciones(e.target.value)}
+              />
+            </div>
+          </div>
+        ) : (
+          <Button variant="ghost" className="w-full" onClick={() => setExtrasAbiertos(true)}>
+            <Plus className="mr-2 h-4 w-4" /> Añadir detalle
+          </Button>
+        )
+      )}
+
+      {/* Visitas no efectivas: textarea siempre visible */}
+      {!esEfectiva && (
+        <div className="space-y-2">
+          <Label className="text-sm">Observaciones</Label>
           <Textarea
             rows={3}
-            placeholder={esEfectiva ? "Observaciones adicionales de la visita…" : "¿Qué ha pasado? (cliente ausente, taller cerrado…)"}
+            placeholder="¿Qué ha pasado? (cliente ausente, taller cerrado…)"
             value={observaciones}
             onChange={(e) => setObservaciones(e.target.value)}
           />
-        </CardContent>
-      </Card>
+        </div>
+      )}
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 p-3 backdrop-blur md:static md:border-0 md:bg-transparent md:p-0">
         <div className="mx-auto flex max-w-3xl gap-2">
