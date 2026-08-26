@@ -1,42 +1,66 @@
-# Actividad interna: análisis por motivo de abono
+# Rediseño de layout en src/pages/Ventas.tsx
 
-Solo se amplía Actividad interna. No se crean tablas nuevas ni se toca Documentos ni el importador.
+Objetivo: aprovechar mejor el ancho de pantallas grandes (~24") y mantener la legibilidad en móvil, sin modificar consultas, hooks, RPCs ni lógica de cálculo. Único archivo afectado: `src/pages/Ventas.tsx`.
 
-## 1. RPC nueva: actividad_interna_motivos
+## Cambios de layout
 
-`public.actividad_interna_motivos(_anio int, _almacen text DEFAULT NULL)`, plpgsql, STABLE, SECURITY DEFINER, `search_path = public`, con la misma comprobación de acceso como primera instrucción (rol admin o `user_dashboard_access` con `actividad_interna`) y `GRANT EXECUTE` a `authenticated`.
+### 1) Fila de KPIs
 
-Una fila por `motivo_abono` sobre los abonos del año (`operacion = 'Abono'`), filtrando por `almacen` cuando `_almacen` no es NULL. Motivo nulo o vacío se agrupa como `'SIN MOTIVO'`.
+- Rejilla condicional según `verMargen`:
+  - `verMargen === true`: `grid-cols-2 sm:grid-cols-3 xl:grid-cols-6`
+  - `verMargen === false`: `grid-cols-2 sm:grid-cols-3 xl:grid-cols-5`
+- Renombrar etiqueta `"Transacciones"` a `"Documentos"` (icono e hint sin cambios).
+- En el KPI "Facturación", ampliar el hint con la proyección de cierre calculada en cliente a partir de `mensual` y `kpis`:
+  - `ytdPrevio` ya existe (línea 170 aprox.).
+  - `totalAnioPrevio = mensual.filter(año anterior).reduce(importe)`.
+  - `proyeccion = kpiActual.importe * (totalAnioPrevio / ytdPrevio)` si `ytdPrevio > 0`.
+  - Hint resultante ejemplo: `"-7,0% vs 2025 YTD · proyección 11,3 M €"`.
+  - Si `ytdPrevio === 0`, omitir la parte de proyección.
 
-Columnas: `motivo`, `n_abonos` (COUNT DISTINCT `id_documento`), `importe` (ABS de la suma), `pct_n` (% sobre el total de abonos del año/almacén), `pct_importe` (% sobre el importe abonado total), `tramitadores` (COUNT DISTINCT `registrado_por`), `clientes_distintos` (COUNT DISTINCT `cod_cliente`). Orden `n_abonos DESC`.
+### 2) Evolución mensual + Ticket medio por mes
 
-## 2. Filtro de motivo en actividad_interna_usuarios
+- Envolver ambas Cards en `<div className="grid gap-4 lg:grid-cols-2">`.
+- Reducir altura del `CardContent` a `h-[240px] lg:h-[260px]`.
+- En el YAxis de "Ticket medio por mes", cambiar `width` de 70 a 55.
 
-`DROP FUNCTION IF EXISTS public.actividad_interna_usuarios(integer, text)` antes de crear la nueva firma `(_anio int, _almacen text DEFAULT NULL, _motivo text DEFAULT NULL)`, para no dejar una sobrecarga.
+### 3) Mix por canal + Devoluciones + Alertas comerciales
 
-El filtro de motivo aplica solo a los abonos:
+- Mover la Card "Alertas comerciales" para que comparta franja con "Mix por canal" y "Devoluciones":
+  - Contenedor: `<div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">`.
+  - Orden: Mix por canal, Devoluciones, Alertas comerciales.
+- En "Alertas comerciales":
+  - Eliminar `sm:flex-row` del `CardHeader` para que los botones queden siempre debajo del título.
+  - Reducir texto de los botones a `text-[11px]`.
+- Verificar que el badge de porcentaje en cada fila de alerta mantiene `shrink-0` y no empuja el nombre del cliente (ya truncado).
 
-- `importe_vendido`, `docs_venta`, `clientes_distintos`, `ticket_medio`, `n_almacenes` y `almacen_principal` se calculan siempre sobre todas las ventas del año, ignorando `_motivo`.
-- `n_abonos`, `importe_abonado`, `abonos_ajenos`, `abonos_atribuidos` e `importe_atribuido` se restringen a los abonos de ese motivo (comparando `SIN MOTIVO` con motivo nulo o vacío).
-- `importe_neto` = `importe_vendido - importe_atribuido` (ya filtrado).
-- `pct_abonos` y `pct_importe_abonado` se mantienen en la RPC.
+### 4) Top 10 clientes | Top familias + Top marcas apilados
 
-Se conservan la atribución por LATERAL con `ORDER BY s.anio DESC, s.cod_cliente, s.id_documento LIMIT 1`, el FULL OUTER JOIN entre tramitados y atribuidos, y el orden por `importe_vendido DESC`.
+- Mantener contenedor `<div className="grid gap-4 lg:grid-cols-2">`.
+- Columna izquierda: "Top 10 clientes" (sin cambios).
+- Columna derecha: `<div className="grid gap-4">` con "Top familias" y "Top marcas" apilados verticalmente.
+- Altura del `CardContent` de cada gráfico de barras: `h-[200px]`.
+- En ambos `BarChart`:
+  - `tick fontSize={10}`
+  - `YAxis width={70}`
+  - `margin={{ ..., left: 70 }}`
+- Eliminar la Card suelta de "Top marcas" que hoy aparece al final de la página.
 
-## 3. actividad_interna_filtros
+### 5) Ajustes de móvil
 
-Se añade `motivos text[]` con los valores distintos de `motivo_abono` presentes en abonos, ordenados alfabéticamente.
+- Espaciado general: `space-y-6` → `space-y-4 sm:space-y-6`.
+- En los cuatro gráficos, pasar a `<Legend wrapperStyle={{ fontSize: 11 }} />`.
+- En los `BarChart`, fijar `margin left: 70` y `YAxis width={70}` para todos los tamaños.
+- Revisar que ninguna Card provoque scroll horizontal en 360 px de ancho.
 
-## 4. Frontend
+### 6) Skeleton de carga
 
-`src/hooks/useCrm.ts`: nuevo tipo `ActividadMotivo` y hook `useActividadMotivos(anio, almacen)`; `motivos` en el tipo de filtros; `useActividadUsuarios` acepta un tercer argumento `motivo` que va en la queryKey y en los parámetros de la RPC.
+- Actualizar para reflejar la nueva estructura:
+  - Una tira de KPIs con el número correcto de columnas según `verMargen` (por defecto mostrar 6 u omitir margen).
+  - Dos bloques de gráficos en paralelo.
 
-`src/pages/ActividadInterna.tsx`:
+## Restricciones
 
-- Tercera pestaña "Por motivo" con su propio selector de almacén y tabla ordenable (mecanismo local existente): Motivo, Abonos, Importe, % abonos, % importe, Tramitadores, Clientes.
-- En "Por usuario", selector "Motivo" junto al de almacén con "Todos los motivos" por defecto; con motivo activo se muestra bajo los filtros una línea de 13px en color secundario: "Las columnas de abonos están filtradas por motivo; las de venta no."
-- Se eliminan de la tabla "Por usuario" las columnas "% abonos" y "% imp. abonado".
-
-## Fuera de alcance
-
-Agrupación de motivos, comparativa anual, gráficos y exportación.
+- No añadir dependencias.
+- No modificar textos excepto el cambio "Transacciones" → "Documentos".
+- No tocar `panel_ventas_kpis` ni ninguna función SQL.
+- No modificar `<Link>` existentes de Top clientes ni de alertas.
