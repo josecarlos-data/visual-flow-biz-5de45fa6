@@ -72,6 +72,7 @@ export default function ClienteDetalle() {
   const [searchParams, setSearchParams] = useSearchParams();
   const codNum = cod ? Number(cod) : null;
 
+  const isMobile = useIsMobile();
   const volverRaw = searchParams.get("volver");
   const volverTxtRaw = searchParams.get("volverTxt");
   const volver = volverRaw && volverRaw.startsWith("/") && !volverRaw.startsWith("//") ? volverRaw : "/clientes";
