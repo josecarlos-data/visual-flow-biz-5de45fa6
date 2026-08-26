@@ -436,16 +436,17 @@ export default function Ventas() {
             {canales.map((c) => {
               const total = canales.reduce((s, x) => s + x.importe, 0);
               const share = total > 0 ? (c.importe / total) * 100 : 0;
+              const ancho = Math.max(0, Math.min(100, share));
               const contenido = (
                 <>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="truncate font-medium">{c.canal}</span>
+                  <div className="flex min-w-0 items-center justify-between gap-3">
+                    <span className="min-w-0 truncate font-medium">{c.canal}</span>
                     <span className="shrink-0 font-medium">{eur(c.importe)}</span>
                   </div>
                   <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                    <div className="h-full rounded-full bg-primary" style={{ width: `${share.toFixed(1)}%` }} />
+                    <div className={`h-full rounded-full ${share < 0 ? "bg-destructive" : "bg-primary"}`} style={{ width: `${ancho.toFixed(1)}%` }} />
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
+                  <div className="mt-1 truncate text-xs text-muted-foreground">
                     {pct(share)} · {fnum(c.documentos)} transacciones · ticket {eur(c.ticket_medio, 2)} · {fnum(c.clientes)} clientes
                   </div>
                 </>
