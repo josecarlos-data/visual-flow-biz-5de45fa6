@@ -1,51 +1,43 @@
-# Ficha de cliente: agendar visita y ajustes de layout móvil
+# Agendar visita desde la ficha + mejoras móviles en Cliente detalle
 
-Sin migraciones: `visitas_planificadas` ya tiene todas las columnas y el UNIQUE necesarios.
-Ficheros afectados: `src/hooks/useCrm.ts` y `src/pages/ClienteDetalle.tsx`.
+Solo se tocan `src/hooks/useCrm.ts` y `src/pages/ClienteDetalle.tsx`. Sin migraciones: `visitas_planificadas` ya tiene todas las columnas y el UNIQUE necesarios.
 
 ## A) Agendar visita desde la ficha
 
-- `useAgendaMutations().add`: ampliar el tipo del parámetro con `notas?: string | null` y pasarlo al insert. Sin más cambios (Agenda.tsx sigue igual).
-- Nuevo hook `useProximaPlanificada(codCliente)`: consulta `visitas_planificadas` con `cod_cliente` y `fecha >= hoyISO()`, orden ascendente por fecha, `limit 1`, devuelve la fila o `null`. `queryKey: ["crm_agenda", "proxima", codCliente]`.
-- En la ficha, junto a "Nueva visita", botón "Agendar" (`variant="outline"`, icono `CalendarPlus`) que abre un Dialog con:
-  - atajos Hoy / Mañana / Otra fecha. "Hoy" y "Mañana" usan el criterio local de `hoyISO()` en `useCrm.ts` (`getFullYear/getMonth/getDate` con `padStart`), no `toISOString()`. Para Mañana se parte de una fecha local y se le suma un día con `setDate(d.getDate() + 1)` antes de formatear. "Otra fecha" revela un `<Input type="date">`.
-  - Textarea opcional "Motivo de la visita (opcional)" (`rows=3`) que se guarda en `notas`,
-  - botón Guardar.
-  - `user_id` desde `useAuth()`.
-- Antes del insert se cuenta cuántas filas hay para ese `user_id` y esa fecha; se inserta con `orden = conteo + 1`.
-- Error `23505`: toast informativo "Este cliente ya está en tu agenda del {fecha}". Cualquier otro error: toast destructive.
+- `useAgendaMutations().add`: el tipo del parámetro pasa a incluir `notas?: string | null`, que se envía en el insert. Nada más cambia, así que Agenda.tsx sigue funcionando igual.
+- Nuevo hook `useProximaPlanificada(codCliente)`: consulta `visitas_planificadas` con `cod_cliente` y `fecha >= hoyISO()`, orden ascendente por fecha, `limit 1`, devuelve la fila o `null`. `queryKey: ["crm_agenda", "proxima", codCliente]` para que lo refresque el `invalidate()` existente.
+- Botón "Agendar" (`variant="outline"`, icono `CalendarPlus`) junto a "Nueva visita". Abre un Dialog con atajos Hoy / Mañana / Otra fecha (este último revela un `Input type="date"`), un `Textarea` opcional "Motivo de la visita (opcional)" con `rows={3}` que se guarda en `notas`, y botón Guardar.
+- Fechas siempre en hora local, con el mismo criterio que `hoyISO()` (`getFullYear`/`getMonth()+1`/`getDate()` con `padStart`). Nunca `toISOString()`. Para Mañana, `setDate(d.getDate() + 1)` sobre una fecha local antes de formatear.
+- `user_id` desde `useAuth()`, igual que en Agenda.tsx.
+- Antes del insert se cuentan las filas de ese `user_id` y esa `fecha` y se inserta con `orden = conteo + 1`.
+- Error `23505`: toast "Este cliente ya está en tu agenda del {fecha}". Cualquier otro error: toast destructive.
 - Si hay próxima planificada, bajo la línea de metadatos aparece un `Badge variant="secondary"` con icono `CalendarCheck`: "Agendado para el {fecha corta}" y, si hay notas, " · {notas}" truncado. El botón Agendar sigue activo.
 
 ## B) Cabecera en móvil
 
-Los dos botones se agrupan en un div `flex w-full gap-2 sm:w-auto sm:shrink-0`, cada botón con `flex-1 sm:flex-none`. En móvil se renderiza justo después del `<h1>`, sus metadatos y el badge de agendado, antes del bloque de situación y del aviso de prohibición de venta. En `sm` y superiores queda arriba a la derecha igual que ahora.
+Los dos botones se agrupan en un div `flex w-full gap-2 sm:w-auto sm:shrink-0`, cada botón con `flex-1 sm:flex-none`. En móvil se renderiza justo después del `<h1>`, sus metadatos y el badge de agendado, antes del bloque de situación; en `sm`+ queda arriba a la derecha como ahora.
 
 ## C) Rejilla de KPIs
 
-- Orden nuevo: Última compra, Última visita, Ventas {anioActual}, Variación vs. {anioPrevio}, y el resto detrás en su orden actual.
-- Estado `kpisAbiertos` (useState, inicial `false`). Botón dentro del grid con `className="col-span-2 sm:hidden ..."`, texto "Ver todas las métricas" y `ChevronDown` que rota (`className={kpisAbiertos ? "rotate-180" : ""}`).
-- Tarjetas de la quinta en adelante envueltas en un div con `className={kpisAbiertos ? "contents" : "hidden sm:contents"}`. De esta manera siguen siendo hijas directas del grid y en `sm` y superiores se ven siempre.
+- Orden nuevo: "Última compra", "Última visita", "Ventas {anioActual}", "Variación vs. {anioPrevio}", y el resto detrás en su orden actual.
+- Sin Radix Collapsible (desmontaría las tarjetas en escritorio). Se usa `useState<boolean>` `kpisAbiertos` (false), un `<button type="button" className="col-span-2 sm:hidden ...">` dentro del grid con texto "Ver todas las métricas" y un `ChevronDown` con `className={kpisAbiertos ? "rotate-180" : ""}`, y las tarjetas de la quinta en adelante envueltas en `<div className={kpisAbiertos ? "contents" : "hidden sm:contents"}>`.
 - Clases del grid: `grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6`.
-- No importar `Collapsible` para esta parte (se conserva el Collapsible de "Ver texto original" en la pestaña Visitas).
 
 ## D) Pestañas
 
-- Orden: Resumen, Visitas, Productos, Documentos, Perfil, Análisis IA (triggers y contenidos), mismos `value`, `defaultValue="resumen"`.
-- Etiquetas cortas en móvil vía `<span className="sm:hidden">` / `<span className="hidden sm:inline">`: Productos→"Product.", Documentos→"Docs.", Análisis IA→"IA".
+- Orden: Resumen, Visitas, Productos, Documentos, Perfil, Análisis IA. Mismos `value` y `defaultValue="resumen"`.
+- Etiquetas cortas en móvil con `<span className="sm:hidden">` / `<span className="hidden sm:inline">`: Productos→"Product.", Documentos→"Docs.", Análisis IA→"IA".
 
-## E) Tabla de documentos
+## E) Tabla de Documentos
 
-- "Fecha": primera línea la fecha; segunda línea `text-xs text-muted-foreground sm:hidden` con nº de documento · tipo (`d.operacion ?? d.tipo_documento`) · canal.
-- "Documento", "Tipo", "Canal": `hidden sm:table-cell`.
-- "Registrado por" y "Líneas": `hidden md:table-cell`.
-- "Importe": siempre visible.
-- Las mismas clases en `TableHead` y `TableCell` de cada columna.
-- Se quita `overflow-x-auto` del `CardContent` de esa tabla.
+- "Fecha": fecha en la primera línea y una segunda línea `text-xs text-muted-foreground sm:hidden` con nº documento · tipo (`d.operacion ?? d.tipo_documento`) · canal.
+- "Documento", "Tipo", "Canal": `hidden sm:table-cell`. "Registrado por" y "Líneas": `hidden md:table-cell`. Mismas clases en `TableHead` y `TableCell`.
+- "Importe" siempre visible. Se quita `overflow-x-auto` del `CardContent` de esa tabla.
 
 ## Fuera de alcance
 
-No se toca el contenido de las tarjetas KPI, la lógica de `verMargen`, la pestaña Productos, `DocumentoLineasDialog` ni `Agenda.tsx`.
+Contenido de las tarjetas KPI, lógica de `verMargen`, pestaña Productos, `DocumentoLineasDialog` y `Agenda.tsx`.
 
 ## Verificación
 
-`tsgo` limpio, build correcto y revisión a 411 px de ancho: botones visibles arriba, sin scroll horizontal en la tabla de documentos.
+`tsgo` limpio y build correcto. A 411 px: los dos botones arriba, las once tarjetas reaparecen al pulsar "Ver todas las métricas", tabla de documentos sin scroll horizontal. A ~1000 px: todas las tarjetas visibles y sin botón de despliegue.
