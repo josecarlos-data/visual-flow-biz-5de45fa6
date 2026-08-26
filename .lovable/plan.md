@@ -1,77 +1,75 @@
-# Reordenación de layout en src/pages/Ventas.tsx
+# Optimización de arranque, robustez y caché en App.tsx
 
 ## Objetivo
-Reorganizar visualmente el cuerpo de la página de Ventas en tres filas independientes, manteniendo intactas las consultas, hooks, cálculos, enlaces y el contenido interno de cada tarjeta. Solo se modifica `src/pages/Ventas.tsx`.
+Mejorar el arranque, la robustez ante errores y el rendimiento percibido de la aplicación con tres cambios concentrados en `src/App.tsx` y un componente nuevo. No se modificará ninguna página, hook, consulta, migración ni archivo de configuración de paquetes.
 
-## Estructura actual (única rejilla)
-Hoy todo el contenido vive dentro de un único `grid items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3` con 7 Cards y col-spanes variados.
+## Cambios previstos
 
-## Estructura nueva
+### 1) Configurar `QueryClient` con opciones globales por defecto
 
-### Fila 0 — sin cambios
-- `<ResumenObjetivos />`
-- Fila de KPIs (`grid grid-cols-2 sm:grid-cols-3 ...`)
+Sustituir en `src/App.tsx` (línea 34) la instancia vacía:
 
-### Fila A — tres columnas iguales
 ```text
-<div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0 xl:h-[560px]">
+const queryClient = new QueryClient();
 ```
 
-| Columna | Contenido | Clases a añadir |
-| --- | --- | --- |
-| 1 | Card "Top 10 clientes" | `h-full flex flex-col` en `<Card>`; `flex-1 overflow-y-auto` en `CardContent` |
-| 2 | Card "Alertas comerciales" | `h-full flex flex-col` en `<Card>`; quitar `lg:col-span-2 2xl:col-span-1`; `flex-1 overflow-y-auto` en `CardContent` |
-| 3 | `<div>` contenedor de dos tarjetas apiladas | `grid grid-rows-2 gap-4 h-full`; `h-full flex flex-col` en cada Card |
-| 3a | Card "Top familias" | `flex-1 min-h-[160px]` en `CardContent` (sustituye `h-[200px] 2xl:h-[240px]`) |
-| 3b | Card "Top marcas" | `flex-1 min-h-[160px]` en `CardContent` (sustituye `h-[200px] 2xl:h-[240px]`) |
+por una instancia con `defaultOptions.queries`:
 
-### Fila B — dos columnas
 ```text
-<div className="grid gap-4 xl:grid-cols-3 [&>*]:min-w-0 xl:h-[420px]">
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 ```
 
-| Columna | Contenido | Clases a añadir |
-| --- | --- | --- |
-| 1 | Card "Mix por canal" | `h-full flex flex-col`; `flex-1` en `CardContent` |
-| 2-3 | Card "Evolución mensual" | `xl:col-span-2`, `h-full flex flex-col`; `flex-1 min-h-[260px]` en `CardContent` (sustituye `h-[260px] sm:h-[300px] 2xl:h-[420px]`) |
+Restricciones:
+- No modificar los `staleTime` que ya declaran individualmente los hooks en `src/hooks/useCrm.ts`, `src/hooks/useObjetivos.ts` y `src/hooks/useHistoricoData.ts`; esos valores seguirán prevaleciendo sobre el global.
+- No tocar ninguna llamada a `invalidateQueries` ni a `refetchOnMount` si existiera.
 
-### Fila C — ancho completo
-- Card "Devoluciones" fuera de cualquier grid, con `w-full` implícita por ser hijo directo del contenedor `space-y-4 sm:space-y-6`.
+### 2) Crear `src/components/ErrorBoundary.tsx`
 
-## Skeleton de carga
-Sustituir la rejilla única actual del skeleton por tres filas que reproduzcan la nueva estructura:
+Nuevo componente de clase con:
+- `static getDerivedStateFromError` para activar el estado de error.
+- `componentDidCatch` para loguear el error mediante `console.error`.
+- UI de error consistente con `AuthErrorScreen` (tarjeta centrada, título, explicación breve, mensaje de error en bloque `bg-muted`, botones "Recargar" y "Volver al inicio").
 
-1. Fila A:
-   ```text
-   <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0 xl:h-[560px]">
-     <Skeleton className="h-full min-h-[260px]" />   // Top 10 clientes
-     <Skeleton className="h-full min-h-[260px]" />   // Alertas comerciales
-     <div className="grid grid-rows-2 gap-4 h-full min-h-[260px]">
-       <Skeleton className="h-full" /> // Top familias
-       <Skeleton className="h-full" /> // Top marcas
-     </div>
-   </div>
-   ```
-2. Fila B:
-   ```text
-   <div className="grid gap-4 xl:grid-cols-3 [&>*]:min-w-0 xl:h-[420px]">
-     <Skeleton className="h-full min-h-[260px]" /> // Mix por canal
-     <Skeleton className="h-full min-h-[260px] xl:col-span-2" /> // Evolución mensual
-   </div>
-   ```
-3. Fila C:
-   ```text
-   <Skeleton className="h-64 w-full" /> // Devoluciones
-   ```
+Comportamiento de los botones:
+- "Recargar" → `window.location.reload()`.
+- "Volver al inicio" → `window.location.href = "/"`.
 
-## Restricciones
-- No modificar RPCs, hooks, consultas, cálculos, estados ni la lógica de proyección.
-- No tocar los `<Link>` de drill-down ni los selectores de métrica/vista.
-- No alterar el contenido interno de las Cards (gráficos, listados, Tabs).
-- No crear migraciones ni modificar `supabase/`.
-- Preservar anti-desbordamientos ya aplicados (`min-w-0`, `truncate`).
+Integración en `src/App.tsx`:
+- Envolver con `<ErrorBoundary>` el contenido dentro de `<BrowserRouter>`, por fuera de `<Routes>`.
+- NO envolver `<AuthProvider>` ni `<QueryClientProvider>` para no impedir el cierre de sesión si fallan.
+
+### 3) Carga diferida de rutas con `React.lazy`
+
+En `src/App.tsx`:
+- Convertir todos los imports de páginas de `src/pages` a `React.lazy`, **excepto** `Auth` y `NotFound`, que permanecen como import estático.
+- Envolver `<Routes>` en `<Suspense fallback={<LoadingScreen />}>`.
+- `LoadingScreen` ya existe y ya está importado en el fichero.
+
+Objetivo de rendimiento:
+- El parser `@e965/xlsx` arrastrado por `src/pages/AdminData.tsx` deja de formar parte del bundle inicial.
+- Cada ruta se convierte en un chunk separado.
+
+## Ficheros afectados
+- `src/App.tsx` (modificado).
+- `src/components/ErrorBoundary.tsx` (nuevo).
+
+## Ficheros explícitamente NO tocados
+- `supabase/` (sin migraciones).
+- `package.json`.
+- Cualquier página bajo `src/pages/`.
+- Cualquier hook bajo `src/hooks/`.
 
 ## Verificación
 1. `tsgo` limpio y `bun run build` exitoso.
-2. En 360 px de ancho: sin scroll horizontal; el orden vertical es exactamente objetivos/KPIs → Top 10 clientes → Alertas → Top familias → Top marcas → Mix por canal → Evolución mensual → Devoluciones.
-3. En `xl` y superiores: Fila A mide 560 px de alto y las tres columnas se estiran a la misma altura; Fila B mide 420 px de alto y Mix por canal se estira junto a Evolución mensual; Devoluciones ocupa todo el ancho. En resoluciones inferiores a `xl` las filas fluyen con `min-h-[260px]` y sin altura fija.
+2. El build genera chunks separados por ruta, no un único bundle.
+3. Navegar entre secciones y volver atrás no vuelve a disparar las consultas dentro de los 5 minutos (gracias al `staleTime` global).
+4. Cambiar de pestaña del navegador y volver no recarga los datos (`refetchOnWindowFocus: false`).
