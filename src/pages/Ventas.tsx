@@ -37,7 +37,7 @@ interface KpiRow { anio: number; importe: number; margen: number; unidades: numb
 interface TopCliente { cod_cliente: number; cliente: string; vendedor: string | null; importe: number; margen: number }
 interface TopDim { importe: number; margen: number; familia?: string; marca?: string }
 interface CanalRow { canal: string; documentos: number; importe: number; margen: number; ticket_medio: number; clientes: number }
-interface DevolucionRow { tipo: string; etiqueta: string; importe: number; lineas: number }
+interface DevolucionRow { tipo: string; etiqueta: string; descripcion: string | null; importe: number; lineas: number }
 
 interface AlertaRow {
   tipo: string;
@@ -134,7 +134,8 @@ export default function Ventas() {
         margen: num(r.margen), ticket_medio: num(r.ticket_medio), clientes: num(r.clientes),
       })));
       setDevoluciones(((devRes.data as any[]) ?? []).map((r) => ({
-        tipo: r.tipo, etiqueta: r.etiqueta ?? "—", importe: num(r.importe), lineas: num(r.lineas),
+        tipo: r.tipo, etiqueta: r.etiqueta ?? "—", descripcion: r.descripcion ?? null,
+        importe: num(r.importe), lineas: num(r.lineas),
       })));
     })();
 
