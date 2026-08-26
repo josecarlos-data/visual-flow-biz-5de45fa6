@@ -89,6 +89,11 @@ export default function ClienteDetalle() {
   const [insights, setInsights] = useState<Insights | null>(null);
   const [anioProd, setAnioProd] = useState<string>("todos");
   const anioProdInicializado = useRef(false);
+  const [busquedaProductos, setBusquedaProductos] = useState("");
+  const [ordenProductos, setOrdenProductos] = useState<{ campo: CampoOrden; dir: "asc" | "desc" }>({
+    campo: "importe",
+    dir: "desc",
+  });
   const [docSeleccionado, setDocSeleccionado] = useState<DocumentoCliente | null>(null);
   const [dialogoLineasOpen, setDialogoLineasOpen] = useState(false);
   const [kpisAbiertos, setKpisAbiertos] = useState(false);
