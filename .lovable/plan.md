@@ -1,32 +1,50 @@
-# Actividad interna (solo gerencia)
+# Actividad interna: atribución real de abonos
 
-Nueva sección aislada que compara la actividad de los usuarios internos que registran documentos en el ERP, a partir de la información ya consolidada de documentos. No se modifica ninguna sección existente ni la vista de documentos.
+Amplía únicamente la sección Actividad interna. No se toca Documentos, ni el importador `maestroIsi.ts`, ni ninguna otra sección.
 
-## 1. Base de datos (una migración)
+## 1. Migración: columna de cruce en la vista de documentos
 
-- Registrar el dashboard `actividad_interna` en el catálogo de dashboards (nombre "Actividad interna", icono BarChart3, ruta `/actividad-interna`, orden 90), idempotente.
-- Conceder acceso únicamente a los usuarios con rol admin actuales, idempotente. No se replica el acceso de Ventas.
-- Tres funciones nuevas, todas `SECURITY DEFINER`, `STABLE`, `search_path = public`, y con la comprobación de acceso como primera instrucción del cuerpo (excepción "No autorizado" si el usuario no tiene el dashboard asignado):
-  - `actividad_interna_usuarios(_anio int, _almacen text DEFAULT NULL)`: una fila por usuario de registro (se excluyen nulos y cadena vacía) con almacén principal (el de más documentos), número de almacenes distintos, importe vendido, documentos de venta, número de abonos, importe abonado en valor absoluto, clientes distintos, ticket medio, % de abonos sobre documentos y % de importe abonado.
-  - `actividad_interna_almacenes(_anio int)`: las mismas métricas agrupadas por almacén, más el número de usuarios distintos.
-  - `actividad_interna_filtros()`: años y almacenes disponibles.
-- `GRANT EXECUTE` de las tres a usuarios autenticados. Sin índices nuevos sobre la vista materializada.
+Recrear `public.documentos_resumen` (DROP sin CASCADE + CREATE) idéntica a la definición actual (mismas 19 columnas, mismo JOIN con clientes, mismo WHERE y GROUP BY) añadiendo una columna:
 
-Criterios respetados tal cual están en el repo: venta = operación distinta de "Abono" (con "Venta" por defecto si es nula); abono = operación "Abono"; los importes de abono son negativos, se presentan en valor absoluto.
+- `doc_ref` = `regexp_replace(v.id_documento, '^[^|]*\|', '')`, agrupada junto a `id_documento`.
 
-## 2. Frontend
+En la misma migración, sin omitir nada de lo existente:
 
-- `src/App.tsx`: ruta `/actividad-interna` protegida con `dashboardKey="actividad_interna"` (sin `adminOnly`).
-- Menú lateral: no requiere cambios de código, la barra lateral se construye desde el catálogo de dashboards, así que la entrada aparece sola al insertar el registro.
-- `src/pages/ActividadInterna.tsx` nueva:
-  - Dos pestañas: "Por usuario" y "Por almacén".
-  - Selector de año (ambas pestañas) y de almacén (solo en "Por usuario"), poblados con `actividad_interna_filtros` y usando los mismos componentes Select que Documentos.
-  - Tabla con ordenación por columna en cliente (primer clic descendente), sin paginación.
-  - Importes en euros sin decimales, porcentajes con un decimal, formato es-ES vía los helpers existentes.
-  - En "almacén principal", badge "+N" cuando el usuario opera en más de un almacén.
-  - `useScrollRestore("actividad-interna", ...)` igual que en Documentos.
-- Hooks de datos: se añaden en `src/hooks/useCrm.ts` siguiendo el patrón de los hooks de documentos (react-query + RPC).
+- `SET LOCAL statement_timeout = '10min'` al inicio.
+- Índices recreados: `idx_documentos_resumen_pk` (UNIQUE sobre `anio, cod_cliente, id_documento`) e `idx_documentos_resumen_anio_importe` (sobre `anio, ABS(importe) DESC`).
+- Índice nuevo: `idx_documentos_resumen_doc_ref` sobre `(doc_ref)`.
+- Permisos: `REVOKE ALL ... FROM authenticated`, `REVOKE ALL ... FROM anon`, `GRANT ALL ... TO service_role`.
+
+## 2. Atribución de abonos en las RPC
+
+Ambas funciones necesitan `DROP FUNCTION` + `CREATE` (cambia la lista de columnas devueltas), manteniendo firma, `SECURITY DEFINER`, `STABLE`, `search_path = public`, la comprobación de acceso tal cual (admin o dashboard `actividad_interna`) y el `GRANT EXECUTE` a `authenticated`.
+
+Tres columnas nuevas en `actividad_interna_usuarios` y en `actividad_interna_almacenes`:
+
+- `abonos_atribuidos` (int): abonos del año cuya venta original fue registrada por ese usuario (o, en la vista por almacén, cuya venta original pertenece a ese almacén).
+- `importe_atribuido` (numeric): `ABS` del importe de esos abonos.
+- `importe_neto` (numeric): `importe_vendido - importe_atribuido`.
+
+Resolución del enlace: para cada abono del año, `LEFT JOIN LATERAL (SELECT registrado_por, almacen FROM public.documentos_resumen s WHERE s.doc_ref = btrim(a.id_doc_enlazado) AND COALESCE(s.operacion,'Venta') <> 'Abono' LIMIT 1) ON TRUE`, sin filtrar el lado de la venta por `_anio` (la venta original puede ser de otro año) y sin JOIN directo, para no duplicar filas cuando `doc_ref` se repite entre clientes. Un abono sin enlace, o cuyo enlace no resuelve, no se atribuye a nadie y queda fuera de estas tres columnas.
+
+- `n_abonos` e `importe_abonado` se mantienen sin cambios en SQL (pasan a interpretarse como "tramitados").
+- `pct_abonos` y `pct_importe_abonado` pasan a calcularse sobre los atribuidos: `abonos_atribuidos / docs_venta * 100` e `importe_atribuido / importe_vendido * 100`.
+- Se mantiene `n_almacenes` y el resto de métricas y el orden por `importe_vendido DESC`.
+
+## 3. Frontend
+
+`src/hooks/useCrm.ts`: añadir `abonos_atribuidos`, `importe_atribuido` e `importe_neto` a `ActividadUsuario` y `ActividadAlmacen`. Sin cambios en los hooks.
+
+`src/pages/ActividadInterna.tsx`, pestaña "Por usuario":
+
+- Nueva columna "Neto" (importe_neto) justo después de "Vendido".
+- "Abonos" -> "Abonos tramitados"; "Importe abonado" -> "Imp. tramitado".
+- Nuevas columnas "Abonos s/ sus ventas" (abonos_atribuidos) e "Imp. atribuido" (importe_atribuido).
+- Cabecera de almacén renombrada a "Plaza (est.)" y eliminado el badge "+N" (el valor sigue siendo el almacén principal).
+- Todas las columnas nuevas ordenables con el mecanismo de ordenación local existente.
+
+Pestaña "Por almacén": se añaden las mismas columnas nuevas para mantener coherencia de lectura.
 
 ## Fuera de alcance
 
-Garantías, margen, canal de entrada, gráficos, comparativa entre años y exportación.
+Clasificación operativo/funcional, comparativa anual, gráficos y exportación.
