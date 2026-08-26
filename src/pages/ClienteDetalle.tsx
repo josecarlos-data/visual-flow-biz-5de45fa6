@@ -57,12 +57,18 @@ type CampoOrden = "referencia" | "familia" | "marca" | "unidades" | "importe" | 
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
-function Dato({ label, value }: { label: string; value: React.ReactNode }) {
+function Dato({ label, value, multilinea }: { label: string; value: React.ReactNode; multilinea?: boolean }) {
   if (value === null || value === undefined || value === "") return null;
+  const isText = typeof value === "string" || typeof value === "number";
   return (
     <div className="min-w-0">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="truncate text-sm font-medium">{value}</p>
+      <p
+        className={`text-sm font-medium ${multilinea ? "break-words" : "truncate"}`}
+        title={!multilinea && isText ? String(value) : undefined}
+      >
+        {value}
+      </p>
     </div>
   );
 }
@@ -625,15 +631,15 @@ export default function ClienteDetalle() {
             ].map(({ title, rows }) => (
               <Card key={title}>
                 <CardHeader><CardTitle className="text-base">{title}</CardTitle></CardHeader>
-                <CardContent className="h-72">
+                <CardContent className="h-80">
                   {rows.length === 0 ? (
                     <p className="py-10 text-center text-sm text-muted-foreground">Sin datos.</p>
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={rows} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
+                      <BarChart data={rows} layout="vertical" margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
                         <XAxis type="number" tickFormatter={eurK} tickLine={false} axisLine={false} className="text-xs" />
-                        <YAxis type="category" dataKey="nombre" width={120} tickLine={false} axisLine={false} className="text-xs" />
+                        <YAxis type="category" dataKey="nombre" width={72} tickLine={false} axisLine={false} className="text-xs" interval={0} tick={{ fontSize: 10 }} />
                         <Tooltip
                           formatter={(v: number) => eur(v)}
                           contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
@@ -650,24 +656,50 @@ export default function ClienteDetalle() {
           <Card>
             <CardHeader><CardTitle className="text-base">Datos de ficha</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-2 gap-x-4 gap-y-3 md:grid-cols-3 lg:grid-cols-4">
-              <Dato label="Comercial" value={cliente.vendedor ? `${cliente.vendedor}${cliente.cod_vendedor ? ` (${cliente.cod_vendedor})` : ""}` : null} />
+              <Dato label="Comercial" multilinea value={cliente.vendedor ? `${cliente.vendedor}${cliente.cod_vendedor ? ` (${cliente.cod_vendedor})` : ""}` : null} />
               <Dato label="Ruta comercial" value={cliente.ruta_comercial ?? cliente.ruta} />
               <Dato label="Ruta especial" value={cliente.ruta_especial} />
               <Dato label="Delegación" value={cliente.delegacion} />
               <Dato label="Tipo de cliente" value={cliente.cod_tipo_cliente} />
               <Dato label="Grupo" value={cliente.grupo} />
               <Dato label="Grupo rappel" value={cliente.grupo_rappel} />
-              <Dato label="Tramos rappel" value={cliente.tramos_rappel} />
-              <Dato label="Razón social" value={cliente.razon_social} />
+              {cliente.tramos_rappel && (
+                <div className="col-span-2 md:col-span-3 lg:col-span-4">
+                  <p className="text-xs text-muted-foreground">Tramos rappel</p>
+                  {(() => {
+                    const tramos = cliente.tramos_rappel.split("|").map((t) => t.trim()).filter(Boolean);
+                    if (tramos.length === 0) return null;
+                    if (tramos.length === 1) return <p className="text-sm break-words">{tramos[0]}</p>;
+                    return (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {tramos.map((t, i) => (
+                          <span key={i} className="inline-block rounded-md border px-2 py-0.5 text-xs">{t}</span>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+              <Dato label="Razón social" multilinea value={cliente.razon_social} />
               <Dato label="CIF" value={cliente.cif} />
-              <Dato label="Persona de contacto" value={cliente.persona_contacto} />
-              <Dato label="Teléfono" value={cliente.telefono} />
-              <Dato label="Teléfono 2" value={cliente.telefono2} />
-              <Dato label="Email" value={cliente.email} />
-              <Dato label="Web" value={cliente.web} />
-              <Dato label="Dirección" value={cliente.direccion} />
-              <Dato label="Población" value={[cliente.cod_postal, cliente.localidad, cliente.provincia].filter(Boolean).join(" · ") || null} />
-              <Dato label="Alta" value={antiguedad} />
+              <Dato label="Persona de contacto" multilinea value={cliente.persona_contacto} />
+              <Dato
+                label="Teléfono"
+                value={cliente.telefono ? <a href={`tel:${cliente.telefono.replace(/\s/g, "")}`} className="text-primary underline underline-offset-2">{cliente.telefono}</a> : null}
+              />
+              <Dato
+                label="Teléfono 2"
+                value={cliente.telefono2 ? <a href={`tel:${cliente.telefono2.replace(/\s/g, "")}`} className="text-primary underline underline-offset-2">{cliente.telefono2}</a> : null}
+              />
+              <Dato
+                label="Email"
+                multilinea
+                value={cliente.email ? <a href={`mailto:${cliente.email}`} className="text-primary underline underline-offset-2">{cliente.email}</a> : null}
+              />
+              <Dato label="Web" multilinea value={cliente.web} />
+              <Dato label="Dirección" multilinea value={cliente.direccion} />
+              <Dato label="Población" multilinea value={[cliente.cod_postal, cliente.localidad, cliente.provincia].filter(Boolean).join(" · ") || null} />
+              <Dato label="Alta" multilinea value={antiguedad} />
               <Dato label="Empleados taller" value={cliente.num_empleados_taller != null ? num(cliente.num_empleados_taller) : null} />
               <Dato label="Primera compra" value={kpis?.primera_compra ? fechaCorta(kpis.primera_compra) : null} />
               <Dato label="Ventas históricas" value={kpis ? eur(kpis.importe_total) : null} />
