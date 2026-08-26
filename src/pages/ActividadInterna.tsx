@@ -173,6 +173,7 @@ export default function ActividadInterna() {
           <TabsList>
             <TabsTrigger value="usuario">Por usuario</TabsTrigger>
             <TabsTrigger value="almacen">Por almacén</TabsTrigger>
+            <TabsTrigger value="motivo">Por motivo</TabsTrigger>
           </TabsList>
           <Select value={anio} onValueChange={setAnio} disabled={cargandoFiltros}>
             <SelectTrigger className="w-40">
@@ -189,24 +190,46 @@ export default function ActividadInterna() {
         </div>
 
         <TabsContent value="usuario" className="space-y-3">
-          {(filtros?.almacenes?.length ?? 0) > 1 && (
-            <Select
-              value={almacen ?? TODOS}
-              onValueChange={(v) => setAlmacen(v === TODOS ? null : v)}
-            >
-              <SelectTrigger className="w-full sm:w-64">
-                <SelectValue placeholder="Todos los almacenes" />
+          <div className="flex flex-col gap-2 sm:flex-row">
+            {(filtros?.almacenes?.length ?? 0) > 1 && (
+              <Select
+                value={almacen ?? TODOS}
+                onValueChange={(v) => setAlmacen(v === TODOS ? null : v)}
+              >
+                <SelectTrigger className="w-full sm:w-64">
+                  <SelectValue placeholder="Todos los almacenes" />
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  <SelectItem value={TODOS}>Todos los almacenes</SelectItem>
+                  {(filtros?.almacenes ?? []).map((a) => (
+                    <SelectItem key={a} value={a}>
+                      {a}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Select value={motivo ?? TODOS} onValueChange={(v) => setMotivo(v === TODOS ? null : v)}>
+              <SelectTrigger className="w-full sm:w-72">
+                <SelectValue placeholder="Todos los motivos" />
               </SelectTrigger>
               <SelectContent className="max-h-72">
-                <SelectItem value={TODOS}>Todos los almacenes</SelectItem>
-                {(filtros?.almacenes ?? []).map((a) => (
-                  <SelectItem key={a} value={a}>
-                    {a}
+                <SelectItem value={TODOS}>Todos los motivos</SelectItem>
+                {(filtros?.motivos ?? []).map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {m}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {motivo && (
+            <p className="text-[13px] text-muted-foreground">
+              Las columnas de abonos están filtradas por motivo; las de venta no.
+            </p>
           )}
+
 
           <Card>
             <CardContent className="p-0">
