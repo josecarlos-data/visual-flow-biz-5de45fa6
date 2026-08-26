@@ -1,45 +1,41 @@
-# Plan: filtros por URL en Documentos y navegación contextual desde Ventas
+# Ventas: desbordamiento móvil + gráfico unificado con proyección
 
-## Alcance
-Solo dos ficheros de frontend. No se tocan RPCs, funciones SQL, paginación, ordenación ni dependencias.
+Trabajo limitado a `src/pages/Ventas.tsx`. Sin RPCs, consultas ni dependencias nuevas.
 
-## A) `src/pages/Documentos.tsx` — hidratar filtros desde query string
+## Parte 1 — Desbordamiento horizontal (prioritario)
 
-1. Importar `useSearchParams` de `react-router-dom`.
-2. Leer al montar (una sola vez, con `useRef` de guarda) los parámetros opcionales:
-   - `anio`, `canal`, `motivoAbono`, `operacion`, `vendedor`, `delegacion`, `importeMin`, `volver`, `volverTxt`.
-3. Reglas de hidratación:
-   - Si `anio` existe y es válido, usarlo como año inicial en lugar del último año con datos.
-   - `importeMin`: si el parámetro está presente, usar su valor (incluido `0`); si no, mantener `UMBRAL_DEFAULT` (300).
-   - El resto de valores mapean directamente a los campos de `Filtros`. Valores no reconocidos se ignoran.
-   - Después del montaje, los cambios manuales de filtros no reescriben la URL ni se re-hidratan.
-4. Botón de volver:
-   - Replicar el patrón de `ClienteDetalle.tsx`:
-     - Validar que `volver` empiece por `/` y no por `//`, con fallback a `/clientes`.
-     - Mostrar `volverTxt` decodificado.
-     - Usar icono `ArrowLeft` arriba del todo, con clase `inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground`.
-   - Si no viene `volver`, no se renderiza el enlace.
-5. Los chips de filtros activos y el panel lateral ya existentes seguirán funcionando sin cambios adicionales.
+1. Mix por canal: `min-w-0` en la fila flex, `min-w-0` en el nombre del canal (junto a `truncate`), y `truncate` en la línea de detalle (porcentaje · transacciones · ticket · clientes).
+2. Devoluciones (las tres pestañas): `min-w-0` en el contenedor flex de cada fila y `min-w-0` en el `span` de la etiqueta.
+3. Barra de progreso del mix: ancho acotado `Math.max(0, Math.min(100, share))`; color `bg-destructive` cuando `share < 0`, `bg-primary` en el resto. El texto del porcentaje sigue mostrando el valor real con signo.
+4. Componente `Kpi`: el hint pasa de recorte a `whitespace-normal break-words` manteniendo `leading-tight`.
+5. Comprobación a 360px de ancho: sin scroll horizontal en ninguna sección (verificación en navegador con captura).
 
-## B) `src/pages/Ventas.tsx` — enlaces hacia Documentos
+## Parte 2 — Una sola tarjeta de línea
 
-1. **"Mix por canal"**: convertir cada fila de `<div>` a `<Link>` hacia:
-   ```text
-   /documentos?anio={anioActual}&canal={encodeURIComponent(c.canal)}&importeMin=0&volver=%2F&volverTxt=Ventas
-   ```
-   Añadir `transition-colors hover:bg-accent`.
-2. **"Devoluciones" — pestaña Motivos**: convertir cada fila a `<Link>` hacia:
-   ```text
-   /documentos?anio={anioActual}&operacion=Abono&motivoAbono={encodeURIComponent(d.etiqueta)}&importeMin=0&volver=%2F&volverTxt=Ventas
-   ```
-3. **"Devoluciones" — pestaña Vendedores**: convertir cada fila a `<Link>` hacia:
-   ```text
-   /documentos?anio={anioActual}&operacion=Abono&vendedor={encodeURIComponent(d.etiqueta)}&importeMin=0&volver=%2F&volverTxt=Ventas
-   ```
-4. **"Devoluciones" — pestaña Referencias**: dejar las filas como `<div>` sin enlace, porque `documentos_listado` no expone filtro por referencia.
-5. **Componente `Kpi`**: en la línea del hint, sustituir `truncate` por `leading-tight` para evitar que la proyección de cierre se corte en móvil.
+- Se elimina la Card "Ticket medio por mes" y la rejilla `lg:grid-cols-2` que las contenía.
+- Queda una Card a ancho completo, título "Evolución mensual", con dos grupos de botones en el header (estilo compacto de Alertas: `size="sm"`, `h-7 px-3 text-[11px]`, contenedor `inline-flex rounded-md border p-0.5`):
+  - Grupo A métrica: Ventas | Ticket medio (por defecto Ventas).
+  - Grupo B vista: Mensual | Acumulada (por defecto Mensual), visible solo con métrica Ventas.
+- Header apilado en móvil, en línea desde `sm`. `CardContent` con `h-[260px] sm:h-[300px]`.
+- Series: Ventas+Mensual usa `serieMensual` tal cual; Ventas+Acumulada calcula suma corrida por año solo sobre meses con dato (los meses sin dato quedan sin valor, no a 0); Ticket medio usa `serieTicket` tal cual.
 
-## C) Validación
+## Parte 3 — Línea de proyección punteada
 
-- `tsgo` sin errores.
-- Build OK según `build-errors.log`.
+Solo con métrica Ventas, en vista Mensual y Acumulada. Reutiliza `mensual`, `ytdPrevio`, `mesesConDatos` y `kpiActual`:
+
+```text
+factor = ytdPrevio > 0 ? kpiActual.importe / ytdPrevio : null
+proyeccion[m] = importe del mes m del año anterior * factor,  para m > mesesConDatos
+proyeccion[mesesConDatos] = valor real de ese mes (punto de anclaje)
+```
+
+En vista Acumulada la proyección se acumula igual que las demás series. Si `factor` es null no se dibuja.
+
+Render: `<Line dataKey="proyeccion" stroke={getYearColor(anioActual, anioActual)} strokeWidth={2} strokeDasharray="5 4" dot={false} connectNulls legendType="none" />`, y el Tooltip la etiqueta como "Proyección" (formatter que traduce el nombre de la clave).
+
+## Notas técnicas
+
+- Nuevos estados locales: `metrica` ("ventas" | "ticket") y `vista` ("mensual" | "acumulada").
+- Un único `useMemo` derivado combina serie base + proyección según el estado, sin tocar `serieMensual`/`serieTicket`.
+- No se modifican los `<Link>` de drill-down ni la sección de KPIs (salvo el punto 4).
+- Verificación: typecheck y build limpios, más revisión visual a 360px.
