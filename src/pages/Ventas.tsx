@@ -70,6 +70,8 @@ export default function Ventas() {
   const [canales, setCanales] = useState<CanalRow[]>([]);
   const [devoluciones, setDevoluciones] = useState<DevolucionRow[]>([]);
   const [vistaAlertas, setVistaAlertas] = useState<VistaAlertas>("atencion");
+  const [metrica, setMetrica] = useState<"ventas" | "ticket">("ventas");
+  const [vista, setVista] = useState<"mensual" | "acumulada">("mensual");
 
 
   const anioActual = useMemo(
@@ -141,16 +143,6 @@ export default function Ventas() {
 
   const anios = useMemo(() => [...new Set(mensual.map((m) => m.anio))].sort(), [mensual]);
 
-  const serieMensual = useMemo(() => {
-    return MESES.map((nombre, i) => {
-      const row: Record<string, number | string> = { mes: nombre };
-      anios.forEach((a) => {
-        const f = mensual.find((m) => m.anio === a && m.mes === i + 1);
-        if (f) row[String(a)] = Math.round(f.importe);
-      });
-      return row;
-    });
-  }, [mensual, anios]);
 
   const serieTicket = useMemo(() => {
     return MESES.map((nombre, i) => {
@@ -199,6 +191,47 @@ export default function Ventas() {
   const fmtShare = (v: number) => `${v.toFixed(1).replace(".", ",")} %`;
   const fmtM = (v: number) => `${(v / 1_000_000).toFixed(1).replace(".", ",")} M €`;
 
+  // Último mes del año en curso con dato real (no el conteo de meses).
+  const ultimoMesConDato = Math.max(...mensual.filter((m) => m.anio === anioActual).map((m) => m.mes), 0);
+  const factorProy = ytdPrevio > 0 && kpiActual ? kpiActual.importe / ytdPrevio : null;
+
+  const datosGrafico = useMemo(() => {
+    if (metrica === "ticket") return serieTicket;
+
+    const rows: Record<string, number | string>[] = MESES.map((nombre) => ({ mes: nombre }));
+    const acum: Record<string, number> = {};
+    anios.forEach((a) => {
+      for (let i = 0; i < 12; i++) {
+        const f = mensual.find((m) => m.anio === a && m.mes === i + 1);
+        if (!f) continue;
+        if (vista === "acumulada") {
+          acum[String(a)] = (acum[String(a)] || 0) + f.importe;
+          rows[i][String(a)] = Math.round(acum[String(a)]);
+        } else {
+          rows[i][String(a)] = Math.round(f.importe);
+        }
+      }
+    });
+
+    if (factorProy !== null && ultimoMesConDato > 0) {
+      const ancla = mensual.find((m) => m.anio === anioActual && m.mes === ultimoMesConDato);
+      let corr = vista === "acumulada" ? acum[String(anioActual)] || 0 : 0;
+      rows[ultimoMesConDato - 1].proyeccion = Math.round(vista === "acumulada" ? corr : ancla?.importe || 0);
+      for (let m = ultimoMesConDato + 1; m <= 12; m++) {
+        const prev = mensual.find((x) => x.anio === anioActual - 1 && x.mes === m);
+        const v = (prev?.importe || 0) * factorProy;
+        if (vista === "acumulada") {
+          corr += v;
+          rows[m - 1].proyeccion = Math.round(corr);
+        } else {
+          rows[m - 1].proyeccion = Math.round(v);
+        }
+      }
+    }
+
+    return rows;
+  }, [metrica, vista, serieTicket, mensual, anios, anioActual, factorProy, ultimoMesConDato]);
+
 
 
 
@@ -228,10 +261,7 @@ export default function Ventas() {
           {(verMargen ? [0, 1, 2, 3, 4, 5] : [0, 1, 2, 3, 4]).map((i) => <Skeleton key={i} className="h-24" />)}
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Skeleton className="h-[260px]" />
-          <Skeleton className="h-[260px]" />
-        </div>
+        <Skeleton className="h-[260px] sm:h-[300px]" />
 
         <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
           <Skeleton className="h-64" />
@@ -311,45 +341,84 @@ export default function Ventas() {
 
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader><CardTitle>Evolución mensual</CardTitle></CardHeader>
-          <CardContent className="h-[240px] lg:h-[260px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={serieMensual} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
-                <Tooltip formatter={(v) => eur(Number(v))} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                {anios.map((a) => (
-                  <Line key={a} type="monotone" dataKey={String(a)} stroke={getYearColor(a, anioActual)} strokeWidth={a === anioActual ? 2.5 : 1.5} dot={false} />
+      <Card>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle>Evolución mensual</CardTitle>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="inline-flex shrink-0 rounded-md border p-0.5">
+              {([
+                { key: "ventas", label: "Ventas" },
+                { key: "ticket", label: "Ticket medio" },
+              ] as { key: "ventas" | "ticket"; label: string }[]).map((m) => (
+                <Button
+                  key={m.key}
+                  size="sm"
+                  variant={metrica === m.key ? "secondary" : "ghost"}
+                  className="h-7 px-3 text-[11px]"
+                  onClick={() => setMetrica(m.key)}
+                >
+                  {m.label}
+                </Button>
+              ))}
+            </div>
+            {metrica === "ventas" && (
+              <div className="inline-flex shrink-0 rounded-md border p-0.5">
+                {([
+                  { key: "mensual", label: "Mensual" },
+                  { key: "acumulada", label: "Acumulada" },
+                ] as { key: "mensual" | "acumulada"; label: string }[]).map((v) => (
+                  <Button
+                    key={v.key}
+                    size="sm"
+                    variant={vista === v.key ? "secondary" : "ghost"}
+                    className="h-7 px-3 text-[11px]"
+                    onClick={() => setVista(v.key)}
+                  >
+                    {v.label}
+                  </Button>
                 ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle>Ticket medio por mes</CardTitle></CardHeader>
-          <CardContent className="h-[240px] lg:h-[260px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={serieTicket} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="h-[260px] sm:h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={datosGrafico} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
+              {metrica === "ticket" ? (
                 <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => eur(Number(v))} width={55} />
-                <Tooltip formatter={(v) => eur(Number(v), 2)} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                {anios.map((a) => (
-                  <Line key={a} type="monotone" dataKey={String(a)} stroke={getYearColor(a, anioActual)} strokeWidth={a === anioActual ? 2.5 : 1.5} dot={false} />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+              ) : (
+                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
+              )}
+              <Tooltip
+                formatter={(v, name) => [
+                  metrica === "ticket" ? eur(Number(v), 2) : eur(Number(v)),
+                  name === "proyeccion" ? "Proyección" : (name as string),
+                ]}
+              />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              {anios.map((a) => (
+                <Line key={a} type="monotone" dataKey={String(a)} stroke={getYearColor(a, anioActual)} strokeWidth={a === anioActual ? 2.5 : 1.5} dot={false} />
+              ))}
+              {metrica === "ventas" && factorProy !== null && (
+                <Line
+                  type="monotone"
+                  dataKey="proyeccion"
+                  stroke={getYearColor(anioActual, anioActual)}
+                  strokeWidth={2}
+                  strokeDasharray="5 4"
+                  dot={false}
+                  connectNulls
+                  legendType="none"
+                />
+              )}
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">
         <Card>
           <CardHeader><CardTitle>Mix por canal {anioActual}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
@@ -357,16 +426,17 @@ export default function Ventas() {
             {canales.map((c) => {
               const total = canales.reduce((s, x) => s + x.importe, 0);
               const share = total > 0 ? (c.importe / total) * 100 : 0;
+              const ancho = Math.max(0, Math.min(100, share));
               const contenido = (
                 <>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="truncate font-medium">{c.canal}</span>
+                  <div className="flex min-w-0 items-center justify-between gap-3">
+                    <span className="min-w-0 truncate font-medium">{c.canal}</span>
                     <span className="shrink-0 font-medium">{eur(c.importe)}</span>
                   </div>
                   <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                    <div className="h-full rounded-full bg-primary" style={{ width: `${share.toFixed(1)}%` }} />
+                    <div className={`h-full rounded-full ${share < 0 ? "bg-destructive" : "bg-primary"}`} style={{ width: `${ancho.toFixed(1)}%` }} />
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
+                  <div className="mt-1 truncate text-xs text-muted-foreground">
                     {pct(share)} · {fnum(c.documentos)} transacciones · ticket {eur(c.ticket_medio, 2)} · {fnum(c.clientes)} clientes
                   </div>
                 </>
@@ -403,7 +473,7 @@ export default function Ventas() {
                       const esLink = t === "motivo" && !esSintetico(d.etiqueta);
                       const contenido = (
                         <>
-                          <span className="truncate">{d.etiqueta}</span>
+                          <span className="min-w-0 truncate">{d.etiqueta}</span>
                           <span className="shrink-0 text-right">
                             <span className="font-medium">{eur(d.importe)}</span>
                             <span className="ml-2 text-xs text-muted-foreground">{fnum(d.lineas)} líneas</span>
@@ -411,11 +481,11 @@ export default function Ventas() {
                         </>
                       );
                       return esLink ? (
-                        <Link key={`${t}-${d.etiqueta}`} to={`/documentos?anio=${anioActual}&operacion=Abono&motivoAbono=${encodeURIComponent(d.etiqueta)}&importeMin=0&volver=%2F&volverTxt=Ventas`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
+                        <Link key={`${t}-${d.etiqueta}`} to={`/documentos?anio=${anioActual}&operacion=Abono&motivoAbono=${encodeURIComponent(d.etiqueta)}&importeMin=0&volver=%2F&volverTxt=Ventas`} className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
                           {contenido}
                         </Link>
                       ) : (
-                        <div key={`${t}-${d.etiqueta}`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm">
+                        <div key={`${t}-${d.etiqueta}`} className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-2 text-sm">
                           {contenido}
                         </div>
                       );
@@ -498,7 +568,7 @@ export default function Ventas() {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
         <Card>
           <CardHeader>
             <CardTitle>Top 10 clientes {anioActual}</CardTitle>
@@ -578,7 +648,7 @@ function Kpi({ icon, label, value, hint, positive }: { icon: React.ReactNode; la
         </div>
         <div className="mt-1 truncate text-xl font-bold tracking-tight sm:text-2xl">{value}</div>
         {hint && (
-          <div className={`mt-0.5 leading-tight text-[11px] sm:text-xs ${positive === undefined ? "text-muted-foreground" : positive ? "text-primary" : "text-destructive"}`}>{hint}</div>
+          <div className={`mt-0.5 whitespace-normal break-words leading-tight text-[11px] sm:text-xs ${positive === undefined ? "text-muted-foreground" : positive ? "text-primary" : "text-destructive"}`}>{hint}</div>
         )}
       </CardContent>
     </Card>
