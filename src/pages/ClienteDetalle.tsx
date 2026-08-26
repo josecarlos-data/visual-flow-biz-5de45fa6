@@ -704,39 +704,89 @@ export default function ClienteDetalle() {
 
         <TabsContent value="productos">
           <Card>
-            <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+            <CardHeader className="flex-col gap-2 space-y-0 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle className="flex items-center gap-2 text-base"><Package className="h-4 w-4" />Productos comprados</CardTitle>
-              <Select value={anioProd} onValueChange={setAnioProd}>
-                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos los años</SelectItem>
-                  {anios.map((a) => (
-                    <SelectItem key={a} value={String(a)}>{a}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  <Input
+                    placeholder="Buscar referencia o descripción"
+                    value={busquedaProductos}
+                    onChange={(e) => setBusquedaProductos(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+                <Select value={anioProd} onValueChange={setAnioProd}>
+                  <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos los años</SelectItem>
+                    {anios.map((a) => (
+                      <SelectItem key={a} value={String(a)}>{a}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               {cargandoProductos ? (
                 <Skeleton className="m-4 h-64" />
               ) : !productos || productos.length === 0 ? (
                 <p className="py-10 text-center text-sm text-muted-foreground">Sin compras registradas en el periodo.</p>
+              ) : productosFiltradosOrdenados.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">Ningún producto coincide con la búsqueda.</p>
               ) : (
                 <div className="max-h-[560px] overflow-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Referencia</TableHead>
-                        <TableHead className="hidden sm:table-cell">Familia</TableHead>
-                        <TableHead className="hidden md:table-cell">Marca</TableHead>
-                        <TableHead className="text-right">Uds.</TableHead>
-                        <TableHead className="text-right">Importe</TableHead>
-                        {verMargen && <TableHead className="hidden text-right md:table-cell">Margen</TableHead>}
-                        <TableHead className="hidden text-right sm:table-cell">Última</TableHead>
+                        <TableHead>
+                          <button className="flex items-center gap-1" onClick={() => setOrdenProductos(cambiarOrden("referencia", ordenProductos))}>
+                            Referencia
+                            {ordenProductos.campo === "referencia" && (ordenProductos.dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
+                          </button>
+                        </TableHead>
+                        <TableHead className="hidden sm:table-cell">
+                          <button className="flex items-center gap-1" onClick={() => setOrdenProductos(cambiarOrden("familia", ordenProductos))}>
+                            Familia
+                            {ordenProductos.campo === "familia" && (ordenProductos.dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
+                          </button>
+                        </TableHead>
+                        <TableHead className="hidden md:table-cell">
+                          <button className="flex items-center gap-1" onClick={() => setOrdenProductos(cambiarOrden("marca", ordenProductos))}>
+                            Marca
+                            {ordenProductos.campo === "marca" && (ordenProductos.dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
+                          </button>
+                        </TableHead>
+                        <TableHead className="text-right">
+                          <button className="ml-auto flex items-center gap-1" onClick={() => setOrdenProductos(cambiarOrden("unidades", ordenProductos))}>
+                            Uds.
+                            {ordenProductos.campo === "unidades" && (ordenProductos.dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
+                          </button>
+                        </TableHead>
+                        <TableHead className="text-right">
+                          <button className="ml-auto flex items-center gap-1" onClick={() => setOrdenProductos(cambiarOrden("importe", ordenProductos))}>
+                            Importe
+                            {ordenProductos.campo === "importe" && (ordenProductos.dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
+                          </button>
+                        </TableHead>
+                        {verMargen && (
+                          <TableHead className="hidden text-right md:table-cell">
+                            <button className="ml-auto flex items-center gap-1" onClick={() => setOrdenProductos(cambiarOrden("margen", ordenProductos))}>
+                              Margen
+                              {ordenProductos.campo === "margen" && (ordenProductos.dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
+                            </button>
+                          </TableHead>
+                        )}
+                        <TableHead className="hidden text-right sm:table-cell">
+                          <button className="ml-auto flex items-center gap-1" onClick={() => setOrdenProductos(cambiarOrden("ultima", ordenProductos))}>
+                            Última
+                            {ordenProductos.campo === "ultima" && (ordenProductos.dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
+                          </button>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {productos.map((p) => (
+                      {productosFiltradosOrdenados.map((p) => (
                         <TableRow key={p.referencia}>
                           <TableCell className="max-w-[220px]">
                             <p className="truncate font-medium">{p.referencia}</p>
