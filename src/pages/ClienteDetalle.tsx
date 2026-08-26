@@ -587,6 +587,82 @@ export default function ClienteDetalle() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="visitas" className="space-y-3">
+
+          {!visitas || visitas.length === 0 ? (
+            <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Sin visitas registradas.</CardContent></Card>
+          ) : (
+            visitas.map((v) => {
+              const bloques = bloquesMap?.get(v.id) ?? [];
+              return (
+                <Card key={v.id}>
+                  <CardContent className="space-y-2 p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-wrap gap-1">
+                        {(bloques.length ? bloques.map((b) => b.motivo_key) : [v.motivo_key]).map((k, i) => (
+                          <Badge key={`${k}-${i}`} variant="secondary">{motivoNombre(k)}</Badge>
+                        ))}
+                      </div>
+                      <span className="shrink-0 text-xs text-muted-foreground">{fechaCorta(v.fecha)}</span>
+                    </div>
+                    {bloques.length ? (
+                      bloques.map((b) => (
+                        <div key={b.id} className="space-y-1 rounded-md border p-2">
+                          <p className="text-xs font-medium text-muted-foreground">{motivoNombre(b.motivo_key)}</p>
+                          {Object.entries(b.campos ?? {}).filter(([, val]) => val).map(([k, val]) => (
+                            <p key={k} className="text-sm">
+                              <span className="text-muted-foreground">{k.replace(/_/g, " ")}: </span>
+                              {String(val)}
+                            </p>
+                          ))}
+                          {b.nota_revision && (
+                            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-destructive">Nota de revisión</p>
+                              <p className="whitespace-pre-wrap text-sm">{b.nota_revision}</p>
+                            </div>
+                          )}
+                        </div>
+
+                      ))
+                    ) : (
+                      Object.entries(v.campos ?? {}).filter(([, val]) => val).map(([k, val]) => (
+                        <p key={k} className="text-sm">
+                          <span className="text-muted-foreground">{k.replace(/_/g, " ")}: </span>
+                          {String(val)}
+                        </p>
+                      ))
+                    )}
+                    {bloques.length === 0 && v.observaciones && <p className="whitespace-pre-wrap text-sm">{v.observaciones}</p>}
+                    {bloques.length > 0 && (v.transcripcion || v.observaciones_original) && (
+                      <Collapsible>
+                        <CollapsibleTrigger className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                          <span>Ver texto original</span>
+                          <ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-180" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="mt-2 space-y-1.5">
+                          <p className="text-xs font-medium text-muted-foreground">
+                            {v.transcripcion ? "Transcripción original" : "Texto original de Gespromo"}
+                          </p>
+                          <p className="whitespace-pre-wrap rounded-md border bg-muted/40 p-2 text-xs text-muted-foreground">
+                            {v.transcripcion || v.observaciones_original}
+                          </p>
+                          {(v.analisis_modelo || v.analisis_prompt_version) && (
+                            <p className="text-[11px] text-muted-foreground">
+                              Analizada con {v.analisis_modelo ?? "—"} · {v.analisis_prompt_version ?? "—"}
+                            </p>
+                          )}
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )}
+                    {v.origen === "gespromo" && <Badge variant="outline" className="text-xs">Importada de Gespromo</Badge>}
+
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
+        </TabsContent>
+
         <TabsContent value="productos">
           <Card>
             <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
@@ -693,82 +769,6 @@ export default function ClienteDetalle() {
             codCliente={codNum!}
             documento={docSeleccionado}
           />
-        </TabsContent>
-
-        <TabsContent value="visitas" className="space-y-3">
-
-          {!visitas || visitas.length === 0 ? (
-            <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Sin visitas registradas.</CardContent></Card>
-          ) : (
-            visitas.map((v) => {
-              const bloques = bloquesMap?.get(v.id) ?? [];
-              return (
-                <Card key={v.id}>
-                  <CardContent className="space-y-2 p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex flex-wrap gap-1">
-                        {(bloques.length ? bloques.map((b) => b.motivo_key) : [v.motivo_key]).map((k, i) => (
-                          <Badge key={`${k}-${i}`} variant="secondary">{motivoNombre(k)}</Badge>
-                        ))}
-                      </div>
-                      <span className="shrink-0 text-xs text-muted-foreground">{fechaCorta(v.fecha)}</span>
-                    </div>
-                    {bloques.length ? (
-                      bloques.map((b) => (
-                        <div key={b.id} className="space-y-1 rounded-md border p-2">
-                          <p className="text-xs font-medium text-muted-foreground">{motivoNombre(b.motivo_key)}</p>
-                          {Object.entries(b.campos ?? {}).filter(([, val]) => val).map(([k, val]) => (
-                            <p key={k} className="text-sm">
-                              <span className="text-muted-foreground">{k.replace(/_/g, " ")}: </span>
-                              {String(val)}
-                            </p>
-                          ))}
-                          {b.nota_revision && (
-                            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-destructive">Nota de revisión</p>
-                              <p className="whitespace-pre-wrap text-sm">{b.nota_revision}</p>
-                            </div>
-                          )}
-                        </div>
-
-                      ))
-                    ) : (
-                      Object.entries(v.campos ?? {}).filter(([, val]) => val).map(([k, val]) => (
-                        <p key={k} className="text-sm">
-                          <span className="text-muted-foreground">{k.replace(/_/g, " ")}: </span>
-                          {String(val)}
-                        </p>
-                      ))
-                    )}
-                    {bloques.length === 0 && v.observaciones && <p className="whitespace-pre-wrap text-sm">{v.observaciones}</p>}
-                    {bloques.length > 0 && (v.transcripcion || v.observaciones_original) && (
-                      <Collapsible>
-                        <CollapsibleTrigger className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-                          <span>Ver texto original</span>
-                          <ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-180" />
-                        </CollapsibleTrigger>
-                        <CollapsibleContent className="mt-2 space-y-1.5">
-                          <p className="text-xs font-medium text-muted-foreground">
-                            {v.transcripcion ? "Transcripción original" : "Texto original de Gespromo"}
-                          </p>
-                          <p className="whitespace-pre-wrap rounded-md border bg-muted/40 p-2 text-xs text-muted-foreground">
-                            {v.transcripcion || v.observaciones_original}
-                          </p>
-                          {(v.analisis_modelo || v.analisis_prompt_version) && (
-                            <p className="text-[11px] text-muted-foreground">
-                              Analizada con {v.analisis_modelo ?? "—"} · {v.analisis_prompt_version ?? "—"}
-                            </p>
-                          )}
-                        </CollapsibleContent>
-                      </Collapsible>
-                    )}
-                    {v.origen === "gespromo" && <Badge variant="outline" className="text-xs">Importada de Gespromo</Badge>}
-
-                  </CardContent>
-                </Card>
-              );
-            })
-          )}
         </TabsContent>
 
         <TabsContent value="perfil">
