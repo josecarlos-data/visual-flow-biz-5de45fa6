@@ -353,6 +353,7 @@ export default function Ventas() {
         <Card>
           <CardHeader><CardTitle>Mix por canal {anioActual}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
+            {canales.length === 0 && <Vacio />}
             {canales.map((c) => {
               const total = canales.reduce((s, x) => s + x.importe, 0);
               const share = total > 0 ? (c.importe / total) * 100 : 0;
