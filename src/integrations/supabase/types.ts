@@ -1955,10 +1955,23 @@ export type Database = {
         Returns: {
           almacenes: string[]
           anios: number[]
+          motivos: string[]
+        }[]
+      }
+      actividad_interna_motivos: {
+        Args: { _almacen?: string; _anio: number }
+        Returns: {
+          clientes_distintos: number
+          importe: number
+          motivo: string
+          n_abonos: number
+          pct_importe: number
+          pct_n: number
+          tramitadores: number
         }[]
       }
       actividad_interna_usuarios: {
-        Args: { _almacen?: string; _anio: number }
+        Args: { _almacen?: string; _anio: number; _motivo?: string }
         Returns: {
           abonos_ajenos: number
           abonos_atribuidos: number

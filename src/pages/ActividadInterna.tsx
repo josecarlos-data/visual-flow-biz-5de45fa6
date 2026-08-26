@@ -9,12 +9,15 @@ import {
   useActividadFiltros,
   useActividadUsuarios,
   useActividadAlmacenes,
+  useActividadMotivos,
   type ActividadUsuario,
   type ActividadAlmacen,
+  type ActividadMotivo,
   eur,
   num,
 } from "@/hooks/useCrm";
 import { useScrollRestore } from "@/hooks/useScrollRestore";
+
 
 const TODOS = "__todos__";
 
@@ -58,6 +61,8 @@ export default function ActividadInterna() {
   const { data: filtros, isLoading: cargandoFiltros } = useActividadFiltros();
   const [anio, setAnio] = useState<string>("");
   const [almacen, setAlmacen] = useState<string | null>(null);
+  const [motivo, setMotivo] = useState<string | null>(null);
+  const [almacenMotivos, setAlmacenMotivos] = useState<string | null>(null);
   const anioInicializado = useRef(false);
 
   useEffect(() => {
@@ -70,13 +75,16 @@ export default function ActividadInterna() {
   }, [filtros]);
 
   const anioNum = anio ? Number(anio) : null;
-  const usuarios = useActividadUsuarios(anioNum, almacen);
+  const usuarios = useActividadUsuarios(anioNum, almacen, motivo);
   const almacenes = useActividadAlmacenes(anioNum);
+  const motivos = useActividadMotivos(anioNum, almacenMotivos);
 
   useScrollRestore("actividad-interna", !usuarios.isLoading);
 
   const ordU = useOrdenLocal<ActividadUsuario>(usuarios.data, "importe_vendido");
   const ordA = useOrdenLocal<ActividadAlmacen>(almacenes.data, "importe_vendido");
+  const ordM = useOrdenLocal<ActividadMotivo>(motivos.data, "n_abonos");
+
 
   const CabU = ({
     col,
@@ -126,6 +134,31 @@ export default function ActividadInterna() {
     </TableHead>
   );
 
+  const CabM = ({
+    col,
+    children,
+    className,
+  }: {
+    col: keyof ActividadMotivo;
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <TableHead className={className}>
+      <button
+        type="button"
+        onClick={() => ordM.ordenar(col)}
+        className={`inline-flex items-center gap-1 hover:text-foreground ${
+          ordM.col === col ? "font-medium text-foreground" : ""
+        }`}
+      >
+        {children}
+        {ordM.col === col &&
+          (ordM.dir === "desc" ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />)}
+      </button>
+    </TableHead>
+  );
+
+
   return (
     <div className="space-y-4">
       <div>
@@ -140,6 +173,7 @@ export default function ActividadInterna() {
           <TabsList>
             <TabsTrigger value="usuario">Por usuario</TabsTrigger>
             <TabsTrigger value="almacen">Por almacén</TabsTrigger>
+            <TabsTrigger value="motivo">Por motivo</TabsTrigger>
           </TabsList>
           <Select value={anio} onValueChange={setAnio} disabled={cargandoFiltros}>
             <SelectTrigger className="w-40">
@@ -156,24 +190,46 @@ export default function ActividadInterna() {
         </div>
 
         <TabsContent value="usuario" className="space-y-3">
-          {(filtros?.almacenes?.length ?? 0) > 1 && (
-            <Select
-              value={almacen ?? TODOS}
-              onValueChange={(v) => setAlmacen(v === TODOS ? null : v)}
-            >
-              <SelectTrigger className="w-full sm:w-64">
-                <SelectValue placeholder="Todos los almacenes" />
+          <div className="flex flex-col gap-2 sm:flex-row">
+            {(filtros?.almacenes?.length ?? 0) > 1 && (
+              <Select
+                value={almacen ?? TODOS}
+                onValueChange={(v) => setAlmacen(v === TODOS ? null : v)}
+              >
+                <SelectTrigger className="w-full sm:w-64">
+                  <SelectValue placeholder="Todos los almacenes" />
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  <SelectItem value={TODOS}>Todos los almacenes</SelectItem>
+                  {(filtros?.almacenes ?? []).map((a) => (
+                    <SelectItem key={a} value={a}>
+                      {a}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Select value={motivo ?? TODOS} onValueChange={(v) => setMotivo(v === TODOS ? null : v)}>
+              <SelectTrigger className="w-full sm:w-72">
+                <SelectValue placeholder="Todos los motivos" />
               </SelectTrigger>
               <SelectContent className="max-h-72">
-                <SelectItem value={TODOS}>Todos los almacenes</SelectItem>
-                {(filtros?.almacenes ?? []).map((a) => (
-                  <SelectItem key={a} value={a}>
-                    {a}
+                <SelectItem value={TODOS}>Todos los motivos</SelectItem>
+                {(filtros?.motivos ?? []).map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {m}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {motivo && (
+            <p className="text-[13px] text-muted-foreground">
+              Las columnas de abonos están filtradas por motivo; las de venta no.
+            </p>
           )}
+
 
           <Card>
             <CardContent className="p-0">
@@ -222,12 +278,6 @@ export default function ActividadInterna() {
                         <CabU col="importe_atribuido" className="text-right">
                           Imp. atribuido
                         </CabU>
-                        <CabU col="pct_abonos" className="text-right">
-                          % abonos
-                        </CabU>
-                        <CabU col="pct_importe_abonado" className="text-right">
-                          % imp. abonado
-                        </CabU>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -245,8 +295,6 @@ export default function ActividadInterna() {
                           <TableCell className="text-right">{eur(r.importe_abonado, 0)}</TableCell>
                           <TableCell className="text-right">{num(r.abonos_atribuidos)}</TableCell>
                           <TableCell className="text-right">{eur(r.importe_atribuido, 0)}</TableCell>
-                          <TableCell className="text-right">{pct1(r.pct_abonos)}</TableCell>
-                          <TableCell className="text-right">{pct1(r.pct_importe_abonado)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -337,6 +385,83 @@ export default function ActividadInterna() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="motivo" className="space-y-3">
+          {(filtros?.almacenes?.length ?? 0) > 1 && (
+            <Select
+              value={almacenMotivos ?? TODOS}
+              onValueChange={(v) => setAlmacenMotivos(v === TODOS ? null : v)}
+            >
+              <SelectTrigger className="w-full sm:w-64">
+                <SelectValue placeholder="Todos los almacenes" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value={TODOS}>Todos los almacenes</SelectItem>
+                {(filtros?.almacenes ?? []).map((a) => (
+                  <SelectItem key={a} value={a}>
+                    {a}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          <Card>
+            <CardContent className="p-0">
+              {motivos.isLoading ? (
+                <div className="space-y-2 p-4">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="h-8 w-full" />
+                  ))}
+                </div>
+              ) : ordM.datos.length === 0 ? (
+                <p className="p-6 text-sm text-muted-foreground">Sin abonos para este año.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <CabM col="motivo">Motivo</CabM>
+                        <CabM col="n_abonos" className="text-right">
+                          Abonos
+                        </CabM>
+                        <CabM col="importe" className="text-right">
+                          Importe
+                        </CabM>
+                        <CabM col="pct_n" className="text-right">
+                          % abonos
+                        </CabM>
+                        <CabM col="pct_importe" className="text-right">
+                          % importe
+                        </CabM>
+                        <CabM col="tramitadores" className="text-right">
+                          Tramitadores
+                        </CabM>
+                        <CabM col="clientes_distintos" className="text-right">
+                          Clientes
+                        </CabM>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {ordM.datos.map((r) => (
+                        <TableRow key={r.motivo}>
+                          <TableCell className="font-medium">{r.motivo}</TableCell>
+                          <TableCell className="text-right">{num(r.n_abonos)}</TableCell>
+                          <TableCell className="text-right">{eur(r.importe, 0)}</TableCell>
+                          <TableCell className="text-right">{pct1(r.pct_n)}</TableCell>
+                          <TableCell className="text-right">{pct1(r.pct_importe)}</TableCell>
+                          <TableCell className="text-right">{num(r.tramitadores)}</TableCell>
+                          <TableCell className="text-right">{num(r.clientes_distintos)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
       </Tabs>
     </div>
   );
