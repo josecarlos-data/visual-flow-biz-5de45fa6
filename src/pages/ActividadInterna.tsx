@@ -134,6 +134,31 @@ export default function ActividadInterna() {
     </TableHead>
   );
 
+  const CabM = ({
+    col,
+    children,
+    className,
+  }: {
+    col: keyof ActividadMotivo;
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <TableHead className={className}>
+      <button
+        type="button"
+        onClick={() => ordM.ordenar(col)}
+        className={`inline-flex items-center gap-1 hover:text-foreground ${
+          ordM.col === col ? "font-medium text-foreground" : ""
+        }`}
+      >
+        {children}
+        {ordM.col === col &&
+          (ordM.dir === "desc" ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />)}
+      </button>
+    </TableHead>
+  );
+
+
   return (
     <div className="space-y-4">
       <div>
