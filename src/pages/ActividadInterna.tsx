@@ -278,12 +278,6 @@ export default function ActividadInterna() {
                         <CabU col="importe_atribuido" className="text-right">
                           Imp. atribuido
                         </CabU>
-                        <CabU col="pct_abonos" className="text-right">
-                          % abonos
-                        </CabU>
-                        <CabU col="pct_importe_abonado" className="text-right">
-                          % imp. abonado
-                        </CabU>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
