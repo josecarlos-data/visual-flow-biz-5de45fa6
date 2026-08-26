@@ -631,15 +631,15 @@ export default function ClienteDetalle() {
             ].map(({ title, rows }) => (
               <Card key={title}>
                 <CardHeader><CardTitle className="text-base">{title}</CardTitle></CardHeader>
-                <CardContent className="h-72">
+                <CardContent className="h-80">
                   {rows.length === 0 ? (
                     <p className="py-10 text-center text-sm text-muted-foreground">Sin datos.</p>
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={rows} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
+                      <BarChart data={rows} layout="vertical" margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
                         <XAxis type="number" tickFormatter={eurK} tickLine={false} axisLine={false} className="text-xs" />
-                        <YAxis type="category" dataKey="nombre" width={120} tickLine={false} axisLine={false} className="text-xs" />
+                        <YAxis type="category" dataKey="nombre" width={72} tickLine={false} axisLine={false} className="text-xs" interval={0} tick={{ fontSize: 10 }} />
                         <Tooltip
                           formatter={(v: number) => eur(v)}
                           contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
