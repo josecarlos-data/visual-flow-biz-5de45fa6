@@ -430,7 +430,9 @@ export default function ClienteDetalle() {
             <p className="text-xs text-muted-foreground">Última compra</p>
             <p className="mt-1 text-sm font-semibold">{kpis?.ultima_compra ? fechaCorta(kpis.ultima_compra) : "Sin compras"}</p>
             <p className={`text-xs ${(kpis?.dias_sin_comprar ?? 0) > 90 ? "font-medium text-destructive" : "text-muted-foreground"}`}>
-              {kpis?.dias_sin_comprar != null ? `${num(kpis.dias_sin_comprar)} días sin comprar` : "—"}
+              {kpis?.dias_sin_comprar != null
+                ? `${num(kpis.dias_sin_comprar)} ${kpis.dias_sin_comprar === 1 ? "día" : "días"} sin comprar`
+                : "—"}
             </p>
           </CardContent>
         </Card>
