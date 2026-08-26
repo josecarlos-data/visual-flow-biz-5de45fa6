@@ -201,6 +201,47 @@ export default function Ventas() {
   const fmtShare = (v: number) => `${v.toFixed(1).replace(".", ",")} %`;
   const fmtM = (v: number) => `${(v / 1_000_000).toFixed(1).replace(".", ",")} M €`;
 
+  // Último mes del año en curso con dato real (no el conteo de meses).
+  const ultimoMesConDato = Math.max(...mensual.filter((m) => m.anio === anioActual).map((m) => m.mes), 0);
+  const factorProy = ytdPrevio > 0 && kpiActual ? kpiActual.importe / ytdPrevio : null;
+
+  const datosGrafico = useMemo(() => {
+    if (metrica === "ticket") return serieTicket;
+
+    const rows: Record<string, number | string>[] = MESES.map((nombre) => ({ mes: nombre }));
+    const acum: Record<string, number> = {};
+    anios.forEach((a) => {
+      for (let i = 0; i < 12; i++) {
+        const f = mensual.find((m) => m.anio === a && m.mes === i + 1);
+        if (!f) continue;
+        if (vista === "acumulada") {
+          acum[String(a)] = (acum[String(a)] || 0) + f.importe;
+          rows[i][String(a)] = Math.round(acum[String(a)]);
+        } else {
+          rows[i][String(a)] = Math.round(f.importe);
+        }
+      }
+    });
+
+    if (factorProy !== null && ultimoMesConDato > 0) {
+      const ancla = mensual.find((m) => m.anio === anioActual && m.mes === ultimoMesConDato);
+      let corr = vista === "acumulada" ? acum[String(anioActual)] || 0 : 0;
+      rows[ultimoMesConDato - 1].proyeccion = Math.round(vista === "acumulada" ? corr : ancla?.importe || 0);
+      for (let m = ultimoMesConDato + 1; m <= 12; m++) {
+        const prev = mensual.find((x) => x.anio === anioActual - 1 && x.mes === m);
+        const v = (prev?.importe || 0) * factorProy;
+        if (vista === "acumulada") {
+          corr += v;
+          rows[m - 1].proyeccion = Math.round(corr);
+        } else {
+          rows[m - 1].proyeccion = Math.round(v);
+        }
+      }
+    }
+
+    return rows;
+  }, [metrica, vista, serieTicket, mensual, anios, anioActual, factorProy, ultimoMesConDato]);
+
 
 
 
