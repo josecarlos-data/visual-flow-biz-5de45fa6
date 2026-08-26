@@ -262,15 +262,21 @@ export default function Ventas() {
           {(verMargen ? [0, 1, 2, 3, 4, 5] : [0, 1, 2, 3, 4]).map((i) => <Skeleton key={i} className="h-24" />)}
         </div>
 
-        <div className="grid items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">
-          <Skeleton className="h-[260px] sm:h-[300px] 2xl:h-[420px] lg:col-span-2 2xl:col-span-2" />
-          <Skeleton className="h-64" />
-          <Skeleton className="h-64" />
-          <Skeleton className="h-64" />
-          <Skeleton className="h-64" />
-          <Skeleton className="h-64" />
-          <Skeleton className="h-64 2xl:col-span-2" />
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0 xl:h-[560px]">
+          <Skeleton className="h-full min-h-[260px]" />
+          <Skeleton className="h-full min-h-[260px]" />
+          <div className="grid grid-rows-2 gap-4 h-full min-h-[260px]">
+            <Skeleton className="h-full" />
+            <Skeleton className="h-full" />
+          </div>
         </div>
+
+        <div className="grid gap-4 xl:grid-cols-3 [&>*]:min-w-0 xl:h-[420px]">
+          <Skeleton className="h-full min-h-[260px]" />
+          <Skeleton className="h-full min-h-[260px] xl:col-span-2" />
+        </div>
+
+        <Skeleton className="h-64 w-full" />
       </div>
     );
   }
@@ -336,85 +342,8 @@ export default function Ventas() {
 
       </div>
 
-      <div className="grid items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">
-        <Card className="lg:col-span-2 2xl:col-span-2">
-          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle>Evolución mensual</CardTitle>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="inline-flex shrink-0 rounded-md border p-0.5">
-                {([
-                  { key: "ventas", label: "Ventas" },
-                  { key: "ticket", label: "Ticket medio" },
-                ] as { key: "ventas" | "ticket"; label: string }[]).map((m) => (
-                  <Button
-                    key={m.key}
-                    size="sm"
-                    variant={metrica === m.key ? "secondary" : "ghost"}
-                    className="h-7 px-3 text-[11px]"
-                    onClick={() => setMetrica(m.key)}
-                  >
-                    {m.label}
-                  </Button>
-                ))}
-              </div>
-              {metrica === "ventas" && (
-                <div className="inline-flex shrink-0 rounded-md border p-0.5">
-                  {([
-                    { key: "mensual", label: "Mensual" },
-                    { key: "acumulada", label: "Acumulada" },
-                  ] as { key: "mensual" | "acumulada"; label: string }[]).map((v) => (
-                    <Button
-                      key={v.key}
-                      size="sm"
-                      variant={vista === v.key ? "secondary" : "ghost"}
-                      className="h-7 px-3 text-[11px]"
-                      onClick={() => setVista(v.key)}
-                    >
-                      {v.label}
-                    </Button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="h-[260px] sm:h-[300px] 2xl:h-[420px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={datosGrafico} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                {metrica === "ticket" ? (
-                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => eur(Number(v))} width={55} />
-                ) : (
-                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
-                )}
-                <Tooltip
-                  formatter={(v, name) => [
-                    metrica === "ticket" ? eur(Number(v), 2) : eur(Number(v)),
-                    name === "proyeccion" ? "Proyección" : (name as string),
-                  ]}
-                />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                {anios.map((a) => (
-                  <Line key={a} type="monotone" dataKey={String(a)} stroke={getYearColor(a, anioActual)} strokeWidth={a === anioActual ? 2.5 : 1.5} dot={false} />
-                ))}
-                {metrica === "ventas" && factorProy !== null && (
-                  <Line
-                    type="monotone"
-                    dataKey="proyeccion"
-                    stroke={getYearColor(anioActual, anioActual)}
-                    strokeWidth={2}
-                    strokeDasharray="5 4"
-                    dot={false}
-                    connectNulls
-                    legendType="none"
-                  />
-                )}
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
+      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0 xl:h-[560px]">
+        <Card className="h-full flex flex-col">
           <CardHeader>
             <CardTitle>Top 10 clientes {anioActual}</CardTitle>
             {shareTopClientes !== null && (
@@ -423,7 +352,7 @@ export default function Ventas() {
               </CardDescription>
             )}
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="flex-1 overflow-y-auto space-y-2">
             {topClientes.map((c, i) => (
               <Link key={c.cod_cliente} to={`/clientes/${c.cod_cliente}?volver=${encodeURIComponent('/')}&volverTxt=${encodeURIComponent('Ventas')}`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
                 <span className="flex min-w-0 items-center gap-2">
@@ -447,7 +376,7 @@ export default function Ventas() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="h-full flex flex-col">
           <CardHeader className="flex flex-col gap-3">
             <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" /> Alertas comerciales</CardTitle>
             <div className="inline-flex shrink-0 rounded-md border p-0.5">
@@ -468,7 +397,7 @@ export default function Ventas() {
               ))}
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1 overflow-y-auto">
             {vistaAlertas !== "todos" && (ocultasPorSituacion > 0 || justificadas > 0) && (
               <p className="mb-3 text-xs text-muted-foreground">
                 {[
@@ -517,39 +446,43 @@ export default function Ventas() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader><CardTitle>Top familias {anioActual}</CardTitle></CardHeader>
-          <CardContent className="h-[200px] 2xl:h-[240px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topFamilias} layout="vertical" margin={{ top: 5, right: 20, left: 70, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
-                <YAxis type="category" dataKey="familia" tick={{ fontSize: 11 }} width={70} />
-                <Tooltip formatter={(v) => eur(Number(v))} />
-                <Bar dataKey="importe" fill={getYearColor(anioActual, anioActual)} radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        <div className="grid grid-rows-2 gap-4 h-full">
+          <Card className="h-full flex flex-col">
+            <CardHeader><CardTitle>Top familias {anioActual}</CardTitle></CardHeader>
+            <CardContent className="flex-1 min-h-[160px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topFamilias} layout="vertical" margin={{ top: 5, right: 20, left: 70, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
+                  <YAxis type="category" dataKey="familia" tick={{ fontSize: 11 }} width={70} />
+                  <Tooltip formatter={(v) => eur(Number(v))} />
+                  <Bar dataKey="importe" fill={getYearColor(anioActual, anioActual)} radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader><CardTitle>Top marcas {anioActual}</CardTitle></CardHeader>
-          <CardContent className="h-[200px] 2xl:h-[240px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topMarcas} layout="vertical" margin={{ top: 5, right: 20, left: 70, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
-                <YAxis type="category" dataKey="marca" tick={{ fontSize: 11 }} width={70} />
-                <Tooltip formatter={(v) => eur(Number(v))} />
-                <Bar dataKey="importe" fill={getYearColor(anioActual - 1, anioActual)} radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          <Card className="h-full flex flex-col">
+            <CardHeader><CardTitle>Top marcas {anioActual}</CardTitle></CardHeader>
+            <CardContent className="flex-1 min-h-[160px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topMarcas} layout="vertical" margin={{ top: 5, right: 20, left: 70, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
+                  <YAxis type="category" dataKey="marca" tick={{ fontSize: 11 }} width={70} />
+                  <Tooltip formatter={(v) => eur(Number(v))} />
+                  <Bar dataKey="importe" fill={getYearColor(anioActual - 1, anioActual)} radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
-        <Card>
+      <div className="grid gap-4 xl:grid-cols-3 [&>*]:min-w-0 xl:h-[420px]">
+        <Card className="h-full flex flex-col">
           <CardHeader><CardTitle>Mix por canal {anioActual}</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="flex-1 space-y-2">
             {canales.length === 0 && <Vacio />}
             {canales.map((c) => {
               const total = canales.reduce((s, x) => s + x.importe, 0);
@@ -583,57 +516,134 @@ export default function Ventas() {
           </CardContent>
         </Card>
 
-        <Card className="2xl:col-span-2">
-          <CardHeader><CardTitle>Devoluciones {anioActual}</CardTitle></CardHeader>
-          <CardContent>
-            <Tabs defaultValue="motivo">
-              <TabsList className="mb-3">
-                <TabsTrigger value="motivo">Motivos</TabsTrigger>
-                <TabsTrigger value="referencia">Referencias</TabsTrigger>
-                <TabsTrigger value="vendedor">Vendedores</TabsTrigger>
-              </TabsList>
-              {["motivo", "referencia", "vendedor"].map((t) => {
-                const filas = devoluciones.filter((d) => d.tipo === t);
-                return (
-                  <TabsContent key={t} value={t} className="space-y-2">
-                    {filas.length === 0 && <Vacio />}
-                    {filas.map((d) => {
-                      const esLink = t === "motivo" && !esSintetico(d.etiqueta);
-                      const contenido = (
-                        <>
-                          {t === "referencia" ? (
-                            <span className="min-w-0">
-                              <span className="block truncate">{d.etiqueta}</span>
-                              {d.descripcion && d.descripcion.trim() !== "" && (
-                                <span className="block truncate text-xs text-muted-foreground">{d.descripcion}</span>
-                              )}
-                            </span>
-                          ) : (
-                            <span className="min-w-0 truncate">{d.etiqueta}</span>
-                          )}
-                          <span className="shrink-0 text-right">
-                            <span className="font-medium">{eur(d.importe)}</span>
-                            <span className="ml-2 text-xs text-muted-foreground">{fnum(d.lineas)} líneas</span>
-                          </span>
-                        </>
-                      );
-                      return esLink ? (
-                        <Link key={`${t}-${d.etiqueta}`} to={`/documentos?anio=${anioActual}&operacion=Abono&motivoAbono=${encodeURIComponent(d.etiqueta)}&importeMin=0&volver=%2F&volverTxt=Ventas`} className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
-                          {contenido}
-                        </Link>
-                      ) : (
-                        <div key={`${t}-${d.etiqueta}`} className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-2 text-sm">
-                          {contenido}
-                        </div>
-                      );
-                    })}
-                  </TabsContent>
-                );
-              })}
-            </Tabs>
+        <Card className="h-full flex flex-col xl:col-span-2">
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle>Evolución mensual</CardTitle>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="inline-flex shrink-0 rounded-md border p-0.5">
+                {([
+                  { key: "ventas", label: "Ventas" },
+                  { key: "ticket", label: "Ticket medio" },
+                ] as { key: "ventas" | "ticket"; label: string }[]).map((m) => (
+                  <Button
+                    key={m.key}
+                    size="sm"
+                    variant={metrica === m.key ? "secondary" : "ghost"}
+                    className="h-7 px-3 text-[11px]"
+                    onClick={() => setMetrica(m.key)}
+                  >
+                    {m.label}
+                  </Button>
+                ))}
+              </div>
+              {metrica === "ventas" && (
+                <div className="inline-flex shrink-0 rounded-md border p-0.5">
+                  {([
+                    { key: "mensual", label: "Mensual" },
+                    { key: "acumulada", label: "Acumulada" },
+                  ] as { key: "mensual" | "acumulada"; label: string }[]).map((v) => (
+                    <Button
+                      key={v.key}
+                      size="sm"
+                      variant={vista === v.key ? "secondary" : "ghost"}
+                      className="h-7 px-3 text-[11px]"
+                      onClick={() => setVista(v.key)}
+                    >
+                      {v.label}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="flex-1 min-h-[260px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={datosGrafico} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
+                {metrica === "ticket" ? (
+                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => eur(Number(v))} width={55} />
+                ) : (
+                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
+                )}
+                <Tooltip
+                  formatter={(v, name) => [
+                    metrica === "ticket" ? eur(Number(v), 2) : eur(Number(v)),
+                    name === "proyeccion" ? "Proyección" : (name as string),
+                  ]}
+                />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {anios.map((a) => (
+                  <Line key={a} type="monotone" dataKey={String(a)} stroke={getYearColor(a, anioActual)} strokeWidth={a === anioActual ? 2.5 : 1.5} dot={false} />
+                ))}
+                {metrica === "ventas" && factorProy !== null && (
+                  <Line
+                    type="monotone"
+                    dataKey="proyeccion"
+                    stroke={getYearColor(anioActual, anioActual)}
+                    strokeWidth={2}
+                    strokeDasharray="5 4"
+                    dot={false}
+                    connectNulls
+                    legendType="none"
+                  />
+                )}
+              </LineChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader><CardTitle>Devoluciones {anioActual}</CardTitle></CardHeader>
+        <CardContent>
+          <Tabs defaultValue="motivo">
+            <TabsList className="mb-3">
+              <TabsTrigger value="motivo">Motivos</TabsTrigger>
+              <TabsTrigger value="referencia">Referencias</TabsTrigger>
+              <TabsTrigger value="vendedor">Vendedores</TabsTrigger>
+            </TabsList>
+            {["motivo", "referencia", "vendedor"].map((t) => {
+              const filas = devoluciones.filter((d) => d.tipo === t);
+              return (
+                <TabsContent key={t} value={t} className="space-y-2">
+                  {filas.length === 0 && <Vacio />}
+                  {filas.map((d) => {
+                    const esLink = t === "motivo" && !esSintetico(d.etiqueta);
+                    const contenido = (
+                      <>
+                        {t === "referencia" ? (
+                          <span className="min-w-0">
+                            <span className="block truncate">{d.etiqueta}</span>
+                            {d.descripcion && d.descripcion.trim() !== "" && (
+                              <span className="block truncate text-xs text-muted-foreground">{d.descripcion}</span>
+                            )}
+                          </span>
+                        ) : (
+                          <span className="min-w-0 truncate">{d.etiqueta}</span>
+                        )}
+                        <span className="shrink-0 text-right">
+                          <span className="font-medium">{eur(d.importe)}</span>
+                          <span className="ml-2 text-xs text-muted-foreground">{fnum(d.lineas)} líneas</span>
+                        </span>
+                      </>
+                    );
+                    return esLink ? (
+                      <Link key={`${t}-${d.etiqueta}`} to={`/documentos?anio=${anioActual}&operacion=Abono&motivoAbono=${encodeURIComponent(d.etiqueta)}&importeMin=0&volver=%2F&volverTxt=Ventas`} className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
+                        {contenido}
+                      </Link>
+                    ) : (
+                      <div key={`${t}-${d.etiqueta}`} className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-2 text-sm">
+                        {contenido}
+                      </div>
+                    );
+                  })}
+                </TabsContent>
+              );
+            })}
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 }
