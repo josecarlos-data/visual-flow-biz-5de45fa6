@@ -1,28 +1,67 @@
-# Migración panel_devoluciones + descripción en Referencias
+# Reorganización de rejilla en src/pages/Ventas.tsx
 
-## 1) Migración SQL: añadir `descripcion` a `public.panel_devoluciones`
+## Objetivo
+Reordenar las Cards del panel de Ventas en un único contenedor de rejilla responsive, manteniendo KPIs, ResumenObjetivos, gráfico, selectores, drill-down y la lógica de cálculo intactos.
 
-- `DROP FUNCTION IF EXISTS public.panel_devoluciones(integer, integer);` para evitar el error de cambio de tipo de retorno (pasa de 4 a 5 columnas).
-- Recrear la función con:
-  - `RETURNS TABLE(tipo text, etiqueta text, descripcion text, importe numeric, lineas integer)`
-  - `LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public'`
-  - Rama `motivo` y `vendedor`: devuelven `NULL::text` como `descripcion`.
-  - Rama `referencia`: hacer `LEFT JOIN public.productos p ON p.referencia = a.referencia`, incluir `p.descripcion` en el `SELECT` y en el `GROUP BY`. Mantener el mismo `ORDER BY ABS(SUM(importe)) DESC` y `LIMIT`.
-- Al final volver a otorgar: `GRANT EXECUTE ON FUNCTION public.panel_devoluciones(integer, integer) TO authenticated;`.
-- No tocar ninguna otra función.
+## Cambios en src/pages/Ventas.tsx
 
-## 2) `src/pages/Ventas.tsx`
+### 1. Nuevo orden y contenedor único
+Eliminar los dos `<div className="grid ...">` actuales (el de Mix/Devoluciones/Alertas y el de Top clientes + familias/marcas) y el `<div className="grid gap-4">` anidado que apila Top familias y Top marcas.
 
-- Ampliar la interfaz `DevolucionRow` con `descripcion: string | null`.
-- En el mapeo del resultado de `panel_devoluciones`, añadir `descripcion: r.descripcion ?? null`.
-- Solo dentro de la pestaña `"Referencias"` (no en "Motivos" ni "Vendedores"):
-  - El bloque izquierdo pasa a ser un `<span className="min-w-0">` que contiene:
-    - Primera línea: `<span className="truncate">{d.etiqueta}</span>`.
-    - Segunda línea (solo si `d.descripcion` no es null ni vacía): `<span className="block truncate text-xs text-muted-foreground">{d.descripcion}</span>`.
-  - Mantener el `<div className="flex min-w-0 items-center justify-between gap-3 ...">` de la fila.
-  - La fila sigue siendo `<div>` (sin enlace) en "Referencias" y "Vendedores"; "Motivos" conserva su `<Link>` actual.
+Sustituirlos por un único contenedor:
 
-## 3) Verificación
+```text
+<div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">
+```
 
-- `tsgo` limpio y `bun run build` exitoso.
-- Revisar visualmente la pestaña Referencias para confirmar que la descripción aparece como segunda línea pequeña y que no hay scroll horizontal.
+Las Cards irán como hijas directas en este orden:
+
+1. Evolución mensual
+2. Top 10 clientes
+3. Alertas comerciales
+4. Top familias
+5. Top marcas
+6. Mix por canal
+7. Devoluciones
+
+### 2. Anchos por Card
+
+| Card | Clases de col-span |
+| --- | --- |
+| Evolución mensual | `lg:col-span-2 2xl:col-span-2` |
+| Top 10 clientes | (por defecto, 1 columna) |
+| Alertas comerciales | (por defecto, 1 columna); quitar `lg:col-span-2 2xl:col-span-1` que lleva hoy |
+| Top familias | (por defecto, 1) |
+| Top marcas | (por defecto, 1) |
+| Mix por canal | (por defecto, 1) |
+| Devoluciones | `2xl:col-span-2` |
+
+### 3. Alturas
+
+- Evolución mensual: `CardContent className="h-[260px] sm:h-[300px] 2xl:h-[420px]"`.
+- Top familias y Top marcas: `CardContent className="h-[200px] 2xl:h-[240px]"`.
+
+### 4. Skeleton de carga
+Actualizar el bloque `if (loading)` para reflejar la nueva rejilla:
+
+- Mantener los Skeleton de KPIs y `ResumenObjetivos` sin tocar.
+- El Skeleton de Evolución mensual ya existe (`h-[260px] sm:h-[300px]`).
+- Sustituir los dos grupos de Skeleton actuales por siete Skeleton que representen las nuevas Cards:
+  - 1 Skeleton ancho completo con `lg:col-span-2 2xl:col-span-2` (Evolución mensual).
+  - 6 Skeleton de altura fija (`h-64`, por ejemplo) para el resto, donde el último tenga `2xl:col-span-2` (Devoluciones).
+- Usar el mismo contenedor `grid gap-4 lg:grid-cols-2 2xl:grid-cols-3` para el skeleton.
+
+### 5. Restricciones
+- No modificar la sección de KPIs ni `<ResumenObjetivos />`.
+- No cambiar los `<Link>` de drill-down ni los selectores Ventas/Ticket medio/Mensual/Acumulada.
+- No alterar el cálculo de la proyección ni los datos mostrados.
+- Preservar los ajustes anti-desbordamiento ya aplicados (`min-w-0`, `truncate`, barras de progreso acotadas).
+
+## Verificación
+
+1. `tsgo` limpio y `bun run build` exitoso.
+2. Con Playwright o inspección responsive, comprobar que en 360 px de ancho:
+   - el orden vertical es exactamente el especificado;
+   - no aparece scroll horizontal en ninguna sección;
+   - Evolución mensual, Top familias y Top marcas respetan las alturas pedidas.
+3. Revisar visualmente en lg y 2xl que no queden huecos en la rejilla.
