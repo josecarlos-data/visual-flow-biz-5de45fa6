@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,32 +7,41 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { AppLayout } from "@/components/AppLayout";
 import LoadingScreen from "@/components/LoadingScreen";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import Auth from "./pages/Auth";
-import PendingApproval from "./pages/PendingApproval";
-import Ventas from "./pages/Ventas";
-import Dashboard from "./pages/Dashboard";
-
-import Clientes from "./pages/Clientes";
-import ClienteDetalle from "./pages/ClienteDetalle";
-import Visitas from "./pages/Visitas";
-import NuevaVisita from "./pages/NuevaVisita";
-import Agenda from "./pages/Agenda";
-import Rutas from "./pages/Rutas";
-import RutaDetalle from "./pages/RutaDetalle";
-import AdminUsers from "./pages/AdminUsers";
-import AdminData from "./pages/AdminData";
-import AdminFunctions from "./pages/AdminFunctions";
-import AdminVisitas from "./pages/AdminVisitas";
-import RevisionVisitas from "./pages/RevisionVisitas";
-import AdminSituaciones from "./pages/AdminSituaciones";
-import AdminObjetivos from "./pages/AdminObjetivos";
-import Objetivos from "./pages/Objetivos";
-import Documentos from "./pages/Documentos";
-import ActividadInterna from "./pages/ActividadInterna";
-
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const PendingApproval = lazy(() => import("./pages/PendingApproval"));
+const Ventas = lazy(() => import("./pages/Ventas"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Clientes = lazy(() => import("./pages/Clientes"));
+const ClienteDetalle = lazy(() => import("./pages/ClienteDetalle"));
+const Visitas = lazy(() => import("./pages/Visitas"));
+const NuevaVisita = lazy(() => import("./pages/NuevaVisita"));
+const Agenda = lazy(() => import("./pages/Agenda"));
+const Rutas = lazy(() => import("./pages/Rutas"));
+const RutaDetalle = lazy(() => import("./pages/RutaDetalle"));
+const AdminUsers = lazy(() => import("./pages/AdminUsers"));
+const AdminData = lazy(() => import("./pages/AdminData"));
+const AdminFunctions = lazy(() => import("./pages/AdminFunctions"));
+const AdminVisitas = lazy(() => import("./pages/AdminVisitas"));
+const RevisionVisitas = lazy(() => import("./pages/RevisionVisitas"));
+const AdminSituaciones = lazy(() => import("./pages/AdminSituaciones"));
+const AdminObjetivos = lazy(() => import("./pages/AdminObjetivos"));
+const Objetivos = lazy(() => import("./pages/Objetivos"));
+const Documentos = lazy(() => import("./pages/Documentos"));
+const ActividadInterna = lazy(() => import("./pages/ActividadInterna"));
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 function AuthErrorScreen({ message, onSignOut }: { message: string; onSignOut: () => void }) {
   return (
@@ -116,34 +126,38 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
-            <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
-            <Route path="/register" element={<Navigate to="/auth" replace />} />
-            <Route path="/auth/register" element={<Navigate to="/auth" replace />} />
-            <Route path="/pending" element={<PendingRoute><PendingApproval /></PendingRoute>} />
-            <Route path="/" element={<ProtectedRoute dashboardKey="ventas"><Ventas /></ProtectedRoute>} />
-            <Route path="/ventas-historico" element={<ProtectedRoute dashboardKey="ventas"><Dashboard /></ProtectedRoute>} />
-            
-            <Route path="/clientes" element={<ProtectedRoute dashboardKey="clientes"><Clientes /></ProtectedRoute>} />
-            <Route path="/clientes/:cod" element={<ProtectedRoute dashboardKey="clientes"><ClienteDetalle /></ProtectedRoute>} />
-            <Route path="/visitas" element={<ProtectedRoute dashboardKey="visitas"><Visitas /></ProtectedRoute>} />
-            <Route path="/visitas/nueva" element={<ProtectedRoute dashboardKey="visitas"><NuevaVisita /></ProtectedRoute>} />
-            <Route path="/visitas/revision" element={<ProtectedRoute dashboardKey="visitas"><RevisionVisitas /></ProtectedRoute>} />
-            <Route path="/agenda" element={<ProtectedRoute dashboardKey="agenda"><Agenda /></ProtectedRoute>} />
-            <Route path="/rutas" element={<ProtectedRoute dashboardKey="rutas"><Rutas /></ProtectedRoute>} />
-            <Route path="/rutas/:codigo" element={<ProtectedRoute dashboardKey="rutas"><RutaDetalle /></ProtectedRoute>} />
-            <Route path="/admin/users" element={<ProtectedRoute adminOnly><AdminUsers /></ProtectedRoute>} />
-            <Route path="/admin/data" element={<ProtectedRoute adminOnly><AdminData /></ProtectedRoute>} />
-            <Route path="/admin/functions" element={<ProtectedRoute adminOnly><AdminFunctions /></ProtectedRoute>} />
-            <Route path="/admin/visitas" element={<ProtectedRoute adminOnly><AdminVisitas /></ProtectedRoute>} />
-            <Route path="/admin/situaciones" element={<ProtectedRoute adminOnly><AdminSituaciones /></ProtectedRoute>} />
-            <Route path="/admin/objetivos" element={<ProtectedRoute adminOnly allowedRoles={["director_comercial"]}><AdminObjetivos /></ProtectedRoute>} />
-            <Route path="/objetivos" element={<ProtectedRoute dashboardKey="objetivos"><Objetivos /></ProtectedRoute>} />
-            <Route path="/documentos" element={<ProtectedRoute dashboardKey="documentos"><Documentos /></ProtectedRoute>} />
-            <Route path="/actividad-interna" element={<ProtectedRoute dashboardKey="actividad_interna"><ActividadInterna /></ProtectedRoute>} />
+          <ErrorBoundary>
+            <Suspense fallback={<LoadingScreen />}>
+              <Routes>
+                <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
+                <Route path="/register" element={<Navigate to="/auth" replace />} />
+                <Route path="/auth/register" element={<Navigate to="/auth" replace />} />
+                <Route path="/pending" element={<PendingRoute><PendingApproval /></PendingRoute>} />
+                <Route path="/" element={<ProtectedRoute dashboardKey="ventas"><Ventas /></ProtectedRoute>} />
+                <Route path="/ventas-historico" element={<ProtectedRoute dashboardKey="ventas"><Dashboard /></ProtectedRoute>} />
+                
+                <Route path="/clientes" element={<ProtectedRoute dashboardKey="clientes"><Clientes /></ProtectedRoute>} />
+                <Route path="/clientes/:cod" element={<ProtectedRoute dashboardKey="clientes"><ClienteDetalle /></ProtectedRoute>} />
+                <Route path="/visitas" element={<ProtectedRoute dashboardKey="visitas"><Visitas /></ProtectedRoute>} />
+                <Route path="/visitas/nueva" element={<ProtectedRoute dashboardKey="visitas"><NuevaVisita /></ProtectedRoute>} />
+                <Route path="/visitas/revision" element={<ProtectedRoute dashboardKey="visitas"><RevisionVisitas /></ProtectedRoute>} />
+                <Route path="/agenda" element={<ProtectedRoute dashboardKey="agenda"><Agenda /></ProtectedRoute>} />
+                <Route path="/rutas" element={<ProtectedRoute dashboardKey="rutas"><Rutas /></ProtectedRoute>} />
+                <Route path="/rutas/:codigo" element={<ProtectedRoute dashboardKey="rutas"><RutaDetalle /></ProtectedRoute>} />
+                <Route path="/admin/users" element={<ProtectedRoute adminOnly><AdminUsers /></ProtectedRoute>} />
+                <Route path="/admin/data" element={<ProtectedRoute adminOnly><AdminData /></ProtectedRoute>} />
+                <Route path="/admin/functions" element={<ProtectedRoute adminOnly><AdminFunctions /></ProtectedRoute>} />
+                <Route path="/admin/visitas" element={<ProtectedRoute adminOnly><AdminVisitas /></ProtectedRoute>} />
+                <Route path="/admin/situaciones" element={<ProtectedRoute adminOnly><AdminSituaciones /></ProtectedRoute>} />
+                <Route path="/admin/objetivos" element={<ProtectedRoute adminOnly allowedRoles={["director_comercial"]}><AdminObjetivos /></ProtectedRoute>} />
+                <Route path="/objetivos" element={<ProtectedRoute dashboardKey="objetivos"><Objetivos /></ProtectedRoute>} />
+                <Route path="/documentos" element={<ProtectedRoute dashboardKey="documentos"><Documentos /></ProtectedRoute>} />
+                <Route path="/actividad-interna" element={<ProtectedRoute dashboardKey="actividad_interna"><ActividadInterna /></ProtectedRoute>} />
 
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
