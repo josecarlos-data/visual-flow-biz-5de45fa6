@@ -23,8 +23,10 @@ Los dos botones se agrupan en un div `flex w-full gap-2 sm:w-auto sm:shrink-0`, 
 ## C) Rejilla de KPIs
 
 - Orden nuevo: Última compra, Última visita, Ventas {anioActual}, Variación vs. {anioPrevio}, y el resto detrás en su orden actual.
-- De la quinta tarjeta en adelante van dentro de un `Collapsible` cerrado por defecto, con trigger de ancho completo "Ver todas las métricas" y `ChevronDown` que rota. El colapso solo actúa por debajo de `sm`: se resuelve con clases Tailwind (`sm:hidden` en el trigger, `hidden sm:contents` en el contenedor colapsado), no con `useIsMobile`.
+- Estado `kpisAbiertos` (useState, inicial `false`). Botón dentro del grid con `className="col-span-2 sm:hidden ..."`, texto "Ver todas las métricas" y `ChevronDown` que rota (`className={kpisAbiertos ? "rotate-180" : ""}`).
+- Tarjetas de la quinta en adelante envueltas en un div con `className={kpisAbiertos ? "contents" : "hidden sm:contents"}`. De esta manera siguen siendo hijas directas del grid y en `sm` y superiores se ven siempre.
 - Clases del grid: `grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6`.
+- No importar `Collapsible` para esta parte (se conserva el Collapsible de "Ver texto original" en la pestaña Visitas).
 
 ## D) Pestañas
 
