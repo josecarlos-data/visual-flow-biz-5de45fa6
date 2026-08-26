@@ -266,6 +266,27 @@ export default function ClienteDetalle() {
             )}
             {cliente.top_truck && <Badge className="gap-1"><Truck className="h-3 w-3" />Top Truck</Badge>}
           </div>
+          {proxima && (
+            <div className="mt-2">
+              <Badge variant="secondary" className="max-w-full gap-1">
+                <CalendarCheck className="h-3 w-3 shrink-0" />
+                <span className="truncate">
+                  Agendado para el {fechaCorta(proxima.fecha)}
+                  {proxima.notas ? ` · ${proxima.notas}` : ""}
+                </span>
+              </Badge>
+            </div>
+          )}
+          <div className="mt-3 flex w-full gap-2 sm:hidden">
+            <Button asChild className="flex-1">
+              <Link to={`/visitas/nueva?cliente=${cliente.cod_cliente}`}>
+                <Plus className="mr-2 h-4 w-4" /> Nueva visita
+              </Link>
+            </Button>
+            <Button variant="outline" className="flex-1" onClick={() => setAgendarOpen(true)}>
+              <CalendarPlus className="mr-2 h-4 w-4" /> Agendar
+            </Button>
+          </div>
           {situacion && (
             <div className="mt-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3">
               <p className="flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-400">
@@ -291,12 +312,46 @@ export default function ClienteDetalle() {
           )}
 
         </div>
-        <Button asChild className="shrink-0">
-          <Link to={`/visitas/nueva?cliente=${cliente.cod_cliente}`}>
-            <Plus className="mr-2 h-4 w-4" /> Nueva visita
-          </Link>
-        </Button>
+        <div className="hidden gap-2 sm:flex sm:w-auto sm:shrink-0">
+          <Button asChild className="sm:flex-none">
+            <Link to={`/visitas/nueva?cliente=${cliente.cod_cliente}`}>
+              <Plus className="mr-2 h-4 w-4" /> Nueva visita
+            </Link>
+          </Button>
+          <Button variant="outline" className="sm:flex-none" onClick={() => setAgendarOpen(true)}>
+            <CalendarPlus className="mr-2 h-4 w-4" /> Agendar
+          </Button>
+        </div>
       </div>
+
+      <Dialog open={agendarOpen} onOpenChange={setAgendarOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Agendar visita</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-xs text-muted-foreground">Fecha</Label>
+              <div className="mt-2 flex gap-2">
+                <Button type="button" size="sm" variant={modoFecha === "hoy" ? "default" : "outline"} className="flex-1" onClick={() => setModoFecha("hoy")}>Hoy</Button>
+                <Button type="button" size="sm" variant={modoFecha === "manana" ? "default" : "outline"} className="flex-1" onClick={() => setModoFecha("manana")}>Mañana</Button>
+                <Button type="button" size="sm" variant={modoFecha === "otra" ? "default" : "outline"} className="flex-1" onClick={() => setModoFecha("otra")}>Otra fecha</Button>
+              </div>
+              {modoFecha === "otra" && (
+                <Input type="date" className="mt-2" value={fechaOtra} onChange={(e) => setFechaOtra(e.target.value)} />
+              )}
+            </div>
+            <div>
+              <Label htmlFor="notas-agenda" className="text-xs text-muted-foreground">Motivo de la visita (opcional)</Label>
+              <Textarea id="notas-agenda" rows={3} className="mt-2" value={notasAgenda} onChange={(e) => setNotasAgenda(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={guardarAgenda} disabled={guardandoAgenda || !fechaElegida}>
+              {guardandoAgenda && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         <Card>
