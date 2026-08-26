@@ -354,43 +354,82 @@ export default function Ventas() {
 
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader><CardTitle>Evolución mensual</CardTitle></CardHeader>
-          <CardContent className="h-[240px] lg:h-[260px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={serieMensual} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
-                <Tooltip formatter={(v) => eur(Number(v))} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                {anios.map((a) => (
-                  <Line key={a} type="monotone" dataKey={String(a)} stroke={getYearColor(a, anioActual)} strokeWidth={a === anioActual ? 2.5 : 1.5} dot={false} />
+      <Card>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle>Evolución mensual</CardTitle>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="inline-flex shrink-0 rounded-md border p-0.5">
+              {([
+                { key: "ventas", label: "Ventas" },
+                { key: "ticket", label: "Ticket medio" },
+              ] as { key: "ventas" | "ticket"; label: string }[]).map((m) => (
+                <Button
+                  key={m.key}
+                  size="sm"
+                  variant={metrica === m.key ? "secondary" : "ghost"}
+                  className="h-7 px-3 text-[11px]"
+                  onClick={() => setMetrica(m.key)}
+                >
+                  {m.label}
+                </Button>
+              ))}
+            </div>
+            {metrica === "ventas" && (
+              <div className="inline-flex shrink-0 rounded-md border p-0.5">
+                {([
+                  { key: "mensual", label: "Mensual" },
+                  { key: "acumulada", label: "Acumulada" },
+                ] as { key: "mensual" | "acumulada"; label: string }[]).map((v) => (
+                  <Button
+                    key={v.key}
+                    size="sm"
+                    variant={vista === v.key ? "secondary" : "ghost"}
+                    className="h-7 px-3 text-[11px]"
+                    onClick={() => setVista(v.key)}
+                  >
+                    {v.label}
+                  </Button>
                 ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle>Ticket medio por mes</CardTitle></CardHeader>
-          <CardContent className="h-[240px] lg:h-[260px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={serieTicket} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="h-[260px] sm:h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={datosGrafico} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
+              {metrica === "ticket" ? (
                 <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => eur(Number(v))} width={55} />
-                <Tooltip formatter={(v) => eur(Number(v), 2)} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                {anios.map((a) => (
-                  <Line key={a} type="monotone" dataKey={String(a)} stroke={getYearColor(a, anioActual)} strokeWidth={a === anioActual ? 2.5 : 1.5} dot={false} />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+              ) : (
+                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
+              )}
+              <Tooltip
+                formatter={(v, name) => [
+                  metrica === "ticket" ? eur(Number(v), 2) : eur(Number(v)),
+                  name === "proyeccion" ? "Proyección" : (name as string),
+                ]}
+              />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              {anios.map((a) => (
+                <Line key={a} type="monotone" dataKey={String(a)} stroke={getYearColor(a, anioActual)} strokeWidth={a === anioActual ? 2.5 : 1.5} dot={false} />
+              ))}
+              {metrica === "ventas" && factorProy !== null && (
+                <Line
+                  type="monotone"
+                  dataKey="proyeccion"
+                  stroke={getYearColor(anioActual, anioActual)}
+                  strokeWidth={2}
+                  strokeDasharray="5 4"
+                  dot={false}
+                  connectNulls
+                  legendType="none"
+                />
+              )}
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
         <Card>
