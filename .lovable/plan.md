@@ -1,75 +1,49 @@
-# Optimización de arranque, robustez y caché en App.tsx
+# Ficha de cliente: agendar visita y ajustes de layout móvil
 
-## Objetivo
-Mejorar el arranque, la robustez ante errores y el rendimiento percibido de la aplicación con tres cambios concentrados en `src/App.tsx` y un componente nuevo. No se modificará ninguna página, hook, consulta, migración ni archivo de configuración de paquetes.
+Sin migraciones: `visitas_planificadas` ya tiene todas las columnas y el UNIQUE necesarios.
+Ficheros afectados: `src/hooks/useCrm.ts` y `src/pages/ClienteDetalle.tsx`.
 
-## Cambios previstos
+## A) Agendar visita desde la ficha
 
-### 1) Configurar `QueryClient` con opciones globales por defecto
+- `useAgendaMutations().add`: ampliar el tipo del parámetro con `notas?: string | null` y pasarlo al insert. Sin más cambios (Agenda.tsx sigue igual).
+- Nuevo hook `useProximaPlanificada(codCliente)`: consulta `visitas_planificadas` con `cod_cliente` y `fecha >= hoyISO()`, orden ascendente por fecha, `limit 1`, devuelve la fila o `null`. `queryKey: ["crm_agenda", "proxima", codCliente]`.
+- En la ficha, junto a "Nueva visita", botón "Agendar" (`variant="outline"`, icono `CalendarPlus`) que abre un Dialog con:
+  - atajos Hoy / Mañana / Otra fecha (esta última revela un `<Input type="date">`),
+  - Textarea opcional "Motivo de la visita (opcional)" (`rows=3`) que se guarda en `notas`,
+  - botón Guardar.
+  - `user_id` desde `useAuth()`.
+- Antes del insert se cuenta cuántas filas hay para ese `user_id` y esa fecha; se inserta con `orden = conteo + 1`.
+- Error `23505`: toast informativo "Este cliente ya está en tu agenda del {fecha}". Cualquier otro error: toast destructive.
+- Si hay próxima planificada, bajo la línea de metadatos aparece un `Badge variant="secondary"` con icono `CalendarCheck`: "Agendado para el {fecha corta}" y, si hay notas, " · {notas}" truncado. El botón Agendar sigue activo.
 
-Sustituir en `src/App.tsx` (línea 34) la instancia vacía:
+## B) Cabecera en móvil
 
-```text
-const queryClient = new QueryClient();
-```
+Los dos botones se agrupan en un div `flex w-full gap-2 sm:w-auto sm:shrink-0`, cada botón con `flex-1 sm:flex-none`. En móvil se renderiza justo después del `<h1>`, sus metadatos y el badge de agendado, antes del bloque de situación y del aviso de prohibición de venta. En `sm` y superiores queda arriba a la derecha igual que ahora.
 
-por una instancia con `defaultOptions.queries`:
+## C) Rejilla de KPIs
 
-```text
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000,
-      gcTime: 10 * 60 * 1000,
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-});
-```
+- Orden nuevo: Última compra, Última visita, Ventas {anioActual}, Variación vs. {anioPrevio}, y el resto detrás en su orden actual.
+- De la quinta tarjeta en adelante van dentro de un `Collapsible` cerrado por defecto, con trigger de ancho completo "Ver todas las métricas" y `ChevronDown` que rota. El colapso solo actúa por debajo de `sm`: se resuelve con clases Tailwind (`sm:hidden` en el trigger, `hidden sm:contents` en el contenedor colapsado), no con `useIsMobile`.
+- Clases del grid: `grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6`.
 
-Restricciones:
-- No modificar los `staleTime` que ya declaran individualmente los hooks en `src/hooks/useCrm.ts`, `src/hooks/useObjetivos.ts` y `src/hooks/useHistoricoData.ts`; esos valores seguirán prevaleciendo sobre el global.
-- No tocar ninguna llamada a `invalidateQueries` ni a `refetchOnMount` si existiera.
+## D) Pestañas
 
-### 2) Crear `src/components/ErrorBoundary.tsx`
+- Orden: Resumen, Visitas, Productos, Documentos, Perfil, Análisis IA (triggers y contenidos), mismos `value`, `defaultValue="resumen"`.
+- Etiquetas cortas en móvil vía `<span className="sm:hidden">` / `<span className="hidden sm:inline">`: Productos→"Product.", Documentos→"Docs.", Análisis IA→"IA".
 
-Nuevo componente de clase con:
-- `static getDerivedStateFromError` para activar el estado de error.
-- `componentDidCatch` para loguear el error mediante `console.error`.
-- UI de error consistente con `AuthErrorScreen` (tarjeta centrada, título, explicación breve, mensaje de error en bloque `bg-muted`, botones "Recargar" y "Volver al inicio").
+## E) Tabla de documentos
 
-Comportamiento de los botones:
-- "Recargar" → `window.location.reload()`.
-- "Volver al inicio" → `window.location.href = "/"`.
+- "Fecha": primera línea la fecha; segunda línea `text-xs text-muted-foreground sm:hidden` con nº de documento · tipo (`d.operacion ?? d.tipo_documento`) · canal.
+- "Documento", "Tipo", "Canal": `hidden sm:table-cell`.
+- "Registrado por" y "Líneas": `hidden md:table-cell`.
+- "Importe": siempre visible.
+- Las mismas clases en `TableHead` y `TableCell` de cada columna.
+- Se quita `overflow-x-auto` del `CardContent` de esa tabla.
 
-Integración en `src/App.tsx`:
-- Envolver con `<ErrorBoundary>` el contenido dentro de `<BrowserRouter>`, por fuera de `<Routes>`.
-- NO envolver `<AuthProvider>` ni `<QueryClientProvider>` para no impedir el cierre de sesión si fallan.
+## Fuera de alcance
 
-### 3) Carga diferida de rutas con `React.lazy`
-
-En `src/App.tsx`:
-- Convertir todos los imports de páginas de `src/pages` a `React.lazy`, **excepto** `Auth` y `NotFound`, que permanecen como import estático.
-- Envolver `<Routes>` en `<Suspense fallback={<LoadingScreen />}>`.
-- `LoadingScreen` ya existe y ya está importado en el fichero.
-
-Objetivo de rendimiento:
-- El parser `@e965/xlsx` arrastrado por `src/pages/AdminData.tsx` deja de formar parte del bundle inicial.
-- Cada ruta se convierte en un chunk separado.
-
-## Ficheros afectados
-- `src/App.tsx` (modificado).
-- `src/components/ErrorBoundary.tsx` (nuevo).
-
-## Ficheros explícitamente NO tocados
-- `supabase/` (sin migraciones).
-- `package.json`.
-- Cualquier página bajo `src/pages/`.
-- Cualquier hook bajo `src/hooks/`.
+No se toca el contenido de las tarjetas KPI, la lógica de `verMargen`, la pestaña Productos, `DocumentoLineasDialog` ni `Agenda.tsx`.
 
 ## Verificación
-1. `tsgo` limpio y `bun run build` exitoso.
-2. El build genera chunks separados por ruta, no un único bundle.
-3. Navegar entre secciones y volver atrás no vuelve a disparar las consultas dentro de los 5 minutos (gracias al `staleTime` global).
-4. Cambiar de pestaña del navegador y volver no recarga los datos (`refetchOnWindowFocus: false`).
+
+`tsgo` limpio, build correcto y revisión a 411 px de ancho: botones visibles arriba, sin scroll horizontal en la tabla de documentos.
