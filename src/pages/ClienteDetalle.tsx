@@ -243,22 +243,35 @@ export default function ClienteDetalle() {
   const anioActual = anios[0] ?? new Date().getFullYear();
   const anioPrevio = anioActual - 1;
 
+  const anioNaturalActual = new Date().getFullYear();
+  const mesActualNatural = new Date().getMonth() + 1;
+
   const porAnio = useMemo(() => {
     const map = new Map<number, number>();
     for (const v of ventas ?? []) map.set(v.anio, (map.get(v.anio) ?? 0) + Number(v.importe ?? 0));
-    return Array.from(map.entries()).sort((a, b) => a[0] - b[0]).map(([anio, total]) => ({ anio: String(anio), total }));
-  }, [ventas]);
+    return Array.from(map.entries()).sort((a, b) => a[0] - b[0]).map(([anio, total]) => ({
+      anio: String(anio),
+      total,
+      enCurso: anio === anioNaturalActual,
+    }));
+  }, [ventas, anioNaturalActual]);
 
   const mensual = useMemo(() => {
-    const base = MESES.map((m, i) => ({ mes: m, actual: 0, anterior: 0, _i: i + 1 }));
+    const aplicarCorte = anioActual === anioNaturalActual;
+    const base = MESES.map((m, i) => ({
+      mes: m,
+      actual: aplicarCorte && (i + 1) > mesActualNatural ? null : 0,
+      anterior: 0,
+      _i: i + 1,
+    }));
     for (const v of ventas ?? []) {
       const row = base[v.mes - 1];
       if (!row) continue;
-      if (v.anio === anioActual) row.actual += Number(v.importe ?? 0);
+      if (v.anio === anioActual) row.actual = (row.actual ?? 0) + Number(v.importe ?? 0);
       if (v.anio === anioPrevio) row.anterior += Number(v.importe ?? 0);
     }
     return base;
-  }, [ventas, anioActual, anioPrevio]);
+  }, [ventas, anioActual, anioPrevio, anioNaturalActual, mesActualNatural]);
 
   const variacionYtd = useMemo(() => {
     if (!kpis || !kpis.importe_anio_anterior_ytd) return null;
