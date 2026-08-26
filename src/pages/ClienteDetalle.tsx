@@ -3,7 +3,7 @@ import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, Phone, Mail, MapPin, Route as RouteIcon, Sparkles, Loader2,
   TrendingUp, TrendingDown, Package, Plus, AlertTriangle, Target, MessageSquareQuote,
-  Truck, User, Info, ChevronDown, CalendarPlus, CalendarCheck,
+  Truck, User, Info, ChevronDown, ChevronUp, CalendarPlus, CalendarCheck, Search,
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ import {
   useCliente, useClienteVentas, useClienteKpis, useClienteProductos, useClienteMix,
   useClienteVisitas, useMotivos, usePuedeVerMargen, useSituacionesVigentes, useClienteDocumentos, useVisitaBloques,
   useProximaPlanificada, useAgendaMutations,
-  etiquetaCategoria, eur, num, eurK, fechaCorta, type DocumentoCliente, type Visita,
+  etiquetaCategoria, eur, num, eurK, fechaCorta, type DocumentoCliente, type Visita, type ProductoCliente,
 } from "@/hooks/useCrm";
 import { ClientePerfilTab } from "@/components/ClientePerfilTab";
 import { DocumentoLineasDialog } from "@/components/DocumentoLineasDialog";
@@ -51,6 +51,8 @@ interface Insights {
   argumentario: string[];
   generado_en?: string;
 }
+
+type CampoOrden = "referencia" | "familia" | "marca" | "unidades" | "importe" | "margen" | "ultima";
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
@@ -89,6 +91,11 @@ export default function ClienteDetalle() {
   const [insights, setInsights] = useState<Insights | null>(null);
   const [anioProd, setAnioProd] = useState<string>("todos");
   const anioProdInicializado = useRef(false);
+  const [busquedaProductos, setBusquedaProductos] = useState("");
+  const [ordenProductos, setOrdenProductos] = useState<{ campo: CampoOrden; dir: "asc" | "desc" }>({
+    campo: "importe",
+    dir: "desc",
+  });
   const [docSeleccionado, setDocSeleccionado] = useState<DocumentoCliente | null>(null);
   const [dialogoLineasOpen, setDialogoLineasOpen] = useState(false);
   const [kpisAbiertos, setKpisAbiertos] = useState(false);
@@ -144,6 +151,48 @@ export default function ClienteDetalle() {
     codNum,
     anioProd === "todos" ? null : Number(anioProd),
   );
+
+  const normalizarBusqueda = (s: string) =>
+    s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+  const cambiarOrden = (
+    campo: CampoOrden,
+    actual: { campo: CampoOrden; dir: "asc" | "desc" },
+  ): { campo: CampoOrden; dir: "asc" | "desc" } => {
+    if (actual.campo === campo) return { campo, dir: actual.dir === "asc" ? "desc" : "asc" };
+    const numOrDate = ["unidades", "importe", "margen", "ultima"].includes(campo);
+    return { campo, dir: numOrDate ? "desc" : "asc" };
+  };
+
+  const productosFiltradosOrdenados = useMemo(() => {
+    if (!productos) return [] as ProductoCliente[];
+    let list = [...productos];
+    const texto = normalizarBusqueda(busquedaProductos).trim();
+    if (texto) {
+      list = list.filter((p) =>
+        normalizarBusqueda([p.referencia, p.descripcion ?? ""].join(" ")).includes(texto)
+      );
+    }
+    const { campo, dir } = ordenProductos;
+    const campoReal = campo === "ultima" ? "ultima_compra" : campo;
+    const esNumero = ["unidades", "importe", "margen"].includes(campo);
+    const esFecha = campo === "ultima";
+    list.sort((a, b) => {
+      const va = (a as any)[campoReal];
+      const vb = (b as any)[campoReal];
+      const na = va == null || va === "";
+      const nb = vb == null || vb === "";
+      if (na && nb) return 0;
+      if (na) return 1;
+      if (nb) return -1;
+      let cmp = 0;
+      if (esNumero) cmp = Number(va) - Number(vb);
+      else if (esFecha) cmp = new Date(va as string).getTime() - new Date(vb as string).getTime();
+      else cmp = String(va).localeCompare(String(vb), "es");
+      return dir === "asc" ? cmp : -cmp;
+    });
+    return list;
+  }, [productos, busquedaProductos, ordenProductos]);
 
   const { data: cached } = useQuery({
     queryKey: ["crm_insights", codNum],
@@ -665,39 +714,89 @@ export default function ClienteDetalle() {
 
         <TabsContent value="productos">
           <Card>
-            <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+            <CardHeader className="flex-col gap-2 space-y-0 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle className="flex items-center gap-2 text-base"><Package className="h-4 w-4" />Productos comprados</CardTitle>
-              <Select value={anioProd} onValueChange={setAnioProd}>
-                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos los años</SelectItem>
-                  {anios.map((a) => (
-                    <SelectItem key={a} value={String(a)}>{a}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  <Input
+                    placeholder="Buscar referencia o descripción"
+                    value={busquedaProductos}
+                    onChange={(e) => setBusquedaProductos(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+                <Select value={anioProd} onValueChange={setAnioProd}>
+                  <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos los años</SelectItem>
+                    {anios.map((a) => (
+                      <SelectItem key={a} value={String(a)}>{a}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               {cargandoProductos ? (
                 <Skeleton className="m-4 h-64" />
               ) : !productos || productos.length === 0 ? (
                 <p className="py-10 text-center text-sm text-muted-foreground">Sin compras registradas en el periodo.</p>
+              ) : productosFiltradosOrdenados.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">Ningún producto coincide con la búsqueda.</p>
               ) : (
                 <div className="max-h-[560px] overflow-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Referencia</TableHead>
-                        <TableHead className="hidden sm:table-cell">Familia</TableHead>
-                        <TableHead className="hidden md:table-cell">Marca</TableHead>
-                        <TableHead className="text-right">Uds.</TableHead>
-                        <TableHead className="text-right">Importe</TableHead>
-                        {verMargen && <TableHead className="hidden text-right md:table-cell">Margen</TableHead>}
-                        <TableHead className="hidden text-right sm:table-cell">Última</TableHead>
+                        <TableHead>
+                          <button className="flex items-center gap-1" onClick={() => setOrdenProductos(cambiarOrden("referencia", ordenProductos))}>
+                            Referencia
+                            {ordenProductos.campo === "referencia" && (ordenProductos.dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
+                          </button>
+                        </TableHead>
+                        <TableHead className="hidden sm:table-cell">
+                          <button className="flex items-center gap-1" onClick={() => setOrdenProductos(cambiarOrden("familia", ordenProductos))}>
+                            Familia
+                            {ordenProductos.campo === "familia" && (ordenProductos.dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
+                          </button>
+                        </TableHead>
+                        <TableHead className="hidden md:table-cell">
+                          <button className="flex items-center gap-1" onClick={() => setOrdenProductos(cambiarOrden("marca", ordenProductos))}>
+                            Marca
+                            {ordenProductos.campo === "marca" && (ordenProductos.dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
+                          </button>
+                        </TableHead>
+                        <TableHead className="text-right">
+                          <button className="ml-auto flex items-center gap-1" onClick={() => setOrdenProductos(cambiarOrden("unidades", ordenProductos))}>
+                            Uds.
+                            {ordenProductos.campo === "unidades" && (ordenProductos.dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
+                          </button>
+                        </TableHead>
+                        <TableHead className="text-right">
+                          <button className="ml-auto flex items-center gap-1" onClick={() => setOrdenProductos(cambiarOrden("importe", ordenProductos))}>
+                            Importe
+                            {ordenProductos.campo === "importe" && (ordenProductos.dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
+                          </button>
+                        </TableHead>
+                        {verMargen && (
+                          <TableHead className="hidden text-right md:table-cell">
+                            <button className="ml-auto flex items-center gap-1" onClick={() => setOrdenProductos(cambiarOrden("margen", ordenProductos))}>
+                              Margen
+                              {ordenProductos.campo === "margen" && (ordenProductos.dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
+                            </button>
+                          </TableHead>
+                        )}
+                        <TableHead className="hidden text-right sm:table-cell">
+                          <button className="ml-auto flex items-center gap-1" onClick={() => setOrdenProductos(cambiarOrden("ultima", ordenProductos))}>
+                            Última
+                            {ordenProductos.campo === "ultima" && (ordenProductos.dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
+                          </button>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {productos.map((p) => (
+                      {productosFiltradosOrdenados.map((p) => (
                         <TableRow key={p.referencia}>
                           <TableCell className="max-w-[220px]">
                             <p className="truncate font-medium">{p.referencia}</p>

@@ -145,21 +145,25 @@ function FilaAtributo({
   }, [hecho, valorAnterior]);
 
   return (
-    <div className="flex items-start justify-between gap-3 border-b py-3 last:border-b-0">
+    <div className="flex flex-col gap-1 border-b py-3 last:border-b-0 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
       <div className="min-w-0">
         <p className="text-sm font-medium">{atributo.nombre}</p>
         <p className="text-xs text-muted-foreground">{trazabilidad}</p>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex w-full items-start gap-2 sm:w-auto sm:justify-end">
         {hecho ? (
           <>
-            <span className={`text-right text-sm ${sinConfirmar ? "text-muted-foreground" : "font-medium text-foreground"}`}>
+            <span
+              className={`min-w-0 flex-1 break-words text-sm sm:flex-none sm:text-right ${
+                sinConfirmar ? "text-muted-foreground" : "font-medium text-foreground"
+              }`}
+            >
               {hecho.valor_texto}
               {atributo.unidad ? ` ${atributo.unidad}` : ""}
             </span>
             {sinConfirmar && (
-              <>
+              <div className="flex shrink-0 items-center gap-2">
                 <Badge variant="secondary" className="whitespace-nowrap">sin confirmar</Badge>
                 <Button
                   size="icon"
@@ -177,11 +181,13 @@ function FilaAtributo({
                 >
                   {confirmar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 </Button>
-              </>
+              </div>
             )}
-            <Button size="icon" variant="ghost" className="h-8 w-8" title="Cambiar valor" onClick={onEditar}>
-              <Pencil className="h-4 w-4" />
-            </Button>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button size="icon" variant="ghost" className="h-8 w-8" title="Cambiar valor" onClick={onEditar}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+            </div>
           </>
         ) : (
           <Button size="sm" variant="outline" onClick={onEditar}>
