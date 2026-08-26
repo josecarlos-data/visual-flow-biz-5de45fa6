@@ -1632,6 +1632,7 @@ export type Database = {
           cliente: string | null
           cod_cliente: number | null
           delegacion: string | null
+          doc_ref: string | null
           fecha: string | null
           hora: string | null
           id_doc_enlazado: string | null
@@ -1934,10 +1935,13 @@ export type Database = {
       actividad_interna_almacenes: {
         Args: { _anio: number }
         Returns: {
+          abonos_atribuidos: number
           almacen: string
           clientes_distintos: number
           docs_venta: number
           importe_abonado: number
+          importe_atribuido: number
+          importe_neto: number
           importe_vendido: number
           n_abonos: number
           n_usuarios: number
@@ -1956,10 +1960,14 @@ export type Database = {
       actividad_interna_usuarios: {
         Args: { _almacen?: string; _anio: number }
         Returns: {
+          abonos_ajenos: number
+          abonos_atribuidos: number
           almacen_principal: string
           clientes_distintos: number
           docs_venta: number
           importe_abonado: number
+          importe_atribuido: number
+          importe_neto: number
           importe_vendido: number
           n_abonos: number
           n_almacenes: number
