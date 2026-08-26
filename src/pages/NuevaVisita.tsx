@@ -84,6 +84,8 @@ export default function NuevaVisita() {
   const [detallesAbiertos, setDetallesAbiertos] = useState(false);
   const [chuletaAbierta, setChuletaAbierta] = useState(false);
   const [extrasAbiertos, setExtrasAbiertos] = useState(false);
+  const [bloquesAbiertos, setBloquesAbiertos] = useState<string[]>([]);
+  const [zonasBAbiertas, setZonasBAbiertas] = useState<Record<string, boolean>>({});
 
   const motivosActivos = useMemo(() => (motivos ?? []).filter((m) => m.is_active), [motivos]);
   const motivoDe = (key: string): Motivo | undefined => motivos?.find((m) => m.key === key);
