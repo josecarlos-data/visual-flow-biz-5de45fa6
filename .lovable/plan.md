@@ -23,8 +23,8 @@ Solo jerarquía visual en `src/pages/NuevaVisita.tsx` (render de bloques, línea
 
 ## 3. Dos zonas dentro del bloque
 
-- Zona A (siempre visible, sin cabecera): campos que necesitan atención = `pendientesDe(b)` más los campos visibles con `meta.confianza === "baja"`, en el orden de `camposVisibles`.
-- Zona B (plegada): el resto de campos visibles, dentro de un `Collapsible` con trigger de texto pequeño "Ver los N campos ya rellenos" y `ChevronDown` que rota.
+- Zona A (siempre visible, sin cabecera): campos que necesitan atención = `bloqueantesDe(b) ∪ pendientesDe(b) ∪ campos visibles con meta.confianza === "baja"`, sin duplicados, en el orden de `camposVisibles`.
+- Zona B (plegada): el resto de campos visibles, dentro de un `Collapsible` con trigger de texto pequeño "Ver los otros N campos" y `ChevronDown` que rota.
   - El `Select` de Motivo (+ `motivo.descripcion`) se mueve al principio de la Zona B.
   - Si Zona A está vacía, la Zona B arranca abierta (estado por uid en un `Record<string, boolean>` local del componente de página, inicializado según ese criterio).
 
