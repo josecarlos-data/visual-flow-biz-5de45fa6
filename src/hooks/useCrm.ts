@@ -1382,3 +1382,79 @@ export function usePerfilMutations(cod: number | null) {
 
   return { confirmar, guardarValor };
 }
+
+// ---------------------------------------------------------------------------
+// Actividad interna (solo gerencia)
+// ---------------------------------------------------------------------------
+
+export interface ActividadUsuario {
+  registrado_por: string;
+  almacen_principal: string | null;
+  n_almacenes: number;
+  importe_vendido: number;
+  docs_venta: number;
+  n_abonos: number;
+  importe_abonado: number;
+  clientes_distintos: number;
+  ticket_medio: number | null;
+  pct_abonos: number | null;
+  pct_importe_abonado: number | null;
+}
+
+export interface ActividadAlmacen {
+  almacen: string;
+  importe_vendido: number;
+  docs_venta: number;
+  n_abonos: number;
+  importe_abonado: number;
+  clientes_distintos: number;
+  ticket_medio: number | null;
+  pct_abonos: number | null;
+  pct_importe_abonado: number | null;
+  n_usuarios: number;
+}
+
+export function useActividadFiltros() {
+  return useQuery({
+    queryKey: ["actividad_interna_filtros"],
+    staleTime: 5 * 60 * 1000,
+    queryFn: async (): Promise<{ anios: number[]; almacenes: string[] }> => {
+      const { data, error } = await supabase.rpc("actividad_interna_filtros" as never);
+      if (error) throw error;
+      const r = (((data ?? []) as unknown as Record<string, unknown>[])[0] ?? {}) as Record<string, unknown>;
+      return {
+        anios: ((r.anios as number[]) ?? []).filter((v) => v != null),
+        almacenes: ((r.almacenes as string[]) ?? []).filter(Boolean),
+      };
+    },
+  });
+}
+
+export function useActividadUsuarios(anio: number | null, almacen: string | null) {
+  return useQuery({
+    queryKey: ["actividad_interna_usuarios", anio, almacen],
+    enabled: anio != null,
+    queryFn: async (): Promise<ActividadUsuario[]> => {
+      const { data, error } = await supabase.rpc("actividad_interna_usuarios" as never, {
+        _anio: anio,
+        _almacen: almacen,
+      } as never);
+      if (error) throw error;
+      return ((data ?? []) as unknown as ActividadUsuario[]);
+    },
+  });
+}
+
+export function useActividadAlmacenes(anio: number | null) {
+  return useQuery({
+    queryKey: ["actividad_interna_almacenes", anio],
+    enabled: anio != null,
+    queryFn: async (): Promise<ActividadAlmacen[]> => {
+      const { data, error } = await supabase.rpc("actividad_interna_almacenes" as never, {
+        _anio: anio,
+      } as never);
+      if (error) throw error;
+      return ((data ?? []) as unknown as ActividadAlmacen[]);
+    },
+  });
+}
