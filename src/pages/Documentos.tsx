@@ -70,8 +70,10 @@ const FILTROS_INICIALES: Filtros = {
 };
 
 export default function Documentos() {
+  const [searchParams] = useSearchParams();
   const [anio, setAnio] = useState<string>("");
   const anioInicializado = useRef(false);
+  const filtrosInicializados = useRef(false);
   const [filtros, setFiltros] = useState<Filtros>(FILTROS_INICIALES);
   const [orden, setOrden] = useState<DocumentosOrden>("fecha");
   const [dir, setDir] = useState<"asc" | "desc">("desc");
@@ -96,6 +98,45 @@ export default function Documentos() {
       return data?.fecha ? new Date(data.fecha).getFullYear() : new Date().getFullYear();
     },
   });
+
+  // Hidratar filtros desde URL una sola vez al montar
+  useEffect(() => {
+    if (filtrosInicializados.current) return;
+
+    const getParam = (name: string) => {
+      const v = searchParams.get(name);
+      return v && v.trim() ? v.trim() : null;
+    };
+
+    const anioParam = getParam("anio");
+    const canal = getParam("canal");
+    const motivoAbono = getParam("motivoAbono");
+    const operacion = getParam("operacion");
+    const vendedor = getParam("vendedor");
+    const delegacion = getParam("delegacion");
+    const importeMinRaw = searchParams.get("importeMin");
+
+    const nuevosFiltros: Partial<Filtros> = {};
+    if (canal) nuevosFiltros.canal = canal;
+    if (motivoAbono) nuevosFiltros.motivoAbono = motivoAbono;
+    if (operacion) nuevosFiltros.operacion = operacion;
+    if (vendedor) nuevosFiltros.vendedor = vendedor;
+    if (delegacion) nuevosFiltros.delegacion = delegacion;
+
+    if (importeMinRaw !== null) {
+      const parsed = Number(importeMinRaw);
+      nuevosFiltros.importeMin = Number.isNaN(parsed) ? 0 : parsed;
+    }
+
+    setFiltros((f) => ({ ...f, ...nuevosFiltros }));
+
+    if (anioParam && /^\d{4}$/.test(anioParam)) {
+      setAnio(anioParam);
+    }
+
+    anioInicializado.current = true;
+    filtrosInicializados.current = true;
+  }, [searchParams]);
 
   useEffect(() => {
     if (ultimoAnio && !anioInicializado.current) {
