@@ -564,15 +564,35 @@ export default function ClienteDetalle() {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={porAnio} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
-                      <XAxis dataKey="anio" tickLine={false} axisLine={false} className="text-xs" />
+                      <XAxis
+                        dataKey="anio"
+                        tickLine={false}
+                        axisLine={false}
+                        className="text-xs"
+                        tickFormatter={(v: string) =>
+                          v === String(anioNaturalActual) ? (isMobile ? `${v} *` : `${v} (en curso)`) : v
+                        }
+                      />
                       <YAxis tickFormatter={eurK} tickLine={false} axisLine={false} className="text-xs" width={54} />
                       <Tooltip
                         formatter={(v: number) => eur(v)}
                         contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
                       />
-                      <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="total" radius={[4, 4, 0, 0]}>
+                        {porAnio.map((entry) => (
+                          <Cell
+                            key={entry.anio}
+                            fill={entry.enCurso ? "hsl(var(--primary) / 0.45)" : "hsl(var(--primary))"}
+                          />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
+                )}
+                {porAnio.some((d) => d.enCurso) && (
+                  <p className="mt-1 text-center text-xs text-muted-foreground">
+                    {isMobile ? "* Año en curso (parcial)" : "El año en curso incluye datos parciales"}
+                  </p>
                 )}
               </CardContent>
             </Card>
