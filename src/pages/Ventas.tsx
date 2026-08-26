@@ -399,15 +399,27 @@ export default function Ventas() {
                 return (
                   <TabsContent key={t} value={t} className="space-y-2">
                     {filas.length === 0 && <Vacio />}
-                    {filas.map((d) => (
-                      <div key={`${t}-${d.etiqueta}`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm">
-                        <span className="truncate">{d.etiqueta}</span>
-                        <span className="shrink-0 text-right">
-                          <span className="font-medium">{eur(d.importe)}</span>
-                          <span className="ml-2 text-xs text-muted-foreground">{fnum(d.lineas)} líneas</span>
-                        </span>
-                      </div>
-                    ))}
+                    {filas.map((d) => {
+                      const esLink = t === "motivo" && !esSintetico(d.etiqueta);
+                      const contenido = (
+                        <>
+                          <span className="truncate">{d.etiqueta}</span>
+                          <span className="shrink-0 text-right">
+                            <span className="font-medium">{eur(d.importe)}</span>
+                            <span className="ml-2 text-xs text-muted-foreground">{fnum(d.lineas)} líneas</span>
+                          </span>
+                        </>
+                      );
+                      return esLink ? (
+                        <Link key={`${t}-${d.etiqueta}`} to={`/documentos?anio=${anioActual}&operacion=Abono&motivoAbono=${encodeURIComponent(d.etiqueta)}&importeMin=0&volver=%2F&volverTxt=Ventas`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
+                          {contenido}
+                        </Link>
+                      ) : (
+                        <div key={`${t}-${d.etiqueta}`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm">
+                          {contenido}
+                        </div>
+                      );
+                    })}
                   </TabsContent>
                 );
               })}
