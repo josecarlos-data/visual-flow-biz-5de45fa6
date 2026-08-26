@@ -155,7 +155,10 @@ export default function ClienteDetalle() {
   const normalizarBusqueda = (s: string) =>
     s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
-  const cambiarOrden = (campo: CampoOrden, actual: { campo: CampoOrden; dir: "asc" | "desc" }) => {
+  const cambiarOrden = (
+    campo: CampoOrden,
+    actual: { campo: CampoOrden; dir: "asc" | "desc" },
+  ): { campo: CampoOrden; dir: "asc" | "desc" } => {
     if (actual.campo === campo) return { campo, dir: actual.dir === "asc" ? "desc" : "asc" };
     const numOrDate = ["unidades", "importe", "margen", "ultima"].includes(campo);
     return { campo, dir: numOrDate ? "desc" : "asc" };
