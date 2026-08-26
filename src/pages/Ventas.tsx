@@ -29,6 +29,8 @@ import { num as fnum, pct } from "@/lib/format";
 
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+const VALORES_SINTETICOS = new Set(["Sin canal", "Sin motivo", "Sin asignar"]);
+const esSintetico = (v: string | null) => !v || VALORES_SINTETICOS.has(v);
 
 interface MensualRow { anio: number; mes: number; importe: number; margen: number; unidades: number; documentos: number; ticket_medio: number }
 interface KpiRow { anio: number; importe: number; margen: number; unidades: number; clientes: number; lineas: number; documentos: number; abonos: number; importe_abonos: number; ticket_medio: number }
