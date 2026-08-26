@@ -611,7 +611,7 @@ export default function ClienteDetalle() {
                     />
                     <Legend />
                     <Line type="monotone" dataKey="anterior" name={String(anioPrevio)} stroke="hsl(var(--muted-foreground))" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="actual" name={String(anioActual)} stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="actual" name={String(anioActual)} stroke="hsl(var(--primary))" strokeWidth={2} dot={false} connectNulls={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
