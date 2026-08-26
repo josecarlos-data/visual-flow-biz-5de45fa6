@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { CalendarDays, Plus, Check, Trash2, ChevronLeft, ChevronRight, MapPin, Route, Navigation } from "lucide-react";
+import { CalendarDays, Plus, Check, Trash2, ChevronLeft, ChevronRight, MapPin, Route, Navigation, Mic, StickyNote, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -39,6 +40,10 @@ export default function Agenda() {
   const [optimizando, setOptimizando] = useState(false);
   const [mapaOpen, setMapaOpen] = useState(false);
 
+  // Edición de notas de la parada: parada abierta y borrador del textarea.
+  const [notaEditId, setNotaEditId] = useState<string | null>(null);
+  const [notaBorrador, setNotaBorrador] = useState("");
+
 
   const codigosPlan = useMemo(() => (plan ?? []).map((p) => p.cod_cliente), [plan]);
   const { data: coords } = useCoordsClientes(codigosPlan);
@@ -63,6 +68,7 @@ export default function Agenda() {
   );
 
   const conGeo = paradas.filter((p) => p.latitud != null && p.longitud != null).length;
+  const hayPendientes = (plan ?? []).some((p) => p.estado !== "realizada");
 
   const optimizar = async () => {
     if (conGeo < 2) {
@@ -124,6 +130,19 @@ export default function Agenda() {
     add.mutate({ user_id: user.id, cod_cliente: cod, fecha, orden: (plan?.length ?? 0) + 1 });
     setOpen(false);
     setBusqueda("");
+  };
+
+  const abrirNota = (id: string, notas: string | null) => {
+    setNotaEditId(id);
+    setNotaBorrador(notas ?? "");
+  };
+
+  const guardarNota = () => {
+    if (!notaEditId) return;
+    const texto = notaBorrador.trim();
+    update.mutate({ id: notaEditId, notas: texto || null });
+    setNotaEditId(null);
+    setNotaBorrador("");
   };
 
 
@@ -189,32 +208,72 @@ export default function Agenda() {
               const c = clienteMap.get(p.cod_cliente);
               const hecha = p.estado === "realizada";
               return (
-                <div key={p.id} className="flex items-center gap-3 rounded-lg border p-3">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
-                    {i + 1}
-                  </span>
-                  <Link to={`/clientes/${p.cod_cliente}?volver=${encodeURIComponent('/agenda')}&volverTxt=${encodeURIComponent('Agenda')}`} className="min-w-0 flex-1">
-                    <p className={`truncate font-medium ${hecha ? "text-muted-foreground line-through" : ""}`}>
-                      {c?.cliente ?? `Cliente #${p.cod_cliente}`}
-                    </p>
-                    {c?.localidad && (
-                      <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="h-3 w-3" />{c.localidad}
-                      </p>
-                    )}
-                  </Link>
-                  {hecha && <Badge variant="secondary">Hecha</Badge>}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Marcar como realizada"
-                    onClick={() => update.mutate({ id: p.id, estado: hecha ? "pendiente" : "realizada" })}
-                  >
-                    <Check className={`h-4 w-4 ${hecha ? "text-primary" : ""}`} />
-                  </Button>
-                  <Button variant="ghost" size="icon" aria-label="Quitar" onClick={() => remove.mutate(p.id)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                <div key={p.id} className="rounded-lg border p-3">
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                      {i + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <Link to={`/clientes/${p.cod_cliente}?volver=${encodeURIComponent('/agenda')}&volverTxt=${encodeURIComponent('Agenda')}`} className="block">
+                        <p className={`truncate font-medium ${hecha ? "text-muted-foreground line-through" : ""}`}>
+                          {c?.cliente ?? `Cliente #${p.cod_cliente}`}
+                        </p>
+                        {c?.localidad && (
+                          <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <MapPin className="h-3 w-3" />{c.localidad}
+                          </p>
+                        )}
+                      </Link>
+                      {p.notas && (
+                        <p className="mt-1 flex items-start gap-1.5 rounded bg-muted/50 px-2 py-1 text-xs break-words">
+                          <StickyNote className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
+                          <span>{p.notas}</span>
+                        </p>
+                      )}
+                      {p.visita_id && (
+                        <Link
+                          to={`/clientes/${p.cod_cliente}?tab=visitas&volver=${encodeURIComponent('/agenda')}&volverTxt=${encodeURIComponent('Agenda')}`}
+                          className="mt-1 inline-block text-xs text-primary hover:underline"
+                        >
+                          Ver visitas del cliente
+                        </Link>
+                      )}
+                      {!hecha && (
+                        <Button asChild size="sm" variant="outline" className="mt-2">
+                          <Link to={`/visitas/nueva?cliente=${p.cod_cliente}&volver=${encodeURIComponent('/agenda')}&volverTxt=${encodeURIComponent('Agenda')}`}>
+                            <Mic className="mr-2 h-4 w-4" />Registrar visita
+                          </Link>
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      {hecha && <Badge variant="secondary">Hecha</Badge>}
+                      {p.visita_id && (
+                        <span className="text-xs text-muted-foreground">Visita registrada</span>
+                      )}
+                      <div className="flex">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Editar nota de la parada"
+                          onClick={() => abrirNota(p.id, p.notas)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Marcar como realizada"
+                          onClick={() => update.mutate({ id: p.id, estado: hecha ? "pendiente" : "realizada" })}
+                        >
+                          <Check className={`h-4 w-4 ${hecha ? "text-primary" : ""}`} />
+                        </Button>
+                        <Button variant="ghost" size="icon" aria-label="Quitar" onClick={() => remove.mutate(p.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               );
             })
@@ -238,9 +297,11 @@ export default function Agenda() {
               {plan.length - conGeo} clientes sin ubicación registrada quedan al final del recorrido.
             </p>
           )}
-          <Button asChild className="w-full">
-            <Link to="/visitas/nueva"><Plus className="mr-2 h-4 w-4" />Registrar visita</Link>
-          </Button>
+          {!hayPendientes && (
+            <Button asChild className="w-full">
+              <Link to="/visitas/nueva"><Plus className="mr-2 h-4 w-4" />Registrar visita</Link>
+            </Button>
+          )}
         </div>
       )}
 
@@ -250,6 +311,22 @@ export default function Agenda() {
         bloques={bloques}
         sinGeo={(plan?.length ?? 0) - conGeo}
       />
+
+      <Dialog open={notaEditId != null} onOpenChange={(v) => { if (!v) setNotaEditId(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Nota de la parada</DialogTitle></DialogHeader>
+          <Textarea
+            autoFocus
+            rows={3}
+            value={notaBorrador}
+            onChange={(e) => setNotaBorrador(e.target.value)}
+            placeholder="Motivo de la visita…"
+          />
+          <div className="flex justify-end">
+            <Button onClick={guardarNota}>Guardar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
 
 
