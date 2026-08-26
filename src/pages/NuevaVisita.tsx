@@ -384,7 +384,22 @@ export default function NuevaVisita() {
         _lng: pos.lng,
       } as never);
     }
-    toast({ title: "Visita guardada" });
+
+    // Si el cliente estaba planificado hoy en la agenda, marcamos la parada como realizada.
+    // Es un extra: cualquier fallo aquí nunca debe afectar al guardado de la visita.
+    let agendaMarcada = false;
+    try {
+      if (user?.id) {
+        agendaMarcada = await marcarPlanificadaRealizada(user.id, Number(codCliente), fecha, (creada as { id: string }).id);
+      }
+    } catch (e) {
+      console.error("No se ha podido actualizar la agenda:", e);
+    }
+
+    toast({
+      title: "Visita guardada",
+      description: agendaMarcada ? "Marcada como realizada en tu agenda." : undefined,
+    });
     navigate(`/clientes/${codCliente}`);
   };
 
