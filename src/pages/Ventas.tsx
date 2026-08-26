@@ -191,6 +191,7 @@ export default function Ventas() {
       : null;
 
   const fmtShare = (v: number) => `${v.toFixed(1).replace(".", ",")} %`;
+  const fmtM = (v: number) => `${(v / 1_000_000).toFixed(1).replace(".", ",")} M €`;
 
 
 
