@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -192,9 +191,12 @@ export default function ActividadInterna() {
                     <TableHeader>
                       <TableRow>
                         <CabU col="registrado_por">Usuario</CabU>
-                        <CabU col="almacen_principal">Almacén</CabU>
+                        <CabU col="almacen_principal">Plaza (est.)</CabU>
                         <CabU col="importe_vendido" className="text-right">
                           Vendido
+                        </CabU>
+                        <CabU col="importe_neto" className="text-right">
+                          Neto
                         </CabU>
                         <CabU col="docs_venta" className="text-right">
                           Docs.
@@ -206,10 +208,19 @@ export default function ActividadInterna() {
                           Clientes
                         </CabU>
                         <CabU col="n_abonos" className="text-right">
-                          Abonos
+                          Abonos tramitados
+                        </CabU>
+                        <CabU col="abonos_ajenos" className="text-right">
+                          de otros
                         </CabU>
                         <CabU col="importe_abonado" className="text-right">
-                          Importe abonado
+                          Imp. tramitado
+                        </CabU>
+                        <CabU col="abonos_atribuidos" className="text-right">
+                          Abonos s/ sus ventas
+                        </CabU>
+                        <CabU col="importe_atribuido" className="text-right">
+                          Imp. atribuido
                         </CabU>
                         <CabU col="pct_abonos" className="text-right">
                           % abonos
@@ -223,20 +234,17 @@ export default function ActividadInterna() {
                       {ordU.datos.map((r) => (
                         <TableRow key={r.registrado_por}>
                           <TableCell className="font-medium">{r.registrado_por}</TableCell>
-                          <TableCell className="whitespace-nowrap">
-                            {r.almacen_principal ?? "-"}
-                            {r.n_almacenes > 1 && (
-                              <Badge variant="secondary" className="ml-2">
-                                +{r.n_almacenes - 1}
-                              </Badge>
-                            )}
-                          </TableCell>
+                          <TableCell className="whitespace-nowrap">{r.almacen_principal ?? "-"}</TableCell>
                           <TableCell className="text-right">{eur(r.importe_vendido, 0)}</TableCell>
+                          <TableCell className="text-right">{eur(r.importe_neto, 0)}</TableCell>
                           <TableCell className="text-right">{num(r.docs_venta)}</TableCell>
                           <TableCell className="text-right">{eur(r.ticket_medio, 0)}</TableCell>
                           <TableCell className="text-right">{num(r.clientes_distintos)}</TableCell>
                           <TableCell className="text-right">{num(r.n_abonos)}</TableCell>
+                          <TableCell className="text-right">{num(r.abonos_ajenos)}</TableCell>
                           <TableCell className="text-right">{eur(r.importe_abonado, 0)}</TableCell>
+                          <TableCell className="text-right">{num(r.abonos_atribuidos)}</TableCell>
+                          <TableCell className="text-right">{eur(r.importe_atribuido, 0)}</TableCell>
                           <TableCell className="text-right">{pct1(r.pct_abonos)}</TableCell>
                           <TableCell className="text-right">{pct1(r.pct_importe_abonado)}</TableCell>
                         </TableRow>
@@ -272,6 +280,9 @@ export default function ActividadInterna() {
                         <CabA col="importe_vendido" className="text-right">
                           Vendido
                         </CabA>
+                        <CabA col="importe_neto" className="text-right">
+                          Neto
+                        </CabA>
                         <CabA col="docs_venta" className="text-right">
                           Docs.
                         </CabA>
@@ -282,10 +293,16 @@ export default function ActividadInterna() {
                           Clientes
                         </CabA>
                         <CabA col="n_abonos" className="text-right">
-                          Abonos
+                          Abonos tramitados
                         </CabA>
                         <CabA col="importe_abonado" className="text-right">
-                          Importe abonado
+                          Imp. tramitado
+                        </CabA>
+                        <CabA col="abonos_atribuidos" className="text-right">
+                          Abonos s/ sus ventas
+                        </CabA>
+                        <CabA col="importe_atribuido" className="text-right">
+                          Imp. atribuido
                         </CabA>
                         <CabA col="pct_abonos" className="text-right">
                           % abonos
@@ -301,11 +318,14 @@ export default function ActividadInterna() {
                           <TableCell className="font-medium">{r.almacen}</TableCell>
                           <TableCell className="text-right">{num(r.n_usuarios)}</TableCell>
                           <TableCell className="text-right">{eur(r.importe_vendido, 0)}</TableCell>
+                          <TableCell className="text-right">{eur(r.importe_neto, 0)}</TableCell>
                           <TableCell className="text-right">{num(r.docs_venta)}</TableCell>
                           <TableCell className="text-right">{eur(r.ticket_medio, 0)}</TableCell>
                           <TableCell className="text-right">{num(r.clientes_distintos)}</TableCell>
                           <TableCell className="text-right">{num(r.n_abonos)}</TableCell>
                           <TableCell className="text-right">{eur(r.importe_abonado, 0)}</TableCell>
+                          <TableCell className="text-right">{num(r.abonos_atribuidos)}</TableCell>
+                          <TableCell className="text-right">{eur(r.importe_atribuido, 0)}</TableCell>
                           <TableCell className="text-right">{pct1(r.pct_abonos)}</TableCell>
                           <TableCell className="text-right">{pct1(r.pct_importe_abonado)}</TableCell>
                         </TableRow>
