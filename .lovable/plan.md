@@ -14,7 +14,7 @@ Hoy todo el contenido vive dentro de un único `grid items-start gap-4 lg:grid-c
 
 ### Fila A — tres columnas iguales
 ```text
-<div className="grid items-start gap-4 lg:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0 xl:h-[560px]">
+<div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0 xl:h-[560px]">
 ```
 
 | Columna | Contenido | Clases a añadir |
