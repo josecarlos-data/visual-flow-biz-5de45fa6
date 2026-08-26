@@ -519,7 +519,7 @@ export default function ClienteDetalle() {
       </div>
 
 
-      <Tabs defaultValue="resumen">
+      <Tabs value={tab} onValueChange={cambiarTab}>
         <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
           <TabsTrigger value="visitas">Visitas</TabsTrigger>

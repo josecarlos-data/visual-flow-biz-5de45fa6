@@ -15,7 +15,7 @@ import { CampoVisita } from "@/components/CampoVisita";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { useClientes, useMotivos, useCatalogos, hoyISO, crearBloques, type Motivo, type MotivoCampo } from "@/hooks/useCrm";
+import { useClientes, useMotivos, useCatalogos, hoyISO, crearBloques, marcarPlanificadaRealizada, type Motivo, type MotivoCampo } from "@/hooks/useCrm";
 import { camposVisibles, normalizarValoresNumericos } from "@/lib/motivoCampos";
 
 type Meta = Record<string, { cita?: string; confianza?: string }>;
