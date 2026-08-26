@@ -9,12 +9,15 @@ import {
   useActividadFiltros,
   useActividadUsuarios,
   useActividadAlmacenes,
+  useActividadMotivos,
   type ActividadUsuario,
   type ActividadAlmacen,
+  type ActividadMotivo,
   eur,
   num,
 } from "@/hooks/useCrm";
 import { useScrollRestore } from "@/hooks/useScrollRestore";
+
 
 const TODOS = "__todos__";
 
