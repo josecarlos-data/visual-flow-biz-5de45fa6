@@ -14,7 +14,7 @@ Objetivo: eliminar las 5-6 pantallas de scroll antes del micrófono en móvil. S
 - Trigger: una fila de texto pequeño con los valores actuales separados por "·", p.ej. "Cliente · Efectiva · hoy", con `ChevronDown` a la derecha que rota al abrir.
 - La fecha muestra "hoy" si `fecha === hoyISO()`; si no, formato dd/MM.
 - Al abrir: los tres campos tal como están hoy (grid Tipo/Resultado, aviso de "sin bloques", input Fecha).
-- Auto-apertura: si `resultado !== "efectiva"`, el Collapsible se abre solo (useEffect que pone `detallesAbiertos = true` al cambiar resultado), para que se vea el aviso "se registra sin bloques".
+- Auto-apertura: si `resultado !== "efectiva"`, el Collapsible se abre solo (`detallesAbiertos = true`). Al volver a "efectiva" no se cierra lo que el usuario haya abierto. El aviso "se registra sin bloques" queda visible.
 
 ### 3. Micrófono primero
 - Mover el bloque `{esEfectiva && (…)}` del VoiceRecorder (líneas 569-649) inmediatamente después del Collapsible de detalles y del aviso `avisoCliente`, antes de la chuleta.
@@ -29,7 +29,8 @@ Objetivo: eliminar las 5-6 pantallas de scroll antes del micrófono en móvil. S
 - Dentro del Sheet: el párrafo introductorio actual, y los `motivosActivos` como `<Accordion type="single" collapsible>`: un item por motivo, trigger = `m.nombre`, contenido = `m.descripcion` + lista de campos `requerido_validacion`. Todos cerrados al abrir el Sheet. Contenido con scroll si excede (max-h).
 
 ### 5. Observaciones y "Añadir bloque"
-- Si `esEfectiva`: ocultar el botón "Añadir otro bloque" y la Card de Observaciones tras un único botón ghost "+ Añadir detalle" al final. Al pulsarlo (`detalleAbierto = true`) se despliega en su sitio: el botón "Añadir otro bloque" y el Textarea de Observaciones sin Card, con Label pequeño.
+- Si `esEfectiva` y `bloques.length === 0`: el botón "Añadir bloque a mano" se muestra siempre visible (no va tras "+ Añadir detalle"). Guardar está deshabilitado sin bloques y esconderlo deja al usuario sin salida cuando la IA falla.
+- Si `esEfectiva` y `bloques.length >= 1`: ocultar el botón "Añadir otro bloque" y la sección de Observaciones tras un único botón ghost "+ Añadir detalle" al final. Al pulsarlo (`extrasAbiertos = true`) se despliega en su sitio: el botón "Añadir otro bloque" y el Textarea de Observaciones sin Card, con Label pequeño.
 - Si NO `esEfectiva`: el Textarea de Observaciones se muestra siempre, expandido, sin botón intermedio (es el único campo que queda). Sin Card, con Label pequeño.
 
 ### 6. General
@@ -40,7 +41,7 @@ Objetivo: eliminar las 5-6 pantallas de scroll antes del micrófono en móvil. S
 ## Estado nuevo (solo presentacional)
 - `detallesAbiertos: boolean` (Collapsible tipo/resultado/fecha).
 - `chuletaAbierta: boolean` (Sheet).
-- `detalleAbierto: boolean` (bloque "+ Añadir detalle").
+- `extrasAbiertos: boolean` (bloque "+ Añadir detalle").
 
 ## Imports nuevos
 - `Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger` de `@/components/ui/sheet`.
