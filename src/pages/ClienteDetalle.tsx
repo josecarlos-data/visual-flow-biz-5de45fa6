@@ -353,7 +353,23 @@ export default function ClienteDetalle() {
       </Dialog>
 
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Última compra</p>
+            <p className="mt-1 text-sm font-semibold">{kpis?.ultima_compra ? fechaCorta(kpis.ultima_compra) : "Sin compras"}</p>
+            <p className={`text-xs ${(kpis?.dias_sin_comprar ?? 0) > 90 ? "font-medium text-destructive" : "text-muted-foreground"}`}>
+              {kpis?.dias_sin_comprar != null ? `${num(kpis.dias_sin_comprar)} días sin comprar` : "—"}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Última visita</p>
+            <p className="mt-1 text-sm font-semibold">{visitas?.[0] ? fechaCorta(visitas[0].fecha) : "Sin visitas"}</p>
+            <p className="text-xs text-muted-foreground">{num(visitas?.length ?? 0)} registradas</p>
+          </CardContent>
+        </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Ventas {anioActual}</p>
@@ -374,81 +390,76 @@ export default function ClienteDetalle() {
             <p className="text-xs text-muted-foreground">{eur(kpis?.importe_anio_anterior_ytd ?? 0)} en {anioPrevio}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Ventas {anioPrevio} (año completo)</p>
-            <p className="mt-1 text-xl font-bold">{eur(kpis?.importe_anio_anterior ?? 0)}</p>
-          </CardContent>
-        </Card>
-        {verMargen && (
+
+        <button
+          type="button"
+          onClick={() => setKpisAbiertos((v) => !v)}
+          className="col-span-2 flex items-center justify-center gap-1 rounded-md border border-dashed py-2 text-xs font-medium text-muted-foreground sm:hidden"
+        >
+          Ver todas las métricas
+          <ChevronDown className={`h-4 w-4 transition-transform ${kpisAbiertos ? "rotate-180" : ""}`} />
+        </button>
+
+        <div className={kpisAbiertos ? "contents" : "hidden sm:contents"}>
           <Card>
             <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Margen {anioActual}</p>
-              <p className="mt-1 text-xl font-bold">{eur(kpis?.margen_anio_actual ?? 0)}</p>
-              <p className="text-xs text-muted-foreground">{pctMargen == null ? "—" : `${num(pctMargen, 1)}% sobre ventas`}</p>
+              <p className="text-xs text-muted-foreground">Ventas {anioPrevio} (año completo)</p>
+              <p className="mt-1 text-xl font-bold">{eur(kpis?.importe_anio_anterior ?? 0)}</p>
             </CardContent>
           </Card>
-        )}
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Transacciones {anioActual}</p>
-            <p className="mt-1 text-xl font-bold">{num(kpis?.num_documentos_actual ?? 0)}</p>
-            <p className="text-xs text-muted-foreground">{num(kpis?.num_documentos_anterior ?? 0)} en {anioPrevio}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Ticket medio {anioActual}</p>
-            <p className="mt-1 text-xl font-bold">{eur(kpis?.ticket_medio_actual ?? 0, 2)}</p>
-            <p className="text-xs text-muted-foreground">
-              {kpis?.ticket_medio_anterior ? `${eur(kpis.ticket_medio_anterior, 2)} en ${anioPrevio}` : "—"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Frecuencia de compra</p>
-            <p className="mt-1 text-xl font-bold">
-              {kpis?.frecuencia_compra_dias ? `${num(kpis.frecuencia_compra_dias, 1)} días` : "—"}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {num(kpis?.lineas_por_documento ?? 0, 1)} líneas por documento
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Referencias distintas</p>
-            <p className="mt-1 text-xl font-bold">{num(kpis?.num_referencias ?? 0)}</p>
-            <p className="text-xs text-muted-foreground">{num(kpis?.num_lineas ?? 0)} líneas</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Abonos</p>
-            <p className="mt-1 text-xl font-bold">{num(kpis?.num_abonos ?? 0)}</p>
-            <p className="text-xs text-muted-foreground">{eur(Math.abs(kpis?.importe_abonos ?? 0))} devueltos</p>
-          </CardContent>
-        </Card>
-        
-
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Última compra</p>
-            <p className="mt-1 text-sm font-semibold">{kpis?.ultima_compra ? fechaCorta(kpis.ultima_compra) : "Sin compras"}</p>
-            <p className={`text-xs ${(kpis?.dias_sin_comprar ?? 0) > 90 ? "font-medium text-destructive" : "text-muted-foreground"}`}>
-              {kpis?.dias_sin_comprar != null ? `${num(kpis.dias_sin_comprar)} días sin comprar` : "—"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Última visita</p>
-            <p className="mt-1 text-sm font-semibold">{visitas?.[0] ? fechaCorta(visitas[0].fecha) : "Sin visitas"}</p>
-            <p className="text-xs text-muted-foreground">{num(visitas?.length ?? 0)} registradas</p>
-          </CardContent>
-        </Card>
+          {verMargen && (
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground">Margen {anioActual}</p>
+                <p className="mt-1 text-xl font-bold">{eur(kpis?.margen_anio_actual ?? 0)}</p>
+                <p className="text-xs text-muted-foreground">{pctMargen == null ? "—" : `${num(pctMargen, 1)}% sobre ventas`}</p>
+              </CardContent>
+            </Card>
+          )}
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Transacciones {anioActual}</p>
+              <p className="mt-1 text-xl font-bold">{num(kpis?.num_documentos_actual ?? 0)}</p>
+              <p className="text-xs text-muted-foreground">{num(kpis?.num_documentos_anterior ?? 0)} en {anioPrevio}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Ticket medio {anioActual}</p>
+              <p className="mt-1 text-xl font-bold">{eur(kpis?.ticket_medio_actual ?? 0, 2)}</p>
+              <p className="text-xs text-muted-foreground">
+                {kpis?.ticket_medio_anterior ? `${eur(kpis.ticket_medio_anterior, 2)} en ${anioPrevio}` : "—"}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Frecuencia de compra</p>
+              <p className="mt-1 text-xl font-bold">
+                {kpis?.frecuencia_compra_dias ? `${num(kpis.frecuencia_compra_dias, 1)} días` : "—"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {num(kpis?.lineas_por_documento ?? 0, 1)} líneas por documento
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Referencias distintas</p>
+              <p className="mt-1 text-xl font-bold">{num(kpis?.num_referencias ?? 0)}</p>
+              <p className="text-xs text-muted-foreground">{num(kpis?.num_lineas ?? 0)} líneas</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Abonos</p>
+              <p className="mt-1 text-xl font-bold">{num(kpis?.num_abonos ?? 0)}</p>
+              <p className="text-xs text-muted-foreground">{eur(Math.abs(kpis?.importe_abonos ?? 0))} devueltos</p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
+
 
       <Tabs defaultValue="resumen">
         <TabsList className="w-full justify-start overflow-x-auto">
