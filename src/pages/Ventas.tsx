@@ -72,6 +72,7 @@ export default function Ventas() {
   const [vistaAlertas, setVistaAlertas] = useState<VistaAlertas>("atencion");
   const [metrica, setMetrica] = useState<"ventas" | "ticket">("ventas");
   const [vista, setVista] = useState<"mensual" | "acumulada">("mensual");
+  const [ranking, setRanking] = useState<"familias" | "marcas">("familias");
 
 
   const anioActual = useMemo(
@@ -256,7 +257,7 @@ export default function Ventas() {
 
   if (loading) {
     return (
-      <div className="flex flex-col gap-4 sm:gap-6">
+      <div className="space-y-4 sm:space-y-6">
         <Skeleton className="h-10 w-64" />
         <div className={`grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 ${verMargen ? "xl:grid-cols-6" : "xl:grid-cols-5"}`}>
           {(verMargen ? [0, 1, 2, 3, 4, 5] : [0, 1, 2, 3, 4]).map((i) => <Skeleton key={i} className="h-24" />)}
@@ -267,10 +268,6 @@ export default function Ventas() {
           <Skeleton className="h-64" />
           <Skeleton className="h-64" />
           <Skeleton className="h-64" />
-        </div>
-
-        <div className="grid items-start gap-4 lg:grid-cols-3 [&>*]:min-w-0 order-first lg:order-none">
-          <Skeleton className="h-64 order-first lg:order-none" />
           <Skeleton className="h-64" />
           <Skeleton className="h-64" />
         </div>
@@ -280,7 +277,7 @@ export default function Ventas() {
 
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Panel de Ventas</h1>
         <p className="text-muted-foreground">Rendimiento, rentabilidad y alertas comerciales {anioActual}</p>
