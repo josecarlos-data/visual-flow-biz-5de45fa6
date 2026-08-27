@@ -1,50 +1,57 @@
-# Fase 2 del rediseño móvil: bloques de visita
+# Rehacer la estructura de rejillas de src/pages/Ventas.tsx
 
-Solo jerarquía visual en `src/pages/NuevaVisita.tsx` (render de bloques, líneas ~689-747) y dos recortes en `src/components/CampoVisita.tsx`. Sin tocar guardado, análisis IA, repregunta ni validaciones.
+El build anterior no se aplicó: el archivo sigue con `xl:h-[560px]`, `xl:h-[420px]`, el `grid grid-rows-2` que apila familias/marcas, Alertas con col-span y Devoluciones como Card suelta. Solo se toca estructura visual (clases y orden de las Cards); no se tocan drill-down, selectores Ventas/Ticket ni Mensual/Acumulada, proyección, KPIs, ResumenObjetivos ni los min-w-0/truncate ya aplicados.
 
-## 1. Bloques como acordeón
+## 1. Eliminar alturas fijas de contenedor
 
-- Sustituir el `bloques.map` de Cards por un único `<Accordion type="multiple" value={bloquesAbiertos} onValueChange={setBloquesAbiertos}>`, un `AccordionItem` por bloque con `value={b.uid}`.
-- Trigger: `motivoDe(b.motivoKey)?.nombre` (fallback "Sin motivo") + `Badge` de estado a la derecha:
-  - `Listo` (variant secondary) si `pendientesDe(b).length === 0` y ningún campo visible tiene `b.meta[key]?.confianza === "baja"`.
-  - `Faltan N` (ámbar) si `pendientesDe(b).length > 0`.
-  - `Revisar` (ámbar) si no faltan pero hay confianza baja.
-- Añadir helper `bloqueantesDe(b)` junto a `pendientesDe`, que filtre `camposVisibles(motivo.campos)` por `c.is_required && !b.valores[c.campo_key]?.trim()`.
-- Zona A = `bloqueantesDe(b) ∪ pendientesDe(b) ∪ campos con meta.confianza === "baja"`, sin duplicados y en el orden de `camposVisibles`.
-- `estadoDe` devuelve `"faltan"` si `bloqueantesDe(b).length > 0` o `pendientesDe(b).length > 0`, `"revisar"` si no faltan pero hay confianza baja, `"listo"` en caso contrario.
-- No se toca `pendientesDe` ni la lógica de `guardar`.
+Quitar `xl:h-[560px]` de la rejilla A, `xl:h-[420px]` de la rejilla B y los `h-full` de las Cards que dependían de ellas. Las Cards crecen con su contenido; los CardContent que usaban `flex-1 overflow-y-auto` se quedan sin altura fija y sin scroll interno forzado (Top 10 clientes, Alertas, Mix por canal pasan a `space-y-2` plano).
 
-## 2. Apertura automática
+## 2. Rejilla A — cuatro Cards hermanas
 
-- Estado nuevo `bloquesAbiertos: string[]`.
-- En los dos puntos donde la IA fija bloques (`analizarTranscripcion`, línea ~209, y el reintento del bloque de transcripción, línea ~624), tras `setBloques(...)` fijar `setBloquesAbiertos` con los uid cuyo `estadoDe` no sea `"listo"`.
-- Al crear bloque a mano (`nuevoBloque`, botones "Añadir bloque a mano" / "Añadir otro bloque" y fallback de error), añadir su uid a `bloquesAbiertos`.
-- Al borrar un bloque, quitar su uid de la lista.
+```text
+<div className="grid items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">
+  1. Top 10 clientes
+  2. Alertas comerciales   (sin "lg:col-span-2 2xl:col-span-1")
+  3. Top familias          (sacada del grid-rows-2)
+  4. Top marcas            (sacada del grid-rows-2)
+</div>
+```
 
-## 3. Dos zonas dentro del bloque
+- Eliminar el `<div className="grid grid-rows-2 gap-4 h-full">` (líneas ~449-479): familias y marcas pasan a ser hermanas directas dentro de la rejilla.
+- `2xl:grid-cols-3`, no `xl`: en portátiles de 14"-15,6" quedan dos columnas.
+- CardContent de Top familias y Top marcas: `h-[220px]` (sustituye al `flex-1 min-h-[160px]`) para que el gráfico tenga altura estable sin estirar la fila.
 
-- Zona A (siempre visible, sin cabecera): campos que necesitan atención = `bloqueantesDe(b) ∪ pendientesDe(b) ∪ campos visibles con meta.confianza === "baja"`, sin duplicados, en el orden de `camposVisibles`.
-- Zona B (plegada): el resto de campos visibles, dentro de un `Collapsible` con trigger de texto pequeño "Ver los otros N campos" y `ChevronDown` que rota.
-  - El `Select` de Motivo (+ `motivo.descripcion`) se mueve al principio de la Zona B.
-  - Si Zona A está vacía, la Zona B arranca abierta (estado por uid en un `Record<string, boolean>` local del componente de página, inicializado según ese criterio).
+## 3. Rejilla B — tres Cards a un tercio
 
-## 4. Aviso redundante
+```text
+<div className="grid items-start gap-4 lg:grid-cols-3 [&>*]:min-w-0 order-first lg:order-none">
+  5. Mix por canal
+  6. Devoluciones          (Card suelta actual, se mueve dentro)
+  7. Evolución mensual     (className "order-first lg:order-none")
+</div>
+```
 
-Eliminar el párrafo "Se puede guardar, pero para que el director la dé por válida faltan: …" (líneas 739-743). El badge del trigger ya lo comunica. La tarjeta de repregunta queda intacta.
+- Sin col-span en ninguna: se quita el `xl:col-span-2` de Evolución mensual.
+- Devoluciones (líneas ~597-…, hoy Card suelta fuera de rejilla) pasa a ser la segunda Card de la rejilla B, con su Tabs de Motivos/Referencias/Vendedores intacto.
+- Orden en móvil sin duplicar DOM: la rejilla B lleva `order-first lg:order-none` (sube entera justo debajo de los KPIs en móvil) y dentro de ella la Card de Evolución mensual lleva `order-first lg:order-none` para preceder a Mix por canal y Devoluciones.
 
-## 5. CampoVisita.tsx
+## 4. Alturas de CardContent
 
-- `campo.ayuda` solo se renderiza si `valor === ""`.
-- La cita `«…»` solo se renderiza si `dudoso` (confianza baja); con confianza normal sigue accesible en el `title` del badge "IA · …".
-- Nada más cambia en ese fichero.
+- Evolución mensual: `h-[260px] sm:h-[300px] 2xl:h-[340px]` (sustituye `flex-1 min-h-[260px]`).
+- Top familias / Top marcas: `h-[220px]`.
+- Resto (Top 10 clientes, Alertas, Mix por canal, Devoluciones): sin altura fija.
+- Ningún contenedor de rejilla lleva altura.
 
-## Detalles técnicos
+## 5. Skeleton (líneas ~257-281)
 
-- Reutilizar `Accordion*` y `Collapsible*` ya importados en el fichero.
-- `estadoDe` y la lista de campos "de atención" se calculan en render, sin memo nuevo, igual que hoy `pendientesDe`.
-- `Card`/`CardHeader`/`CardTitle` siguen usándose en la repregunta, así que los imports se mantienen.
+Mismo patrón: rejilla A con `items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3` (4 skeletons `h-64`, sin `grid-rows-2` ni alturas de contenedor) y rejilla B con `items-start gap-4 lg:grid-cols-3` (3 skeletons `h-64`, el tercero con `order-first lg:order-none` en su contenedor). Se elimina el `Skeleton className="h-64 w-full"` final suelto.
+
+## 6. No tocar
+
+Drill-down a /documentos, toggles Ventas/Ticket medio y Mensual/Acumulada, cálculo de proyección (`factorProy`), KPIs, ResumenObjetivos, línea punteada de proyección, min-w-0 y truncate existentes.
 
 ## Verificación
 
 - `tsgo` + build.
-- Playwright a 411 px con tres bloques simulados (uno completo, uno con campos requeridos vacíos y uno con confianza baja): captura mostrando que solo los dos últimos aparecen abiertos, con badges "Listo" / "Faltan N" / "Revisar" correctos y sin scroll horizontal.
+- Playwright a 360 px: sin scroll horizontal; la primera Card tras los KPIs es "Evolución mensual".
+- Playwright a 1920 px: rejilla A en 3 columnas, rejilla B en 3 tercios, ninguna Card se solapa con otra.
