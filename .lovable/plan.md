@@ -1,57 +1,68 @@
-# Rehacer la estructura de rejillas de src/pages/Ventas.tsx
+# Reconstruir el bloque de rejillas de src/pages/Ventas.tsx
 
-El build anterior no se aplicó: el archivo sigue con `xl:h-[560px]`, `xl:h-[420px]`, el `grid grid-rows-2` que apila familias/marcas, Alertas con col-span y Devoluciones como Card suelta. Solo se toca estructura visual (clases y orden de las Cards); no se tocan drill-down, selectores Ventas/Ticket ni Mensual/Acumulada, proyección, KPIs, ResumenObjetivos ni los min-w-0/truncate ya aplicados.
+Reescritura completa de la zona de layout. No se toca la carga de datos, las RPC, los drill-down a `/documentos`, los toggles Ventas/Ticket medio y Mensual/Acumulada, ni el cálculo de proyección.
 
-## 1. Eliminar alturas fijas de contenedor
+Estado actual verificado: raíz en `flex flex-col gap-4 sm:gap-6`, `order-first lg:order-none` en la rejilla B y en la Card de Evolución mensual, dos rejillas de contenido, Top familias y Top marcas como Cards separadas con `h-[220px]`, y el margen del Top 10 renderizado como `{((c.margen / c.importe) * 100).toFixed(1)}%` sin etiqueta.
 
-Quitar `xl:h-[560px]` de la rejilla A, `xl:h-[420px]` de la rejilla B y los `h-full` de las Cards que dependían de ellas. Las Cards crecen con su contenido; los CardContent que usaban `flex-1 overflow-y-auto` se quedan sin altura fija y sin scroll interno forzado (Top 10 clientes, Alertas, Mix por canal pasan a `space-y-2` plano).
+## 1. Contenedor raíz
 
-## 2. Rejilla A — cuatro Cards hermanas
+Volver a `<div className="space-y-4 sm:space-y-6">` en la vista normal y en el skeleton. Eliminar toda clase `order-*` del fichero (rejilla B y Card de Evolución mensual, más el skeleton). El orden del DOM manda en todos los tamaños.
+
+Orden de bloques hijos del raíz: título, aviso de error, `<ResumenObjetivos />`, rejilla de KPIs, rejilla de contenido.
+
+## 2. Card única Top familias / Top marcas
+
+Nuevo estado `const [ranking, setRanking] = useState<"familias" | "marcas">("familias");`
+
+Se eliminan las dos Cards actuales y cualquier div envolvente. La nueva Card usa el mismo patrón de cabecera que Evolución mensual: `CardHeader` con `flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`, título dinámico `Top familias {anioActual}` / `Top marcas {anioActual}`, y un grupo `inline-flex shrink-0 rounded-md border p-0.5` con dos `Button` `h-7 px-3 text-[11px]` (Familias / Marcas), variante `secondary` para el activo.
+
+Un solo `BarChart` que conmuta las tres cosas a la vez:
+
+```text
+data     : ranking === "familias" ? topFamilias : topMarcas
+YAxis    : dataKey "familia" | "marca"
+Bar fill : getYearColor(anioActual, anioActual) | getYearColor(anioActual - 1, anioActual)
+```
+
+Resto igual: layout vertical, `margin left 70`, `YAxis width 70`, `tick fontSize 11`, tickFormatter en miles, Tooltip con `eur()`. Sin consultas nuevas.
+
+## 3. Una sola rejilla de contenido
 
 ```text
 <div className="grid items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">
-  1. Top 10 clientes
-  2. Alertas comerciales   (sin "lg:col-span-2 2xl:col-span-1")
-  3. Top familias          (sacada del grid-rows-2)
-  4. Top marcas            (sacada del grid-rows-2)
+  1. Alertas comerciales
+  2. Top 10 clientes
+  3. Top familias / marcas
+  4. Mix por canal
+  5. Devoluciones
+  6. Evolución mensual
 </div>
 ```
 
-- Eliminar el `<div className="grid grid-rows-2 gap-4 h-full">` (líneas ~449-479): familias y marcas pasan a ser hermanas directas dentro de la rejilla.
-- `2xl:grid-cols-3`, no `xl`: en portátiles de 14"-15,6" quedan dos columnas.
-- CardContent de Top familias y Top marcas: `h-[220px]` (sustituye al `flex-1 min-h-[160px]`) para que el gráfico tenga altura estable sin estirar la fila.
-
-## 3. Rejilla B — tres Cards a un tercio
-
-```text
-<div className="grid items-start gap-4 lg:grid-cols-3 [&>*]:min-w-0 order-first lg:order-none">
-  5. Mix por canal
-  6. Devoluciones          (Card suelta actual, se mueve dentro)
-  7. Evolución mensual     (className "order-first lg:order-none")
-</div>
-```
-
-- Sin col-span en ninguna: se quita el `xl:col-span-2` de Evolución mensual.
-- Devoluciones (líneas ~597-…, hoy Card suelta fuera de rejilla) pasa a ser la segunda Card de la rejilla B, con su Tabs de Motivos/Referencias/Vendedores intacto.
-- Orden en móvil sin duplicar DOM: la rejilla B lleva `order-first lg:order-none` (sube entera justo debajo de los KPIs en móvil) y dentro de ella la Card de Evolución mensual lleva `order-first lg:order-none` para preceder a Mix por canal y Devoluciones.
+Ninguna hija lleva col-span. Se eliminan: la segunda rejilla, el `grid grid-rows-2`, la Card de Devoluciones suelta (pasa a ser la quinta hija con sus Tabs intactas), y cualquier `xl:h-[560px]`, `xl:h-[420px]`, `xl:col-span-2`, `lg:col-span-2`, `2xl:col-span-1`. Queda exactamente una rejilla de contenido.
 
 ## 4. Alturas de CardContent
 
-- Evolución mensual: `h-[260px] sm:h-[300px] 2xl:h-[340px]` (sustituye `flex-1 min-h-[260px]`).
-- Top familias / Top marcas: `h-[220px]`.
-- Resto (Top 10 clientes, Alertas, Mix por canal, Devoluciones): sin altura fija.
-- Ningún contenedor de rejilla lleva altura.
+- Alertas comerciales: `lg:max-h-[480px] lg:overflow-y-auto`
+- Top 10 clientes: `lg:max-h-[480px] lg:overflow-y-auto`
+- Familias / marcas: `h-[240px] 2xl:h-[420px]`
+- Mix por canal y Devoluciones: sin altura
+- Evolución mensual: `h-[260px] sm:h-[300px] 2xl:h-[380px]`
 
-## 5. Skeleton (líneas ~257-281)
+Ningún contenedor de rejilla lleva altura.
 
-Mismo patrón: rejilla A con `items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3` (4 skeletons `h-64`, sin `grid-rows-2` ni alturas de contenedor) y rejilla B con `items-start gap-4 lg:grid-cols-3` (3 skeletons `h-64`, el tercero con `order-first lg:order-none` en su contenedor). Se elimina el `Skeleton className="h-64 w-full"` final suelto.
+## 5. Etiqueta del margen en Top 10 clientes
 
-## 6. No tocar
+El segundo porcentaje pasa de `29.5%` a `29,5 % margen`, reutilizando `fmtShare` (mismo decimal y separador que la línea "de cartera"): `{fmtShare((c.margen / c.importe) * 100)} margen`.
 
-Drill-down a /documentos, toggles Ventas/Ticket medio y Mensual/Acumulada, cálculo de proyección (`factorProy`), KPIs, ResumenObjetivos, línea punteada de proyección, min-w-0 y truncate existentes.
+## 6. Skeleton
+
+Raíz `space-y-4 sm:space-y-6`, la rejilla de KPIs igual que ahora, y una sola rejilla `grid items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0` con seis `Skeleton h-64`. Sin `order`, sin alturas de contenedor.
 
 ## Verificación
 
-- `tsgo` + build.
-- Playwright a 360 px: sin scroll horizontal; la primera Card tras los KPIs es "Evolución mensual".
-- Playwright a 1920 px: rejilla A en 3 columnas, rejilla B en 3 tercios, ninguna Card se solapa con otra.
+- `tsgo` y build.
+- Playwright 360 px: ResumenObjetivos primero, luego KPIs, luego las seis Cards en orden 1-6; sin scroll horizontal.
+- Playwright 1366 px: dos columnas, Alertas y Top 10 en la misma fila.
+- Playwright 1920 px: dos filas de tres, sin solapamientos.
+- Toggle Familias/Marcas: cambia título, datos, etiquetas del eje y color de barra.
