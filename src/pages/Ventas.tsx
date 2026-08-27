@@ -256,37 +256,36 @@ export default function Ventas() {
 
   if (loading) {
     return (
-      <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col gap-4 sm:gap-6">
         <Skeleton className="h-10 w-64" />
         <div className={`grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 ${verMargen ? "xl:grid-cols-6" : "xl:grid-cols-5"}`}>
           {(verMargen ? [0, 1, 2, 3, 4, 5] : [0, 1, 2, 3, 4]).map((i) => <Skeleton key={i} className="h-24" />)}
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0 xl:h-[560px]">
-          <Skeleton className="h-full min-h-[260px]" />
-          <Skeleton className="h-full min-h-[260px]" />
-          <div className="grid grid-rows-2 gap-4 h-full min-h-[260px]">
-            <Skeleton className="h-full" />
-            <Skeleton className="h-full" />
-          </div>
+        <div className="grid items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-3 [&>*]:min-w-0 xl:h-[420px]">
-          <Skeleton className="h-full min-h-[260px]" />
-          <Skeleton className="h-full min-h-[260px] xl:col-span-2" />
+        <div className="grid items-start gap-4 lg:grid-cols-3 [&>*]:min-w-0 order-first lg:order-none">
+          <Skeleton className="h-64 order-first lg:order-none" />
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
         </div>
-
-        <Skeleton className="h-64 w-full" />
       </div>
     );
   }
 
+
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="flex flex-col gap-4 sm:gap-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Panel de Ventas</h1>
         <p className="text-muted-foreground">Rendimiento, rentabilidad y alertas comerciales {anioActual}</p>
       </div>
+
 
       {errorMsg && (
         <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
@@ -342,8 +341,8 @@ export default function Ventas() {
 
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0 xl:h-[560px]">
-        <Card className="h-full flex flex-col">
+      <div className="grid items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">
+        <Card className="flex flex-col">
           <CardHeader>
             <CardTitle>Top 10 clientes {anioActual}</CardTitle>
             {shareTopClientes !== null && (
@@ -352,7 +351,7 @@ export default function Ventas() {
               </CardDescription>
             )}
           </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto space-y-2">
+          <CardContent className="space-y-2">
             {topClientes.map((c, i) => (
               <Link key={c.cod_cliente} to={`/clientes/${c.cod_cliente}?volver=${encodeURIComponent('/')}&volverTxt=${encodeURIComponent('Ventas')}`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
                 <span className="flex min-w-0 items-center gap-2">
@@ -376,7 +375,7 @@ export default function Ventas() {
           </CardContent>
         </Card>
 
-        <Card className="h-full flex flex-col">
+        <Card className="flex flex-col">
           <CardHeader className="flex flex-col gap-3">
             <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" /> Alertas comerciales</CardTitle>
             <div className="inline-flex shrink-0 rounded-md border p-0.5">
@@ -397,7 +396,7 @@ export default function Ventas() {
               ))}
             </div>
           </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto">
+          <CardContent className="space-y-2">
             {vistaAlertas !== "todos" && (ocultasPorSituacion > 0 || justificadas > 0) && (
               <p className="mb-3 text-xs text-muted-foreground">
                 {[
@@ -446,43 +445,42 @@ export default function Ventas() {
           </CardContent>
         </Card>
 
-        <div className="grid grid-rows-2 gap-4 h-full">
-          <Card className="h-full flex flex-col">
-            <CardHeader><CardTitle>Top familias {anioActual}</CardTitle></CardHeader>
-            <CardContent className="flex-1 min-h-[160px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topFamilias} layout="vertical" margin={{ top: 5, right: 20, left: 70, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
-                  <YAxis type="category" dataKey="familia" tick={{ fontSize: 11 }} width={70} />
-                  <Tooltip formatter={(v) => eur(Number(v))} />
-                  <Bar dataKey="importe" fill={getYearColor(anioActual, anioActual)} radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+        <Card className="flex flex-col">
+          <CardHeader><CardTitle>Top familias {anioActual}</CardTitle></CardHeader>
+          <CardContent className="h-[220px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={topFamilias} layout="vertical" margin={{ top: 5, right: 20, left: 70, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
+                <YAxis type="category" dataKey="familia" tick={{ fontSize: 11 }} width={70} />
+                <Tooltip formatter={(v) => eur(Number(v))} />
+                <Bar dataKey="importe" fill={getYearColor(anioActual, anioActual)} radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
 
-          <Card className="h-full flex flex-col">
-            <CardHeader><CardTitle>Top marcas {anioActual}</CardTitle></CardHeader>
-            <CardContent className="flex-1 min-h-[160px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topMarcas} layout="vertical" margin={{ top: 5, right: 20, left: 70, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
-                  <YAxis type="category" dataKey="marca" tick={{ fontSize: 11 }} width={70} />
-                  <Tooltip formatter={(v) => eur(Number(v))} />
-                  <Bar dataKey="importe" fill={getYearColor(anioActual - 1, anioActual)} radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="flex flex-col">
+          <CardHeader><CardTitle>Top marcas {anioActual}</CardTitle></CardHeader>
+          <CardContent className="h-[220px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={topMarcas} layout="vertical" margin={{ top: 5, right: 20, left: 70, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
+                <YAxis type="category" dataKey="marca" tick={{ fontSize: 11 }} width={70} />
+                <Tooltip formatter={(v) => eur(Number(v))} />
+                <Bar dataKey="importe" fill={getYearColor(anioActual - 1, anioActual)} radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3 [&>*]:min-w-0 xl:h-[420px]">
-        <Card className="h-full flex flex-col">
+
+      <div className="grid items-start gap-4 lg:grid-cols-3 [&>*]:min-w-0 order-first lg:order-none">
+        <Card className="flex flex-col">
           <CardHeader><CardTitle>Mix por canal {anioActual}</CardTitle></CardHeader>
-          <CardContent className="flex-1 space-y-2">
+          <CardContent className="space-y-2">
             {canales.length === 0 && <Vacio />}
             {canales.map((c) => {
               const total = canales.reduce((s, x) => s + x.importe, 0);
@@ -516,7 +514,58 @@ export default function Ventas() {
           </CardContent>
         </Card>
 
-        <Card className="h-full flex flex-col xl:col-span-2">
+        <Card className="flex flex-col">
+          <CardHeader><CardTitle>Devoluciones {anioActual}</CardTitle></CardHeader>
+          <CardContent>
+            <Tabs defaultValue="motivo">
+              <TabsList className="mb-3">
+                <TabsTrigger value="motivo">Motivos</TabsTrigger>
+                <TabsTrigger value="referencia">Referencias</TabsTrigger>
+                <TabsTrigger value="vendedor">Vendedores</TabsTrigger>
+              </TabsList>
+              {["motivo", "referencia", "vendedor"].map((t) => {
+                const filas = devoluciones.filter((d) => d.tipo === t);
+                return (
+                  <TabsContent key={t} value={t} className="space-y-2">
+                    {filas.length === 0 && <Vacio />}
+                    {filas.map((d) => {
+                      const esLink = t === "motivo" && !esSintetico(d.etiqueta);
+                      const contenido = (
+                        <>
+                          {t === "referencia" ? (
+                            <span className="min-w-0">
+                              <span className="block truncate">{d.etiqueta}</span>
+                              {d.descripcion && d.descripcion.trim() !== "" && (
+                                <span className="block truncate text-xs text-muted-foreground">{d.descripcion}</span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="min-w-0 truncate">{d.etiqueta}</span>
+                          )}
+                          <span className="shrink-0 text-right">
+                            <span className="font-medium">{eur(d.importe)}</span>
+                            <span className="ml-2 text-xs text-muted-foreground">{fnum(d.lineas)} líneas</span>
+                          </span>
+                        </>
+                      );
+                      return esLink ? (
+                        <Link key={`${t}-${d.etiqueta}`} to={`/documentos?anio=${anioActual}&operacion=Abono&motivoAbono=${encodeURIComponent(d.etiqueta)}&importeMin=0&volver=%2F&volverTxt=Ventas`} className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
+                          {contenido}
+                        </Link>
+                      ) : (
+                        <div key={`${t}-${d.etiqueta}`} className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-2 text-sm">
+                          {contenido}
+                        </div>
+                      );
+                    })}
+                  </TabsContent>
+                );
+              })}
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        <Card className="order-first lg:order-none flex flex-col">
           <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle>Evolución mensual</CardTitle>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -556,7 +605,7 @@ export default function Ventas() {
               )}
             </div>
           </CardHeader>
-          <CardContent className="flex-1 min-h-[260px]">
+          <CardContent className="h-[260px] sm:h-[300px] 2xl:h-[340px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={datosGrafico} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -594,56 +643,7 @@ export default function Ventas() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader><CardTitle>Devoluciones {anioActual}</CardTitle></CardHeader>
-        <CardContent>
-          <Tabs defaultValue="motivo">
-            <TabsList className="mb-3">
-              <TabsTrigger value="motivo">Motivos</TabsTrigger>
-              <TabsTrigger value="referencia">Referencias</TabsTrigger>
-              <TabsTrigger value="vendedor">Vendedores</TabsTrigger>
-            </TabsList>
-            {["motivo", "referencia", "vendedor"].map((t) => {
-              const filas = devoluciones.filter((d) => d.tipo === t);
-              return (
-                <TabsContent key={t} value={t} className="space-y-2">
-                  {filas.length === 0 && <Vacio />}
-                  {filas.map((d) => {
-                    const esLink = t === "motivo" && !esSintetico(d.etiqueta);
-                    const contenido = (
-                      <>
-                        {t === "referencia" ? (
-                          <span className="min-w-0">
-                            <span className="block truncate">{d.etiqueta}</span>
-                            {d.descripcion && d.descripcion.trim() !== "" && (
-                              <span className="block truncate text-xs text-muted-foreground">{d.descripcion}</span>
-                            )}
-                          </span>
-                        ) : (
-                          <span className="min-w-0 truncate">{d.etiqueta}</span>
-                        )}
-                        <span className="shrink-0 text-right">
-                          <span className="font-medium">{eur(d.importe)}</span>
-                          <span className="ml-2 text-xs text-muted-foreground">{fnum(d.lineas)} líneas</span>
-                        </span>
-                      </>
-                    );
-                    return esLink ? (
-                      <Link key={`${t}-${d.etiqueta}`} to={`/documentos?anio=${anioActual}&operacion=Abono&motivoAbono=${encodeURIComponent(d.etiqueta)}&importeMin=0&volver=%2F&volverTxt=Ventas`} className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
-                        {contenido}
-                      </Link>
-                    ) : (
-                      <div key={`${t}-${d.etiqueta}`} className="flex min-w-0 items-center justify-between gap-3 rounded-md border p-2 text-sm">
-                        {contenido}
-                      </div>
-                    );
-                  })}
-                </TabsContent>
-              );
-            })}
-          </Tabs>
-        </CardContent>
-      </Card>
+
     </div>
   );
 }
