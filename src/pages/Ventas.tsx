@@ -72,6 +72,7 @@ export default function Ventas() {
   const [vistaAlertas, setVistaAlertas] = useState<VistaAlertas>("atencion");
   const [metrica, setMetrica] = useState<"ventas" | "ticket">("ventas");
   const [vista, setVista] = useState<"mensual" | "acumulada">("mensual");
+  const [ranking, setRanking] = useState<"familias" | "marcas">("familias");
 
 
   const anioActual = useMemo(
@@ -256,7 +257,7 @@ export default function Ventas() {
 
   if (loading) {
     return (
-      <div className="flex flex-col gap-4 sm:gap-6">
+      <div className="space-y-4 sm:space-y-6">
         <Skeleton className="h-10 w-64" />
         <div className={`grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 ${verMargen ? "xl:grid-cols-6" : "xl:grid-cols-5"}`}>
           {(verMargen ? [0, 1, 2, 3, 4, 5] : [0, 1, 2, 3, 4]).map((i) => <Skeleton key={i} className="h-24" />)}
@@ -267,10 +268,6 @@ export default function Ventas() {
           <Skeleton className="h-64" />
           <Skeleton className="h-64" />
           <Skeleton className="h-64" />
-        </div>
-
-        <div className="grid items-start gap-4 lg:grid-cols-3 [&>*]:min-w-0 order-first lg:order-none">
-          <Skeleton className="h-64 order-first lg:order-none" />
           <Skeleton className="h-64" />
           <Skeleton className="h-64" />
         </div>
@@ -280,7 +277,7 @@ export default function Ventas() {
 
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Panel de Ventas</h1>
         <p className="text-muted-foreground">Rendimiento, rentabilidad y alertas comerciales {anioActual}</p>
@@ -343,39 +340,6 @@ export default function Ventas() {
 
       <div className="grid items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">
         <Card className="flex flex-col">
-          <CardHeader>
-            <CardTitle>Top 10 clientes {anioActual}</CardTitle>
-            {shareTopClientes !== null && (
-              <CardDescription>
-                Estos {topClientes.length} clientes representan el {fmtShare(shareTopClientes)} de tu cartera
-              </CardDescription>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {topClientes.map((c, i) => (
-              <Link key={c.cod_cliente} to={`/clientes/${c.cod_cliente}?volver=${encodeURIComponent('/')}&volverTxt=${encodeURIComponent('Ventas')}`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
-                <span className="flex min-w-0 items-center gap-2">
-                  <span className="w-5 text-xs text-muted-foreground">{i + 1}</span>
-                  <span className="truncate">{c.cliente}</span>
-                </span>
-                <span className="shrink-0 text-right">
-                  <span className="font-medium">{eur(c.importe)}</span>
-                  {shareTopClientes !== null && (
-                    <span className="block text-xs text-muted-foreground">
-                      {fmtShare((c.importe / kpiActual!.importe) * 100)} de cartera
-                    </span>
-                  )}
-                  {verMargen && c.importe > 0 && (
-                    <span className="ml-2 text-xs text-muted-foreground">{((c.margen / c.importe) * 100).toFixed(1)}%</span>
-                  )}
-                </span>
-              </Link>
-            ))}
-            {topClientes.length === 0 && <Vacio />}
-          </CardContent>
-        </Card>
-
-        <Card className="flex flex-col">
           <CardHeader className="flex flex-col gap-3">
             <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" /> Alertas comerciales</CardTitle>
             <div className="inline-flex shrink-0 rounded-md border p-0.5">
@@ -396,7 +360,7 @@ export default function Ventas() {
               ))}
             </div>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-2 lg:max-h-[480px] lg:overflow-y-auto">
             {vistaAlertas !== "todos" && (ocultasPorSituacion > 0 || justificadas > 0) && (
               <p className="mb-3 text-xs text-muted-foreground">
                 {[
@@ -445,39 +409,72 @@ export default function Ventas() {
           </CardContent>
         </Card>
 
+
         <Card className="flex flex-col">
-          <CardHeader><CardTitle>Top familias {anioActual}</CardTitle></CardHeader>
-          <CardContent className="h-[220px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topFamilias} layout="vertical" margin={{ top: 5, right: 20, left: 70, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
-                <YAxis type="category" dataKey="familia" tick={{ fontSize: 11 }} width={70} />
-                <Tooltip formatter={(v) => eur(Number(v))} />
-                <Bar dataKey="importe" fill={getYearColor(anioActual, anioActual)} radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <CardHeader>
+            <CardTitle>Top 10 clientes {anioActual}</CardTitle>
+            {shareTopClientes !== null && (
+              <CardDescription>
+                Estos {topClientes.length} clientes representan el {fmtShare(shareTopClientes)} de tu cartera
+              </CardDescription>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-2 lg:max-h-[480px] lg:overflow-y-auto">
+            {topClientes.map((c, i) => (
+              <Link key={c.cod_cliente} to={`/clientes/${c.cod_cliente}?volver=${encodeURIComponent('/')}&volverTxt=${encodeURIComponent('Ventas')}`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="w-5 text-xs text-muted-foreground">{i + 1}</span>
+                  <span className="truncate">{c.cliente}</span>
+                </span>
+                <span className="shrink-0 text-right">
+                  <span className="font-medium">{eur(c.importe)}</span>
+                  {shareTopClientes !== null && (
+                    <span className="block text-xs text-muted-foreground">
+                      {fmtShare((c.importe / kpiActual!.importe) * 100)} de cartera
+                    </span>
+                  )}
+                  {verMargen && c.importe > 0 && (
+                    <span className="block text-xs text-muted-foreground">{fmtShare((c.margen / c.importe) * 100)} margen</span>
+                  )}
+                </span>
+              </Link>
+            ))}
+            {topClientes.length === 0 && <Vacio />}
           </CardContent>
         </Card>
 
         <Card className="flex flex-col">
-          <CardHeader><CardTitle>Top marcas {anioActual}</CardTitle></CardHeader>
-          <CardContent className="h-[220px]">
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle>{ranking === "familias" ? `Top familias ${anioActual}` : `Top marcas ${anioActual}`}</CardTitle>
+            <div className="inline-flex shrink-0 rounded-md border p-0.5">
+              {([
+                { key: "familias", label: "Familias" },
+                { key: "marcas", label: "Marcas" },
+              ] as { key: "familias" | "marcas"; label: string }[]).map((r) => (
+                <Button
+                  key={r.key}
+                  size="sm"
+                  variant={ranking === r.key ? "secondary" : "ghost"}
+                  className="h-7 px-3 text-[11px]"
+                  onClick={() => setRanking(r.key)}
+                >
+                  {r.label}
+                </Button>
+              ))}
+            </div>
+          </CardHeader>
+          <CardContent className="h-[240px] 2xl:h-[420px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topMarcas} layout="vertical" margin={{ top: 5, right: 20, left: 70, bottom: 5 }}>
+              <BarChart data={ranking === "familias" ? topFamilias : topMarcas} layout="vertical" margin={{ top: 5, right: 20, left: 70, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
-                <YAxis type="category" dataKey="marca" tick={{ fontSize: 11 }} width={70} />
+                <YAxis type="category" dataKey={ranking === "familias" ? "familia" : "marca"} tick={{ fontSize: 11 }} width={70} />
                 <Tooltip formatter={(v) => eur(Number(v))} />
-                <Bar dataKey="importe" fill={getYearColor(anioActual - 1, anioActual)} radius={[0, 4, 4, 0]} />
+                <Bar dataKey="importe" fill={getYearColor(ranking === "familias" ? anioActual : anioActual - 1, anioActual)} radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
-      </div>
-
-
-      <div className="grid items-start gap-4 lg:grid-cols-3 [&>*]:min-w-0 order-first lg:order-none">
         <Card className="flex flex-col">
           <CardHeader><CardTitle>Mix por canal {anioActual}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
@@ -565,7 +562,7 @@ export default function Ventas() {
           </CardContent>
         </Card>
 
-        <Card className="order-first lg:order-none flex flex-col">
+        <Card className="flex flex-col">
           <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle>Evolución mensual</CardTitle>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -605,7 +602,7 @@ export default function Ventas() {
               )}
             </div>
           </CardHeader>
-          <CardContent className="h-[260px] sm:h-[300px] 2xl:h-[340px]">
+          <CardContent className="h-[260px] sm:h-[300px] 2xl:h-[380px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={datosGrafico} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
