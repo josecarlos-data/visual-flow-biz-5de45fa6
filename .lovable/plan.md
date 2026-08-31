@@ -1,68 +1,30 @@
-# Reconstruir el bloque de rejillas de src/pages/Ventas.tsx
+# Línea de contexto comercial en las paradas de Agenda
 
-Reescritura completa de la zona de layout. No se toca la carga de datos, las RPC, los drill-down a `/documentos`, los toggles Ventas/Ticket medio y Mensual/Acumulada, ni el cálculo de proyección.
+## Objetivo
 
-Estado actual verificado: raíz en `flex flex-col gap-4 sm:gap-6`, `order-first lg:order-none` en la rejilla B y en la Card de Evolución mensual, dos rejillas de contenido, Top familias y Top marcas como Cards separadas con `h-[220px]`, y el margen del Top 10 renderizado como `{((c.margen / c.importe) * 100).toFixed(1)}%` sin etiqueta.
+Añadir a cada parada de la Agenda una línea de contexto comercial (días sin comprar, volumen del año en curso y variación) usando únicamente datos que ya devuelve `useClientes()`. Se modifica **solo** `src/pages/Agenda.tsx`; sin migraciones, funciones SQL ni hooks nuevos.
 
-## 1. Contenedor raíz
+## Cambios en src/pages/Agenda.tsx
 
-Volver a `<div className="space-y-4 sm:space-y-6">` en la vista normal y en el skeleton. Eliminar toda clase `order-*` del fichero (rejilla B y Card de Evolución mensual, más el skeleton). El orden del DOM manda en todos los tamaños.
+1. **Import** — añadir `import { eur, num } from "@/lib/format";` (el fichero existe y Agenda aún no lo usa).
 
-Orden de bloques hijos del raíz: título, aviso de error, `<ResumenObjetivos />`, rejilla de KPIs, rejilla de contenido.
+2. **`useClientes(false)`** (línea 37) — para que las paradas de clientes inactivos también encuentren su nombre y sus datos.
 
-## 2. Card única Top familias / Top marcas
+3. **`clienteMap`** (líneas 52-56) — ampliar el tipo del mapa para guardar también `importe_actual: number`, `importe_anterior: number` y `ultima_compra: string | null`, ya presentes en la respuesta de `clientes_visibles`.
 
-Nuevo estado `const [ranking, setRanking] = useState<"familias" | "marcas">("familias");`
+4. **Helper `diasDesde(fecha: string | null): number | null`** — días transcurridos desde `ultima_compra` hasta hoy (comparando a medianoche local); devuelve `null` si la fecha es `null` y `0` si fuera futura. Se coloca junto a `addDays`.
 
-Se eliminan las dos Cards actuales y cualquier div envolvente. La nueva Card usa el mismo patrón de cabecera que Evolución mensual: `CardHeader` con `flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`, título dinámico `Top familias {anioActual}` / `Top marcas {anioActual}`, y un grupo `inline-flex shrink-0 rounded-md border p-0.5` con dos `Button` `h-7 px-3 text-[11px]` (Familias / Marcas), variante `secondary` para el activo.
+5. **Línea de contexto comercial** — debajo de la línea de localidad, **fuera** del `<Link>` que envuelve nombre y localidad, dentro del div `min-w-0 flex-1`, y **solo si `clienteMap` tiene el código** (`c` definido):
 
-Un solo `BarChart` que conmuta las tres cosas a la vez:
+   - **Días sin comprar**: `"{n} días sin comprar"` (singular `"1 día"`), con la clase `font-medium text-destructive` si `> 90` y `text-muted-foreground` en caso contrario (mismo criterio que ClienteDetalle.tsx línea 454). Si `ultima_compra` es `null`: texto `"Sin compras"`.
+   - **Volumen**: `eur(importe_actual)` (0 decimales, formato es-ES).
+   - **Variación** frente a `importe_anterior` en porcentaje con signo (`+8,4 %` / `-2,1 %`, 1 decimal). Si `importe_anterior` es `0` o `null`, **no** se calcula (evitar división por cero) y se muestra `"Nuevo"`. Positiva → `text-primary` (verde corporativo del tema); negativa → `text-destructive`; cero → `text-muted-foreground`.
+   - Separados por `" · "`, con `flex flex-wrap`, todo en `text-xs`, sin iconos nuevos.
 
-```text
-data     : ranking === "familias" ? topFamilias : topMarcas
-YAxis    : dataKey "familia" | "marca"
-Bar fill : getYearColor(anioActual, anioActual) | getYearColor(anioActual - 1, anioActual)
-```
+6. **Sin cambios** en la maquetación existente, el orden de los elementos ni la columna derecha de acciones; sin clases `order-*`.
 
-Resto igual: layout vertical, `margin left 70`, `YAxis width 70`, `tick fontSize 11`, tickFormatter en miles, Tooltip con `eur()`. Sin consultas nuevas.
+## Notas técnicas
 
-## 3. Una sola rejilla de contenido
-
-```text
-<div className="grid items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0">
-  1. Alertas comerciales
-  2. Top 10 clientes
-  3. Top familias / marcas
-  4. Mix por canal
-  5. Devoluciones
-  6. Evolución mensual
-</div>
-```
-
-Ninguna hija lleva col-span. Se eliminan: la segunda rejilla, el `grid grid-rows-2`, la Card de Devoluciones suelta (pasa a ser la quinta hija con sus Tabs intactas), y cualquier `xl:h-[560px]`, `xl:h-[420px]`, `xl:col-span-2`, `lg:col-span-2`, `2xl:col-span-1`. Queda exactamente una rejilla de contenido.
-
-## 4. Alturas de CardContent
-
-- Alertas comerciales: `lg:max-h-[480px] lg:overflow-y-auto`
-- Top 10 clientes: `lg:max-h-[480px] lg:overflow-y-auto`
-- Familias / marcas: `h-[240px] 2xl:h-[420px]`
-- Mix por canal y Devoluciones: sin altura
-- Evolución mensual: `h-[260px] sm:h-[300px] 2xl:h-[380px]`
-
-Ningún contenedor de rejilla lleva altura.
-
-## 5. Etiqueta del margen en Top 10 clientes
-
-El segundo porcentaje pasa de `29.5%` a `29,5 % margen`, reutilizando `fmtShare` (mismo decimal y separador que la línea "de cartera"): `{fmtShare((c.margen / c.importe) * 100)} margen`.
-
-## 6. Skeleton
-
-Raíz `space-y-4 sm:space-y-6`, la rejilla de KPIs igual que ahora, y una sola rejilla `grid items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3 [&>*]:min-w-0` con seis `Skeleton h-64`. Sin `order`, sin alturas de contenedor.
-
-## Verificación
-
-- `tsgo` y build.
-- Playwright 360 px: ResumenObjetivos primero, luego KPIs, luego las seis Cards en orden 1-6; sin scroll horizontal.
-- Playwright 1366 px: dos columnas, Alertas y Top 10 en la misma fila.
-- Playwright 1920 px: dos filas de tres, sin solapamientos.
-- Toggle Familias/Marcas: cambia título, datos, etiquetas del eje y color de barra.
+- Verde/rojo se implementan con los tokens semánticos del tema (`--primary` = turquesa/verde corporativo, `--destructive` = rojo), igual que en el KPI de variación de ClienteDetalle, sin colores hardcodeados.
+- El texto de "días sin comprar" replica el formato de ClienteDetalle (`num(n)` + "día"/"días").
+- Orden visual de la línea: días sin comprar · volumen · variación, con wrap en móvil.
