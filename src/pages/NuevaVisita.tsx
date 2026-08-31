@@ -768,7 +768,7 @@ export default function NuevaVisita() {
                       {estado === "listo" && <Badge variant="secondary" className="text-[10px]">Listo</Badge>}
                       {estado === "faltan" && (
                         <Badge variant="outline" className="border-amber-500 text-amber-700 text-[10px] dark:text-amber-500">
-                          Faltan {bloqueantesDe(b).length + pendientesDe(b).length}
+                          Faltan {new Set([...bloqueantesDe(b), ...pendientesDe(b)].map((c) => c.campo_key)).size}
                         </Badge>
                       )}
                       {estado === "revisar" && (
@@ -806,21 +806,6 @@ export default function NuevaVisita() {
                           <ChevronDown className={cn("h-4 w-4 transition-transform", zonaBAbierta && "rotate-180")} />
                         </CollapsibleTrigger>
                         <CollapsibleContent className="space-y-3 pt-2">
-                          <div className="space-y-2">
-                            <Label className="text-sm">Motivo</Label>
-                            <Select
-                              value={b.motivoKey}
-                              onValueChange={(val) => actualizarBloque(b.uid, { motivoKey: val, valores: {}, meta: {} })}
-                            >
-                              <SelectTrigger><SelectValue placeholder="Selecciona motivo" /></SelectTrigger>
-                              <SelectContent>
-                                {motivosActivos.map((m) => (
-                                  <SelectItem key={m.key} value={m.key}>{m.nombre}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            {motivo?.descripcion && <p className="text-xs text-muted-foreground">{motivo.descripcion}</p>}
-                          </div>
                           {otros.map((c) => (
                             <CampoVisita
                               key={c.campo_key}
@@ -834,6 +819,23 @@ export default function NuevaVisita() {
                         </CollapsibleContent>
                       </Collapsible>
                     )}
+
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Motivo</Label>
+                      <Select
+                        value={b.motivoKey}
+                        onValueChange={(val) => actualizarBloque(b.uid, { motivoKey: val, valores: {}, meta: {} })}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Selecciona motivo" /></SelectTrigger>
+                        <SelectContent>
+                          {motivosActivos.map((m) => (
+                            <SelectItem key={m.key} value={m.key}>{m.nombre}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {motivo?.descripcion && <p className="text-xs text-muted-foreground">{motivo.descripcion}</p>}
+                    </div>
+
 
                     {bloques.length > 1 && (
                       <Button
