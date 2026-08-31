@@ -768,7 +768,7 @@ export default function NuevaVisita() {
                       {estado === "listo" && <Badge variant="secondary" className="text-[10px]">Listo</Badge>}
                       {estado === "faltan" && (
                         <Badge variant="outline" className="border-amber-500 text-amber-700 text-[10px] dark:text-amber-500">
-                          Faltan {bloqueantesDe(b).length + pendientesDe(b).length}
+                          Faltan {new Set([...bloqueantesDe(b), ...pendientesDe(b)].map((c) => c.campo_key)).size}
                         </Badge>
                       )}
                       {estado === "revisar" && (
