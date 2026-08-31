@@ -308,6 +308,20 @@ export default function ClienteDetalle() {
 
   const motivoNombre = (key: string | null) => motivos?.find((m) => m.key === key)?.nombre ?? key ?? "—";
 
+  const labelsCamposPorMotivo = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of motivos ?? []) {
+      for (const c of m.campos ?? []) {
+        map.set(`${m.key}::${c.campo_key}`, c.label);
+      }
+    }
+    return map;
+  }, [motivos]);
+
+  const campoNombre = (motivoKey: string | null, campoKey: string) =>
+    (motivoKey ? labelsCamposPorMotivo.get(`${motivoKey}::${campoKey}`) : undefined) ??
+    campoKey.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+
   const antiguedad = useMemo(() => {
     if (!cliente?.fecha_alta) return null;
     const alta = new Date(`${cliente.fecha_alta}T00:00:00`);
@@ -737,8 +751,8 @@ export default function ClienteDetalle() {
                         <div key={b.id} className="space-y-1 rounded-md border p-2">
                           <p className="text-xs font-medium text-muted-foreground">{motivoNombre(b.motivo_key)}</p>
                           {Object.entries(b.campos ?? {}).filter(([, val]) => val).map(([k, val]) => (
-                            <p key={k} className="text-sm">
-                              <span className="text-muted-foreground">{k.replace(/_/g, " ")}: </span>
+<p key={k} className="text-sm">
+                              <span className="text-muted-foreground">{campoNombre(b.motivo_key, k)}: </span>
                               {String(val)}
                             </p>
                           ))}
@@ -753,8 +767,8 @@ export default function ClienteDetalle() {
                       ))
                     ) : (
                       Object.entries(v.campos ?? {}).filter(([, val]) => val).map(([k, val]) => (
-                        <p key={k} className="text-sm">
-                          <span className="text-muted-foreground">{k.replace(/_/g, " ")}: </span>
+<p key={k} className="text-sm">
+                          <span className="text-muted-foreground">{campoNombre(v.motivo_key, k)}: </span>
                           {String(val)}
                         </p>
                       ))
