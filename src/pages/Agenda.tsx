@@ -60,7 +60,7 @@ export default function Agenda() {
   const { data: coords } = useCoordsClientes(codigosPlan);
   const reordenar = useReordenarAgenda();
 
-const clienteMap = useMemo(() => {
+  const clienteMap = useMemo(() => {
     const m = new Map<number, { cliente: string; localidad: string | null; ruta: string | null; importe_actual: number; ultima_compra: string | null }>();
     for (const c of clientes ?? [])
       m.set(c.cod_cliente, {
@@ -222,7 +222,7 @@ const clienteMap = useMemo(() => {
               <p className="text-sm text-muted-foreground">No hay visitas planificadas para este día.</p>
             </div>
           ) : (
-plan.map((p, i) => {
+            plan.map((p, i) => {
               const c = clienteMap.get(p.cod_cliente);
               const hecha = p.estado === "realizada";
               const dias = diasDesde(c?.ultima_compra ?? null);
@@ -242,7 +242,7 @@ plan.map((p, i) => {
                             <MapPin className="h-3 w-3" />{c.localidad}
                           </p>
                         )}
-</Link>
+                      </Link>
                       {c && (
                         <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs">
                           <span className={dias != null && dias > 90 ? "font-medium text-destructive" : "text-muted-foreground"}>
