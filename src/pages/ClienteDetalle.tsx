@@ -120,7 +120,7 @@ export default function ClienteDetalle() {
   // --- Agendar visita ---
   const { user } = useAuth();
   const { add: addPlanificada } = useAgendaMutations();
-  const { data: proxima } = useProximaPlanificada(codNum);
+  const { data: proxima } = useProximaPlanificada(codNum, user?.id ?? null);
   const [agendarOpen, setAgendarOpen] = useState(false);
   const [modoFecha, setModoFecha] = useState<"hoy" | "manana" | "otra">("hoy");
   const [fechaOtra, setFechaOtra] = useState<string>(fechaHoy());

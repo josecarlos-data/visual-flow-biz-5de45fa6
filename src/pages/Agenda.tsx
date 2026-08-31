@@ -31,7 +31,7 @@ function addDays(iso: string, days: number) {
 export default function Agenda() {
   const { user } = useAuth();
   const [fecha, setFecha] = useState(hoyISO());
-  const { data: plan } = useAgenda(fecha, fecha);
+  const { data: plan } = useAgenda(fecha, fecha, user?.id ?? null);
   useScrollRestore("agenda", !!plan);
   const { add, update, remove } = useAgendaMutations();
   const { data: clientes } = useClientes();
