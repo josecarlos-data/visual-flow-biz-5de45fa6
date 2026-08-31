@@ -306,7 +306,7 @@ export default function ClienteDetalle() {
   );
   const topMarcas = useMemo(() => topMix((mix?.marcas ?? []) as never, "marca"), [mix]);
 
-const motivoNombre = (key: string | null) => motivos?.find((m) => m.key === key)?.nombre ?? key ?? "—";
+  const motivoNombre = (key: string | null) => motivos?.find((m) => m.key === key)?.nombre ?? key ?? "—";
 
   const labelsCamposPorMotivo = useMemo(() => {
     const map = new Map<string, string>();
