@@ -306,7 +306,21 @@ export default function ClienteDetalle() {
   );
   const topMarcas = useMemo(() => topMix((mix?.marcas ?? []) as never, "marca"), [mix]);
 
-  const motivoNombre = (key: string | null) => motivos?.find((m) => m.key === key)?.nombre ?? key ?? "—";
+const motivoNombre = (key: string | null) => motivos?.find((m) => m.key === key)?.nombre ?? key ?? "—";
+
+  const labelsCamposPorMotivo = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of motivos ?? []) {
+      for (const c of m.campos ?? []) {
+        map.set(`${m.key}::${c.campo_key}`, c.label);
+      }
+    }
+    return map;
+  }, [motivos]);
+
+  const campoNombre = (motivoKey: string | null, campoKey: string) =>
+    (motivoKey ? labelsCamposPorMotivo.get(`${motivoKey}::${campoKey}`) : undefined) ??
+    campoKey.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 
   const antiguedad = useMemo(() => {
     if (!cliente?.fecha_alta) return null;
