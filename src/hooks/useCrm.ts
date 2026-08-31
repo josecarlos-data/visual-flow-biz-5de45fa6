@@ -873,17 +873,17 @@ export function useMotivosAdmin() {
 }
 
 
-export function useAgenda(desde: string, hasta: string) {
+export function useAgenda(desde: string, hasta: string, userId?: string | null) {
   return useQuery({
-    queryKey: ["crm_agenda", desde, hasta],
+    queryKey: ["crm_agenda", desde, hasta, userId ?? null],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("visitas_planificadas")
         .select("*")
         .gte("fecha", desde)
-        .lte("fecha", hasta)
-        .order("fecha")
-        .order("orden");
+        .lte("fecha", hasta);
+      if (userId) q = q.eq("user_id", userId);
+      const { data, error } = await q.order("fecha").order("orden");
       if (error) throw error;
       return (data ?? []) as unknown as Planificada[];
     },
@@ -891,18 +891,19 @@ export function useAgenda(desde: string, hasta: string) {
 }
 
 /** Próxima visita planificada (hoy o posterior) de un cliente. */
-export function useProximaPlanificada(codCliente: number | null) {
+export function useProximaPlanificada(codCliente: number | null, userId?: string | null) {
   return useQuery({
-    queryKey: ["crm_agenda", "proxima", codCliente],
+    queryKey: ["crm_agenda", "proxima", codCliente, userId ?? null],
     enabled: !!codCliente,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("visitas_planificadas")
         .select("*")
         .eq("cod_cliente", codCliente!)
-        .gte("fecha", hoyISO())
-        .order("fecha", { ascending: true })
-        .limit(1);
+        .neq("estado", "realizada")
+        .gte("fecha", hoyISO());
+      if (userId) q = q.eq("user_id", userId);
+      const { data, error } = await q.order("fecha", { ascending: true }).limit(1);
       if (error) throw error;
       return ((data?.[0] ?? null) as unknown) as Planificada | null;
     },
