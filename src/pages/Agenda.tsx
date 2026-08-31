@@ -20,6 +20,7 @@ import {
 import { useScrollRestore } from "@/hooks/useScrollRestore";
 import { TramosMapaDialog } from "@/components/TramosMapaDialog";
 import { optimizarRuta, posicionActual, tramos, distanciaTotalKm } from "@/lib/maps";
+import { eur, num } from "@/lib/format";
 
 
 function addDays(iso: string, days: number) {
@@ -28,13 +29,23 @@ function addDays(iso: string, days: number) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/** Días transcurridos desde una fecha ISO hasta hoy (medianoche local). null si no hay fecha; 0 si es futura. */
+function diasDesde(fecha: string | null): number | null {
+  if (!fecha) return null;
+  const fin = new Date(`${fecha}T00:00:00`);
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const dias = Math.round((hoy.getTime() - fin.getTime()) / 86400000);
+  return dias < 0 ? 0 : dias;
+}
+
 export default function Agenda() {
   const { user } = useAuth();
   const [fecha, setFecha] = useState(hoyISO());
   const { data: plan } = useAgenda(fecha, fecha, user?.id ?? null);
   useScrollRestore("agenda", !!plan);
   const { add, update, remove } = useAgendaMutations();
-  const { data: clientes } = useClientes();
+  const { data: clientes } = useClientes(false);
   const [open, setOpen] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [optimizando, setOptimizando] = useState(false);
@@ -49,9 +60,16 @@ export default function Agenda() {
   const { data: coords } = useCoordsClientes(codigosPlan);
   const reordenar = useReordenarAgenda();
 
-  const clienteMap = useMemo(() => {
-    const m = new Map<number, { cliente: string; localidad: string | null; ruta: string | null }>();
-    for (const c of clientes ?? []) m.set(c.cod_cliente, { cliente: c.cliente, localidad: c.localidad, ruta: c.ruta });
+const clienteMap = useMemo(() => {
+    const m = new Map<number, { cliente: string; localidad: string | null; ruta: string | null; importe_actual: number; ultima_compra: string | null }>();
+    for (const c of clientes ?? [])
+      m.set(c.cod_cliente, {
+        cliente: c.cliente,
+        localidad: c.localidad,
+        ruta: c.ruta,
+        importe_actual: c.importe_actual,
+        ultima_compra: c.ultima_compra,
+      });
     return m;
   }, [clientes]);
 
@@ -204,9 +222,10 @@ export default function Agenda() {
               <p className="text-sm text-muted-foreground">No hay visitas planificadas para este día.</p>
             </div>
           ) : (
-            plan.map((p, i) => {
+plan.map((p, i) => {
               const c = clienteMap.get(p.cod_cliente);
               const hecha = p.estado === "realizada";
+              const dias = diasDesde(c?.ultima_compra ?? null);
               return (
                 <div key={p.id} className="rounded-lg border p-3">
                   <div className="flex items-start gap-3">
@@ -223,7 +242,16 @@ export default function Agenda() {
                             <MapPin className="h-3 w-3" />{c.localidad}
                           </p>
                         )}
-                      </Link>
+</Link>
+                      {c && (
+                        <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs">
+                          <span className={dias != null && dias > 90 ? "font-medium text-destructive" : "text-muted-foreground"}>
+                            {dias == null ? "Sin compras" : `${num(dias)} ${dias === 1 ? "día" : "días"} sin comprar`}
+                          </span>
+                          <span className="text-muted-foreground">·</span>
+                          <span>{eur(c.importe_actual)}</span>
+                        </p>
+                      )}
                       {p.notas && (
                         <p className="mt-1 flex items-start gap-1.5 rounded bg-muted/50 px-2 py-1 text-xs break-words">
                           <StickyNote className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
