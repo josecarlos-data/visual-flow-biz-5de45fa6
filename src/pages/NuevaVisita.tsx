@@ -806,21 +806,6 @@ export default function NuevaVisita() {
                           <ChevronDown className={cn("h-4 w-4 transition-transform", zonaBAbierta && "rotate-180")} />
                         </CollapsibleTrigger>
                         <CollapsibleContent className="space-y-3 pt-2">
-                          <div className="space-y-2">
-                            <Label className="text-sm">Motivo</Label>
-                            <Select
-                              value={b.motivoKey}
-                              onValueChange={(val) => actualizarBloque(b.uid, { motivoKey: val, valores: {}, meta: {} })}
-                            >
-                              <SelectTrigger><SelectValue placeholder="Selecciona motivo" /></SelectTrigger>
-                              <SelectContent>
-                                {motivosActivos.map((m) => (
-                                  <SelectItem key={m.key} value={m.key}>{m.nombre}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            {motivo?.descripcion && <p className="text-xs text-muted-foreground">{motivo.descripcion}</p>}
-                          </div>
                           {otros.map((c) => (
                             <CampoVisita
                               key={c.campo_key}
@@ -834,6 +819,23 @@ export default function NuevaVisita() {
                         </CollapsibleContent>
                       </Collapsible>
                     )}
+
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Motivo</Label>
+                      <Select
+                        value={b.motivoKey}
+                        onValueChange={(val) => actualizarBloque(b.uid, { motivoKey: val, valores: {}, meta: {} })}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Selecciona motivo" /></SelectTrigger>
+                        <SelectContent>
+                          {motivosActivos.map((m) => (
+                            <SelectItem key={m.key} value={m.key}>{m.nombre}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {motivo?.descripcion && <p className="text-xs text-muted-foreground">{motivo.descripcion}</p>}
+                    </div>
+
 
                     {bloques.length > 1 && (
                       <Button
