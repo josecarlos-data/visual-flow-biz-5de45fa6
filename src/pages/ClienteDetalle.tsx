@@ -751,8 +751,8 @@ const motivoNombre = (key: string | null) => motivos?.find((m) => m.key === key)
                         <div key={b.id} className="space-y-1 rounded-md border p-2">
                           <p className="text-xs font-medium text-muted-foreground">{motivoNombre(b.motivo_key)}</p>
                           {Object.entries(b.campos ?? {}).filter(([, val]) => val).map(([k, val]) => (
-                            <p key={k} className="text-sm">
-                              <span className="text-muted-foreground">{k.replace(/_/g, " ")}: </span>
+<p key={k} className="text-sm">
+                              <span className="text-muted-foreground">{campoNombre(b.motivo_key, k)}: </span>
                               {String(val)}
                             </p>
                           ))}
@@ -767,8 +767,8 @@ const motivoNombre = (key: string | null) => motivos?.find((m) => m.key === key)
                       ))
                     ) : (
                       Object.entries(v.campos ?? {}).filter(([, val]) => val).map(([k, val]) => (
-                        <p key={k} className="text-sm">
-                          <span className="text-muted-foreground">{k.replace(/_/g, " ")}: </span>
+<p key={k} className="text-sm">
+                          <span className="text-muted-foreground">{campoNombre(v.motivo_key, k)}: </span>
                           {String(val)}
                         </p>
                       ))
