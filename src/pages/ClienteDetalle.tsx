@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
@@ -29,7 +29,7 @@ import {
   useCliente, useClienteVentas, useClienteKpis, useClienteProductos, useClienteMix,
   useClienteVisitas, useMotivos, usePuedeVerMargen, useSituacionesVigentes, useClienteDocumentos, useVisitaBloques,
   useProximaPlanificada, useAgendaMutations,
-  etiquetaCategoria, eur, num, eurK, fechaCorta, type DocumentoCliente, type Visita, type ProductoCliente,
+  etiquetaCategoria, eur, num, eurK, fechaCorta, type DocumentoCliente, type Visita, type ProductoCliente, type RangoProductos,
 } from "@/hooks/useCrm";
 import { ClientePerfilTab } from "@/components/ClientePerfilTab";
 import { DocumentoLineasDialog } from "@/components/DocumentoLineasDialog";
@@ -53,7 +53,7 @@ interface Insights {
   generado_en?: string;
 }
 
-type CampoOrden = "referencia" | "familia" | "marca" | "unidades" | "importe" | "margen" | "ultima";
+type CampoOrden = "referencia" | "familia" | "marca" | "unidades" | "importe" | "margen" | "ultima" | "variacion";
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
@@ -106,8 +106,7 @@ export default function ClienteDetalle() {
   const { mapa: situaciones } = useSituacionesVigentes();
   const situacion = codNum != null ? situaciones.get(codNum) : undefined;
   const [insights, setInsights] = useState<Insights | null>(null);
-  const [anioProd, setAnioProd] = useState<string>("todos");
-  const anioProdInicializado = useRef(false);
+const [periodoProd, setPeriodoProd] = useState<string>("12m");
   const [busquedaProductos, setBusquedaProductos] = useState("");
   const [ordenProductos, setOrdenProductos] = useState<{ campo: CampoOrden; dir: "asc" | "desc" }>({
     campo: "importe",
@@ -164,10 +163,38 @@ export default function ClienteDetalle() {
     }
   };
 
-  const { data: productos, isLoading: cargandoProductos } = useClienteProductos(
-    codNum,
-    anioProd === "todos" ? null : Number(anioProd),
-  );
+/** Rango del periodo seleccionado y de su periodo anterior de comparación, siempre en hora local. */
+  const rangoProductos = useMemo<RangoProductos | null>(() => {
+    const hoy = new Date();
+    const hoyIso = isoLocal(hoy);
+    if (periodoProd === "todos") {
+      return { desde: "2000-01-01", hasta: hoyIso, desdePrev: null, hastaPrev: null };
+    }
+    if (periodoProd === "12m") {
+      const desde = new Date(hoy.getFullYear(), hoy.getMonth() - 12, hoy.getDate());
+      const desdePrev = new Date(hoy.getFullYear(), hoy.getMonth() - 24, hoy.getDate());
+      const hastaPrev = new Date(desde.getTime() - 86400000);
+      return {
+        desde: isoLocal(desde),
+        hasta: hoyIso,
+        desdePrev: isoLocal(desdePrev),
+        hastaPrev: isoLocal(hastaPrev),
+      };
+    }
+    const anio = Number(periodoProd);
+    if (!Number.isFinite(anio)) return null;
+    const esActual = anio === hoy.getFullYear();
+    return {
+      desde: `${anio}-01-01`,
+      hasta: esActual ? hoyIso : `${anio}-12-31`,
+      desdePrev: `${anio - 1}-01-01`,
+      hastaPrev: esActual ? isoLocal(new Date(hoy.getFullYear() - 1, hoy.getMonth(), hoy.getDate())) : `${anio - 1}-12-31`,
+    };
+  }, [periodoProd]);
+
+  const conComparacion = rangoProductos?.desdePrev != null;
+
+  const { data: productos, isLoading: cargandoProductos } = useClienteProductos(codNum, rangoProductos);
 
   const normalizarBusqueda = (s: string) =>
     s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -176,8 +203,8 @@ export default function ClienteDetalle() {
     campo: CampoOrden,
     actual: { campo: CampoOrden; dir: "asc" | "desc" },
   ): { campo: CampoOrden; dir: "asc" | "desc" } => {
-    if (actual.campo === campo) return { campo, dir: actual.dir === "asc" ? "desc" : "asc" };
-    const numOrDate = ["unidades", "importe", "margen", "ultima"].includes(campo);
+if (actual.campo === campo) return { campo, dir: actual.dir === "asc" ? "desc" : "asc" };
+    const numOrDate = ["unidades", "importe", "margen", "ultima", "variacion"].includes(campo);
     return { campo, dir: numOrDate ? "desc" : "asc" };
   };
 
@@ -190,26 +217,71 @@ export default function ClienteDetalle() {
         normalizarBusqueda([p.referencia, p.descripcion ?? ""].join(" ")).includes(texto)
       );
     }
-    const { campo, dir } = ordenProductos;
-    const campoReal = campo === "ultima" ? "ultima_compra" : campo;
-    const esNumero = ["unidades", "importe", "margen"].includes(campo);
-    const esFecha = campo === "ultima";
+const { campo, dir } = ordenProductos;
+    const valor = (p: ProductoCliente): number | string | null => {
+      if (campo === "variacion") return pctVariacion(p);
+      if (campo === "ultima") return p.ultima_compra;
+      return (p as any)[campo];
+    };
     list.sort((a, b) => {
-      const va = (a as any)[campoReal];
-      const vb = (b as any)[campoReal];
+      const va = valor(a);
+      const vb = valor(b);
       const na = va == null || va === "";
       const nb = vb == null || vb === "";
       if (na && nb) return 0;
-      if (na) return 1;
+      if (na) return 1; // nulos ("Nueva") al final, en ambas direcciones
       if (nb) return -1;
-      let cmp = 0;
-      if (esNumero) cmp = Number(va) - Number(vb);
-      else if (esFecha) cmp = new Date(va as string).getTime() - new Date(vb as string).getTime();
+      let cmp: number;
+      if (typeof va === "number" && typeof vb === "number") cmp = va - vb;
+      else if (campo === "ultima") cmp = new Date(va as string).getTime() - new Date(vb as string).getTime();
       else cmp = String(va).localeCompare(String(vb), "es");
       return dir === "asc" ? cmp : -cmp;
     });
     return list;
   }, [productos, busquedaProductos, ordenProductos]);
+
+  /** Porcentaje de variación vs. periodo anterior; null = sin comparación posible ("Nueva"). */
+  const pctVariacion = (p: ProductoCliente): number | null => {
+    if (p.importe_anterior > 0) return ((p.importe - p.importe_anterior) / p.importe_anterior) * 100;
+    return null;
+  };
+
+  /** Celda de la columna Variación (escritorio, md+). */
+  const celdaVariacion = (p: ProductoCliente) => {
+    if (p.importe_anterior > 0) {
+      const pct = pctVariacion(p) ?? -100;
+      const sube = pct >= 0;
+      return (
+        <>
+          <span className={`flex items-center justify-end gap-1 ${sube ? "text-primary" : "text-destructive"}`}>
+            {sube ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+            {sube ? "+" : "−"}{num(Math.abs(pct), 1)} %
+          </span>
+          <span className="text-xs text-muted-foreground">{p.importe > 0 ? eur(p.importe_anterior, 2) : "sin compras"}</span>
+        </>
+      );
+    }
+    return <Badge variant="outline" className="text-xs">Nueva</Badge>;
+  };
+
+  /** Segunda línea bajo el importe en móvil (la columna está oculta). */
+  const variacionMovil = (p: ProductoCliente) => {
+    if (p.importe_anterior > 0) {
+      const pct = pctVariacion(p) ?? -100;
+      const sube = pct >= 0;
+      return (
+        <span className={`mt-0.5 flex items-center justify-end gap-1 text-xs md:hidden ${sube ? "text-primary" : "text-destructive"}`}>
+          {sube ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+          {sube ? "+" : "−"}{num(Math.abs(pct), 1)} %
+        </span>
+      );
+    }
+    return p.importe > 0 ? (
+      <span className="mt-0.5 flex items-center justify-end md:hidden">
+        <Badge variant="outline" className="px-1.5 py-0 text-[10px]">Nueva</Badge>
+      </span>
+    ) : null;
+  };
 
   const { data: cached } = useQuery({
     queryKey: ["crm_insights", codNum],
@@ -241,12 +313,6 @@ export default function ClienteDetalle() {
     [ventas],
   );
 
-  useEffect(() => {
-    if (anios.length > 0 && !anioProdInicializado.current) {
-      setAnioProd(String(anios[0]));
-      anioProdInicializado.current = true;
-    }
-  }, [anios]);
 
   const anioActual = anios[0] ?? new Date().getFullYear();
   const anioPrevio = anioActual - 1;
@@ -818,13 +884,14 @@ export default function ClienteDetalle() {
                     className="pl-8"
                   />
                 </div>
-                <Select value={anioProd} onValueChange={setAnioProd}>
-                  <SelectTrigger className="w-full sm:w-36"><SelectValue /></SelectTrigger>
+<Select value={periodoProd} onValueChange={setPeriodoProd}>
+                  <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="todos">Todos los años</SelectItem>
+                    <SelectItem value="12m">Últimos 12 meses</SelectItem>
                     {anios.map((a) => (
                       <SelectItem key={a} value={String(a)}>{a}</SelectItem>
                     ))}
+                    <SelectItem value="todos">Todos los años</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -878,6 +945,14 @@ export default function ClienteDetalle() {
                               {ordenProductos.campo === "margen" && (ordenProductos.dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
                             </button>
                           </TableHead>
+)}
+                        {conComparacion && (
+                          <TableHead className="hidden text-right md:table-cell">
+                            <button className="ml-auto flex items-center gap-1" onClick={() => setOrdenProductos(cambiarOrden("variacion", ordenProductos))}>
+                              Variación
+                              {ordenProductos.campo === "variacion" && (ordenProductos.dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
+                            </button>
+                          </TableHead>
                         )}
                         <TableHead className="hidden text-right sm:table-cell">
                           <button className="ml-auto flex items-center gap-1" onClick={() => setOrdenProductos(cambiarOrden("ultima", ordenProductos))}>
@@ -897,8 +972,12 @@ export default function ClienteDetalle() {
                           <TableCell className="hidden text-muted-foreground sm:table-cell">{p.familia ?? "—"}</TableCell>
                           <TableCell className="hidden text-muted-foreground md:table-cell">{p.marca ?? "—"}</TableCell>
                           <TableCell className="text-right tabular-nums">{num(p.unidades)}</TableCell>
-                          <TableCell className="text-right tabular-nums">{eur(p.importe, 2)}</TableCell>
+<TableCell className="text-right tabular-nums">
+                            {eur(p.importe, 2)}
+                            {conComparacion && variacionMovil(p)}
+                          </TableCell>
                           {verMargen && <TableCell className="hidden text-right tabular-nums md:table-cell">{eur(p.margen, 2)}</TableCell>}
+                          {conComparacion && <TableCell className="hidden text-right tabular-nums md:table-cell">{celdaVariacion(p)}</TableCell>}
                           <TableCell className="hidden text-right text-muted-foreground sm:table-cell">{p.ultima_compra ? fechaCorta(p.ultima_compra) : "—"}</TableCell>
                         </TableRow>
                       ))}

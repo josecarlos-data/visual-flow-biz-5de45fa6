@@ -504,16 +504,29 @@ export interface ProductoCliente {
   importe: number;
   margen: number;
   ultima_compra: string | null;
+  unidades_anterior: number;
+  importe_anterior: number;
 }
 
-export function useClienteProductos(cod: number | null, anio: number | null = null) {
+/** Rango de fechas (ISO local) y periodo anterior de comparación. */
+export interface RangoProductos {
+  desde: string;
+  hasta: string;
+  desdePrev: string | null;
+  hastaPrev: string | null;
+}
+
+export function useClienteProductos(cod: number | null, rango: RangoProductos | null = null) {
   return useQuery({
-    queryKey: ["crm_cliente_productos", cod, anio],
-    enabled: cod != null,
+    queryKey: ["crm_cliente_productos", cod, rango?.desde, rango?.hasta, rango?.desdePrev, rango?.hastaPrev],
+    enabled: cod != null && rango != null,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("cliente_top_productos" as never, {
         _cod: cod!,
-        _anio: anio,
+        _desde: rango!.desde,
+        _hasta: rango!.hasta,
+        _desde_prev: rango!.desdePrev,
+        _hasta_prev: rango!.hastaPrev,
       } as never);
       if (error) throw error;
       return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
@@ -525,6 +538,8 @@ export function useClienteProductos(cod: number | null, anio: number | null = nu
         importe: Number(r.importe ?? 0),
         margen: Number(r.margen ?? 0),
         ultima_compra: (r.ultima_compra as string) ?? null,
+        unidades_anterior: Number(r.unidades_anterior ?? 0),
+        importe_anterior: Number(r.importe_anterior ?? 0),
       })) as ProductoCliente[];
     },
   });
