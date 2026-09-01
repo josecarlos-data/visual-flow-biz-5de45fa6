@@ -99,6 +99,7 @@ No se tocan `cliente_documentos`, `cliente_documento_lineas`, las tarjetas KPI n
 
 ## Verificación
 
-- La migración hace DROP con la firma exacta `(integer, integer)` antes del CREATE y termina con el GRANT EXECUTE sobre `(integer, date, date, date, date)`.
-- Tras el cambio, los únicos llamadores vivos serán `useCrm.ts` y la edge function `cliente-insights` (ambos con la nueva firma).
+- La migración hace DROP con la firma exacta `(integer, integer)` antes del CREATE, recrea la firma antigua como envoltorio y termina con los dos GRANT EXECUTE, sobre `(integer, date, date, date, date)` y sobre `(integer, integer)`.
+- Tras el cambio, los llamadores vivos serán `useCrm.ts` (nueva firma) y la edge function `cliente-insights` (nueva firma tras el redespliegue; el envoltorio la cubre si el despliegue no llegara a aplicarse).
+
 - Build y `tsgo` limpios; comprobación en preview de los tres periodos y de la columna en escritorio y móvil.
