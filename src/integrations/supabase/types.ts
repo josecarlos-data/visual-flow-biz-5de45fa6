@@ -2032,19 +2032,41 @@ export type Database = {
           vendedor_linea: string
         }[]
       }
-      cliente_top_productos: {
-        Args: { _anio?: number; _cod: number }
-        Returns: {
-          descripcion: string
-          familia: string
-          importe: number
-          marca: string
-          margen: number
-          referencia: string
-          ultima_compra: string
-          unidades: number
-        }[]
-      }
+      cliente_top_productos:
+        | {
+            Args: { _anio?: number; _cod: number }
+            Returns: {
+              descripcion: string
+              familia: string
+              importe: number
+              marca: string
+              margen: number
+              referencia: string
+              ultima_compra: string
+              unidades: number
+            }[]
+          }
+        | {
+            Args: {
+              _cod: number
+              _desde: string
+              _desde_prev?: string
+              _hasta: string
+              _hasta_prev?: string
+            }
+            Returns: {
+              descripcion: string
+              familia: string
+              importe: number
+              importe_anterior: number
+              marca: string
+              margen: number
+              referencia: string
+              ultima_compra: string
+              unidades: number
+              unidades_anterior: number
+            }[]
+          }
       clientes_permitidos: {
         Args: { _user_id: string }
         Returns: {
