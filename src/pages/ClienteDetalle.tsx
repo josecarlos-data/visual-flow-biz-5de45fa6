@@ -313,12 +313,6 @@ const { campo, dir } = ordenProductos;
     [ventas],
   );
 
-  useEffect(() => {
-    if (anios.length > 0 && !anioProdInicializado.current) {
-      setAnioProd(String(anios[0]));
-      anioProdInicializado.current = true;
-    }
-  }, [anios]);
 
   const anioActual = anios[0] ?? new Date().getFullYear();
   const anioPrevio = anioActual - 1;
@@ -890,13 +884,14 @@ const { campo, dir } = ordenProductos;
                     className="pl-8"
                   />
                 </div>
-                <Select value={anioProd} onValueChange={setAnioProd}>
-                  <SelectTrigger className="w-full sm:w-36"><SelectValue /></SelectTrigger>
+<Select value={periodoProd} onValueChange={setPeriodoProd}>
+                  <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="todos">Todos los años</SelectItem>
+                    <SelectItem value="12m">Últimos 12 meses</SelectItem>
                     {anios.map((a) => (
                       <SelectItem key={a} value={String(a)}>{a}</SelectItem>
                     ))}
+                    <SelectItem value="todos">Todos los años</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -950,6 +945,14 @@ const { campo, dir } = ordenProductos;
                               {ordenProductos.campo === "margen" && (ordenProductos.dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
                             </button>
                           </TableHead>
+)}
+                        {conComparacion && (
+                          <TableHead className="hidden text-right md:table-cell">
+                            <button className="ml-auto flex items-center gap-1" onClick={() => setOrdenProductos(cambiarOrden("variacion", ordenProductos))}>
+                              Variación
+                              {ordenProductos.campo === "variacion" && (ordenProductos.dir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
+                            </button>
+                          </TableHead>
                         )}
                         <TableHead className="hidden text-right sm:table-cell">
                           <button className="ml-auto flex items-center gap-1" onClick={() => setOrdenProductos(cambiarOrden("ultima", ordenProductos))}>
@@ -969,8 +972,12 @@ const { campo, dir } = ordenProductos;
                           <TableCell className="hidden text-muted-foreground sm:table-cell">{p.familia ?? "—"}</TableCell>
                           <TableCell className="hidden text-muted-foreground md:table-cell">{p.marca ?? "—"}</TableCell>
                           <TableCell className="text-right tabular-nums">{num(p.unidades)}</TableCell>
-                          <TableCell className="text-right tabular-nums">{eur(p.importe, 2)}</TableCell>
+<TableCell className="text-right tabular-nums">
+                            {eur(p.importe, 2)}
+                            {conComparacion && variacionMovil(p)}
+                          </TableCell>
                           {verMargen && <TableCell className="hidden text-right tabular-nums md:table-cell">{eur(p.margen, 2)}</TableCell>}
+                          {conComparacion && <TableCell className="hidden text-right tabular-nums md:table-cell">{celdaVariacion(p)}</TableCell>}
                           <TableCell className="hidden text-right text-muted-foreground sm:table-cell">{p.ultima_compra ? fechaCorta(p.ultima_compra) : "—"}</TableCell>
                         </TableRow>
                       ))}
