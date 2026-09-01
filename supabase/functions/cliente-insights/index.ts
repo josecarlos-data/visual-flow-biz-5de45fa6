@@ -66,10 +66,20 @@ Deno.serve(async (req) => {
       });
     }
 
+// Fecha local (no UTC) para "hasta hoy" en la consulta de productos
+    const hoyLocal = new Date();
+    const hoyIso = `${hoyLocal.getFullYear()}-${String(hoyLocal.getMonth() + 1).padStart(2, "0")}-${String(hoyLocal.getDate()).padStart(2, "0")}`;
+
     const [clienteRes, ventasRes, productosRes, visitasRes, kpisRes] = await Promise.all([
       userClient.from("clientes").select("*").eq("cod_cliente", cod_cliente).maybeSingle(),
       userClient.from("resumen_cliente_mes").select("anio, mes, importe").eq("cod_cliente", cod_cliente),
-      userClient.rpc("cliente_top_productos", { _cod: cod_cliente, _anio: null }),
+      userClient.rpc("cliente_top_productos", {
+        _cod: cod_cliente,
+        _desde: "2000-01-01",
+        _hasta: hoyIso,
+        _desde_prev: null,
+        _hasta_prev: null,
+      }),
       userClient.from("visitas").select("fecha, motivo_key, campos, observaciones").eq("cod_cliente", cod_cliente).order("fecha", { ascending: false }).limit(8),
       userClient.from("cliente_kpis").select("*").eq("cod_cliente", cod_cliente).maybeSingle(),
     ]);
