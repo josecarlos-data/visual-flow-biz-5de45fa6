@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
@@ -29,7 +29,7 @@ import {
   useCliente, useClienteVentas, useClienteKpis, useClienteProductos, useClienteMix,
   useClienteVisitas, useMotivos, usePuedeVerMargen, useSituacionesVigentes, useClienteDocumentos, useVisitaBloques,
   useProximaPlanificada, useAgendaMutations,
-  etiquetaCategoria, eur, num, eurK, fechaCorta, type DocumentoCliente, type Visita, type ProductoCliente,
+  etiquetaCategoria, eur, num, eurK, fechaCorta, type DocumentoCliente, type Visita, type ProductoCliente, type RangoProductos,
 } from "@/hooks/useCrm";
 import { ClientePerfilTab } from "@/components/ClientePerfilTab";
 import { DocumentoLineasDialog } from "@/components/DocumentoLineasDialog";
@@ -53,7 +53,7 @@ interface Insights {
   generado_en?: string;
 }
 
-type CampoOrden = "referencia" | "familia" | "marca" | "unidades" | "importe" | "margen" | "ultima";
+type CampoOrden = "referencia" | "familia" | "marca" | "unidades" | "importe" | "margen" | "ultima" | "variacion";
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
@@ -106,8 +106,7 @@ export default function ClienteDetalle() {
   const { mapa: situaciones } = useSituacionesVigentes();
   const situacion = codNum != null ? situaciones.get(codNum) : undefined;
   const [insights, setInsights] = useState<Insights | null>(null);
-  const [anioProd, setAnioProd] = useState<string>("todos");
-  const anioProdInicializado = useRef(false);
+const [periodoProd, setPeriodoProd] = useState<string>("12m");
   const [busquedaProductos, setBusquedaProductos] = useState("");
   const [ordenProductos, setOrdenProductos] = useState<{ campo: CampoOrden; dir: "asc" | "desc" }>({
     campo: "importe",
@@ -164,10 +163,38 @@ export default function ClienteDetalle() {
     }
   };
 
-  const { data: productos, isLoading: cargandoProductos } = useClienteProductos(
-    codNum,
-    anioProd === "todos" ? null : Number(anioProd),
-  );
+/** Rango del periodo seleccionado y de su periodo anterior de comparación, siempre en hora local. */
+  const rangoProductos = useMemo<RangoProductos | null>(() => {
+    const hoy = new Date();
+    const hoyIso = isoLocal(hoy);
+    if (periodoProd === "todos") {
+      return { desde: "2000-01-01", hasta: hoyIso, desdePrev: null, hastaPrev: null };
+    }
+    if (periodoProd === "12m") {
+      const desde = new Date(hoy.getFullYear(), hoy.getMonth() - 12, hoy.getDate());
+      const desdePrev = new Date(hoy.getFullYear(), hoy.getMonth() - 24, hoy.getDate());
+      const hastaPrev = new Date(desde.getTime() - 86400000);
+      return {
+        desde: isoLocal(desde),
+        hasta: hoyIso,
+        desdePrev: isoLocal(desdePrev),
+        hastaPrev: isoLocal(hastaPrev),
+      };
+    }
+    const anio = Number(periodoProd);
+    if (!Number.isFinite(anio)) return null;
+    const esActual = anio === hoy.getFullYear();
+    return {
+      desde: `${anio}-01-01`,
+      hasta: esActual ? hoyIso : `${anio}-12-31`,
+      desdePrev: `${anio - 1}-01-01`,
+      hastaPrev: esActual ? isoLocal(new Date(hoy.getFullYear() - 1, hoy.getMonth(), hoy.getDate())) : `${anio - 1}-12-31`,
+    };
+  }, [periodoProd]);
+
+  const conComparacion = rangoProductos?.desdePrev != null;
+
+  const { data: productos, isLoading: cargandoProductos } = useClienteProductos(codNum, rangoProductos);
 
   const normalizarBusqueda = (s: string) =>
     s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
