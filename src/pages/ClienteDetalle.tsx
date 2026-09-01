@@ -203,8 +203,8 @@ const [periodoProd, setPeriodoProd] = useState<string>("12m");
     campo: CampoOrden,
     actual: { campo: CampoOrden; dir: "asc" | "desc" },
   ): { campo: CampoOrden; dir: "asc" | "desc" } => {
-    if (actual.campo === campo) return { campo, dir: actual.dir === "asc" ? "desc" : "asc" };
-    const numOrDate = ["unidades", "importe", "margen", "ultima"].includes(campo);
+if (actual.campo === campo) return { campo, dir: actual.dir === "asc" ? "desc" : "asc" };
+    const numOrDate = ["unidades", "importe", "margen", "ultima", "variacion"].includes(campo);
     return { campo, dir: numOrDate ? "desc" : "asc" };
   };
 
