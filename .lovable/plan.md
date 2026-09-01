@@ -27,24 +27,42 @@ Un único fichero, en este orden:
 2. `CREATE FUNCTION public.cliente_top_productos(_cod integer, _desde date, _hasta date, _desde_prev date DEFAULT NULL, _hasta_prev date DEFAULT NULL)`
    `RETURNS TABLE(referencia text, descripcion text, familia text, marca text, unidades numeric, importe numeric, margen numeric, ultima_compra date, unidades_anterior numeric, importe_anterior numeric)`
    `LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'public'`
-3. `GRANT EXECUTE ON FUNCTION public.cliente_top_productos(integer, date, date, date, date) TO authenticated;`
+3. Envoltorio de compatibilidad con la firma antigua
+   `public.cliente_top_productos(_cod integer, _anio integer DEFAULT NULL)`,
+   `LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public'`, que hace
+   `SELECT` de las ocho columnas antiguas sobre la nueva función, traduciendo
+   `_anio` a `1 ene Y … 31 dic Y` y `NULL` a `2000-01-01 … CURRENT_DATE`, sin
+   periodo de comparación.
+4. `GRANT EXECUTE ON FUNCTION public.cliente_top_productos(integer, date, date, date, date) TO authenticated;`
+5. `GRANT EXECUTE ON FUNCTION public.cliente_top_productos(integer, integer) TO authenticated;`
 
-Cuerpo, igual que hoy salvo lo indicado:
+Nota sobre la sobrecarga: con las dos firmas conviviendo, una llamada de un solo
+argumento (`cliente_top_productos(_cod)`) sería ambigua. Ni el frontend ni la edge
+function lo hacen (siempre pasan 2 o 4-5 argumentos), así que no hay conflicto.
+
+Cuerpo de la nueva función, igual que hoy salvo lo indicado:
 
 - Se conserva `IF NOT public.can_view_cliente(auth.uid(), _cod) THEN RETURN; END IF;`
   y `v_margen := public.puede_ver_margen(auth.uid());`.
+- **Cualificación obligatoria**: con `RETURNS TABLE`, los nombres de salida
+  (`referencia`, `unidades`, `importe`, `margen`, `ultima_compra`) son variables del
+  ámbito de la función. Todas las referencias a columnas van cualificadas con el
+  alias (`v.referencia`, `v.unidades`, `v.importe`, `v.margen`, `v.fecha`) en SELECT,
+  WHERE, FILTER, GROUP BY y ORDER BY. Sin ello, el CREATE pasaría y el error
+  "column reference is ambiguous" saldría en ejecución, en la ficha.
 - WHERE con una sola pasada:
   `v.cod_cliente = _cod AND v.fecha >= LEAST(_desde, COALESCE(_desde_prev,_desde)) AND v.fecha <= GREATEST(_hasta, COALESCE(_hasta_prev,_hasta))`.
 - Periodo actual: `COALESCE(SUM(v.unidades) FILTER (WHERE v.fecha BETWEEN _desde AND _hasta), 0)` e ídem para importe.
 - Margen: `CASE WHEN v_margen THEN COALESCE(SUM(v.margen) FILTER (WHERE v.fecha BETWEEN _desde AND _hasta),0) ELSE 0 END`.
 - `ultima_compra`: `MAX(v.fecha) FILTER (WHERE v.fecha BETWEEN _desde AND _hasta)`.
-- Periodo anterior: `COALESCE(SUM(...) FILTER (WHERE _desde_prev IS NOT NULL AND v.fecha BETWEEN _desde_prev AND _hasta_prev), 0)`.
-- GROUP BY idéntico al actual (referencia, descripción y los COALESCE de familia y marca).
-- `ORDER BY GREATEST(COALESCE(<importe_actual>,0), COALESCE(<importe_anterior>,0)) DESC LIMIT 500`
-  (expresiones repetidas en el ORDER BY, ya que no hay alias de salida usable en plpgsql RETURN QUERY).
+- Periodo anterior: `COALESCE(SUM(v.unidades|v.importe) FILTER (WHERE _desde_prev IS NOT NULL AND v.fecha BETWEEN _desde_prev AND _hasta_prev), 0)`.
+- GROUP BY idéntico al actual (`v.referencia`, `p.descripcion` y los COALESCE de familia y marca).
+- `ORDER BY GREATEST(COALESCE(<importe actual>,0), COALESCE(<importe anterior>,0)) DESC LIMIT 500`,
+  con las expresiones `SUM(...) FILTER (...)` repetidas y cualificadas.
 
 Como el rango completo puede abarcar dos periodos, en "Todos los años"
 (`_desde = 2000-01-01`) el escaneo es el mismo que hoy con `_anio IS NULL`.
+
 
 ## 2) Hook `useCrm.ts`
 
