@@ -4,16 +4,20 @@
 
 La verificación pedida en el punto 6 encuentra **un llamador fuera del frontend**:
 `supabase/functions/cliente-insights/index.ts` (línea 72) invoca
-`cliente_top_productos` con `{ _cod, _anio: null }`. Al hacer DROP de la firma
-`(integer, integer)`, esa llamada fallaría y el análisis IA de la ficha dejaría
-de generarse.
+`cliente_top_productos` con `{ _cod, _anio: null }`.
 
-Propuesta (mínima, dentro del espíritu del plan): actualizar esa llamada a la
-nueva firma con el equivalente de "todos los años":
-`{ _cod, _desde: "2000-01-01", _hasta: <hoy>, _desde_prev: null, _hasta_prev: null }`,
-y redesplegar la función. No se cambia su prompt ni su lógica.
+Doble medida:
+
+1. Se actualiza esa llamada a la nueva firma con el equivalente de "todos los años"
+   (`_desde: "2000-01-01"`, `_hasta: <hoy>`, `_desde_prev: null`, `_hasta_prev: null`)
+   y se redespliega la función. No se cambia su prompt ni su lógica.
+2. En la misma migración se crea un **envoltorio deliberado** con la firma antigua
+   `(integer, integer)` que delega en la nueva, para que nada quede huérfano si el
+   despliegue no llega a aplicarse. Convive con la nueva y no se elimina.
+
 El resto de coincidencias del grep son ficheros de migraciones ya aplicados
 (histórico), que no se re-ejecutan.
+
 
 ## 1) Migración
 
