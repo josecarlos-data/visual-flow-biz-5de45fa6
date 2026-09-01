@@ -246,13 +246,7 @@ const { campo, dir } = ordenProductos;
     return list;
   }, [productos, busquedaProductos, ordenProductos]);
 
-  /** Porcentaje de variación vs. periodo anterior; null = sin comparación posible ("Nueva"). */
-  const pctVariacion = (p: ProductoCliente): number | null => {
-    if (p.importe_anterior > 0) return ((p.importe - p.importe_anterior) / p.importe_anterior) * 100;
-    return null;
-  };
-
-  /** Celda de la columna Variación (escritorio, md+). */
+/** Celda de la columna Variación (escritorio, md+). */
   const celdaVariacion = (p: ProductoCliente) => {
     if (p.importe_anterior > 0) {
       const pct = pctVariacion(p) ?? -100;
