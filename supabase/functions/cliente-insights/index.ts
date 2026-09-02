@@ -272,7 +272,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    const duracion_ms = Math.round(performance.now() - t0);
     const chatJson = await chat.json();
+    const usage = chatJson.usage ?? {};
+    const numOnull = (v: unknown) => (typeof v === "number" ? v : null);
+    const _meta = {
+      modelo: modeloUsado,
+      prompt_tokens: numOnull(usage.prompt_tokens),
+      completion_tokens: numOnull(usage.completion_tokens),
+      total_tokens: numOnull(usage.total_tokens),
+      duracion_ms,
+    };
     let parsed: Record<string, unknown>;
     try {
       parsed = JSON.parse(chatJson.choices?.[0]?.message?.content ?? "{}");
