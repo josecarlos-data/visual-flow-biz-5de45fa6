@@ -3,6 +3,22 @@ import { corsHeaders } from "../_shared/cors.ts";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 
+/** Marcadores de basura que a veces cuelan los modelos al final del texto. */
+const MARCADORES = ["<|endoftext|>", "#+#+", "billing:", "COST:", "[PLUGIN]", "TOKEN ", "END asr"];
+
+/** Corta la cola de basura, quita controles no imprimibles y normaliza espacios. */
+function limpiar(texto: string): string {
+  let s = String(texto ?? "");
+  for (const m of MARCADORES) {
+    const i = s.indexOf(m);
+    if (i >= 0) s = s.slice(0, i);
+  }
+  // deno-lint-ignore no-control-regex
+  s = s.replace(/[\u0000-\u0009\u000B-\u001F\u007F]/g, "");
+  s = s.replace(/[^\S\n]{2,}/g, " ").trim();
+  return s.length < 3 ? "" : s;
+}
+
 const SCHEMA = {
   type: "object",
   properties: {
