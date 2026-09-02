@@ -132,11 +132,47 @@ Deno.serve(async (req) => {
     }
     const kpis = kpisRes.data;
 
+    // Etiquetas legibles de los catálogos
+    const etiquetaAtributo = new Map<string, string>();
+    const unidadAtributo = new Map<string, string>();
+    for (const a of atributosRes.data ?? []) {
+      etiquetaAtributo.set(a.key as string, (a.nombre as string) ?? (a.key as string));
+      if (a.unidad) unidadAtributo.set(a.key as string, a.unidad as string);
+    }
+    const etiquetaCampo = new Map<string, string>();
+    for (const c of camposRes.data ?? []) {
+      if (!etiquetaCampo.has(c.campo_key as string)) etiquetaCampo.set(c.campo_key as string, (c.label as string) ?? (c.campo_key as string));
+    }
+
+    // Situación vigente: mismo criterio que la cabecera de la ficha
+    const situacion = (situacionesRes.data ?? []).find(
+      (s) => s.activo && (s.desde as string) <= hoyIso && (!s.hasta || (s.hasta as string) >= hoyIso),
+    );
+
+    const ddmm = (f: string | null | undefined) => {
+      if (!f) return "";
+      const [, m, d] = String(f).split("-");
+      return m && d ? `${d}/${m}` : String(f);
+    };
+
+    const perfilLineas = (perfilRes.data ?? []).map((p) => {
+      const label = etiquetaAtributo.get(p.atributo_key as string) ?? (p.atributo_key as string);
+      const unidad = unidadAtributo.get(p.atributo_key as string);
+      const valor = p.valor_num !== null && p.valor_num !== undefined
+        ? `${Number(p.valor_num).toLocaleString("es-ES")}${unidad ? ` ${unidad}` : ""}`
+        : (p.valor_texto as string) ?? "";
+      const obs = ddmm(p.observado_en as string);
+      return `  ${label}: ${valor}${obs ? ` (observado ${obs})` : ""}`;
+    });
+
+    const eur0 = (n: number) => Math.round(n).toLocaleString("es-ES");
+
     const cliente = clienteRes.data;
     const contexto = [
       `CLIENTE: ${cliente.cliente} (código ${cliente.cod_cliente})`,
       `Delegación: ${cliente.delegacion ?? "—"} · Localidad: ${cliente.localidad ?? "—"} · Comercial: ${cliente.vendedor ?? "—"}`,
       cliente.tipo_cliente ? `Tipo: ${cliente.tipo_cliente}` : "",
+      situacion ? `SITUACIÓN: ${situacion.etiqueta}` : "",
       cliente.observaciones ? `Observaciones de ficha: ${cliente.observaciones}` : "",
       "",
       "VENTAS POR AÑO (EUR):",
