@@ -117,7 +117,7 @@ const [periodoProd, setPeriodoProd] = useState<string>("12m");
   const [kpisAbiertos, setKpisAbiertos] = useState(false);
 
   // --- Agendar visita ---
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { add: addPlanificada } = useAgendaMutations();
   const { data: proxima } = useProximaPlanificada(codNum, user?.id ?? null);
   const [agendarOpen, setAgendarOpen] = useState(false);
