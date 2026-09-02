@@ -1,32 +1,43 @@
-# Comparar modelos de IA en la ficha de cliente
+# Evitar comparaciones engañosas de año en curso en el análisis IA
 
-Los cuatro modelos de la lista blanca existen en el gateway (`openai/gpt-5.5`, `openai/gpt-5.6-luna`, `openai/gpt-5.6-terra`, `openai/gpt-5.6-sol`), verificado contra el listado del gateway. No hace falta cambiar la lista.
+Solo `supabase/functions/cliente-insights/index.ts`. Sin migraciones ni cambios de frontend.
 
-## A) La edge function acepta un modelo opcional
+## 1. Etiquetar los años en la lista de ventas
 
-En `supabase/functions/cliente-insights/index.ts`:
+En el bloque "VENTAS POR AÑO (EUR)", cada año se marca como completo o parcial comparando con el año natural de `hoyLocal`:
 
-- Lista blanca `MODELOS_PERMITIDOS` declarada en el fichero con los cuatro identificadores; `MODELO_POR_DEFECTO = "openai/gpt-5.5"`.
-- El body admite `modelo?: string`. Si viene y no está en la lista, respuesta 400 con mensaje claro. Si no viene, se usa el modelo por defecto.
-- Modo prueba: si el body trae `modelo`, se omite por completo el upsert a `cliente_insights`. Sin `modelo`, el flujo es idéntico al actual (upsert incluido).
-- La respuesta incluye siempre `_meta`: `{ modelo, prompt_tokens, completion_tokens, total_tokens, duracion_ms }`. Los tres contadores se leen de `chatJson.usage` y valen `null` si el gateway no los informa (nunca 0). `duracion_ms` se mide con `performance.now()` alrededor del `fetch` al gateway.
+```text
+VENTAS POR AÑO (EUR):
+  2024 (año completo): 247.371 EUR
+  2025 (año completo): 290.478 EUR
+  2026 (parcial, hasta 01/09): 184.914 EUR
+```
 
-Prompt, esquema de respuesta, saneado y manejo de errores se quedan como están.
+El "hasta" es la fecha local de hoy en formato DD/MM (se reutiliza el helper `ddmm` ya existente sobre `hoyIso`). Importes con `eur0` (separador de miles es-ES).
 
-## B) Panel de comparación en la ficha (solo admin)
+## 2. Bloque COMPARACIÓN VÁLIDA
 
-En `src/pages/ClienteDetalle.tsx`, pestaña "Análisis IA", debajo del botón actual:
+Justo debajo de la lista, y solo si `kpis.importe_anio_anterior_ytd` viene informado y es distinto de 0:
 
-- Visibilidad: `role === "admin"` leído de `useAuth()`, que la página ya importa. Nota: el gate de margen (`usePuedeVerMargen`) no sirve aquí porque `ver_margen` es un permiso de perfil independiente y lo pueden tener no administradores; el panel de pruebas se limita a administradores como pide el objetivo.
-- Bloque "Comparar modelos" con un `Select` de los cuatro modelos y un botón "Probar" que invoca la edge function con `{ cod_cliente, modelo }`.
-- Estado local `pruebas: Array<{ modelo, meta, resumen, alertas, oportunidades, argumentario }>`; cada resultado se **añade** al array para poder acumular y comparar.
-- Cada prueba se pinta en su propia `Card`: título con el nombre del modelo, línea pequeña con tokens de entrada, tokens de salida y segundos (`duracion_ms / 1000`, un decimal), y debajo las cuatro secciones del informe con el mismo formato visual que el informe normal.
-- Botón "Limpiar pruebas" que vacía el array.
-- Aviso pequeño permanente: "Pruebas no guardadas. El informe del cliente no se modifica."
-- Spinner y desactivación del botón "Probar" mientras hay una prueba en curso; errores por toast, igual que el flujo actual.
+```text
+COMPARACIÓN VÁLIDA (mismo periodo del año anterior):
+  2025 hasta 01/09: 201.640 EUR  ·  2026 hasta 01/09: 184.914 EUR  ·  -8,3 %
+```
 
-El informe normal, su botón "Generar análisis" y la generación en segundo plano no cambian.
+- Año en curso: `kpis.importe_anio_actual`; año anterior mismo periodo: `kpis.importe_anio_anterior_ytd`.
+- Porcentaje calculado en la función: `(actual - ytd) / ytd * 100`, un decimal, formato es-ES, con signo.
+- Si `importe_anio_anterior_ytd` es null o 0, o no hay registro de KPIs, se omite el bloque entero (nunca división por cero).
+
+## 3. Regla en el system prompt
+
+Se añade al final del mensaje de sistema, sin quitar nada de lo actual:
+
+"El año en curso está incompleto. NUNCA compares su importe con el total de un año cerrado ni presentes esa diferencia como una caída o una subida. Para cualquier afirmación sobre la evolución anual usa exclusivamente el bloque COMPARACIÓN VÁLIDA. Si ese bloque no aparece, no afirmes nada sobre la tendencia anual."
+
+## 4. Revisión del resto del prompt
+
+Se revisa el resto de instrucciones y del contexto por si alguna invita a comparar años completos con el año en curso. La única frase con riesgo hoy es la de referencias caídas, que se refiere a "últimos 12 meses vs. 12 anteriores" (comparación ya homogénea) y se deja como está; si al revisar aparece algo ambiguo, se ajusta la redacción para acotarlo a esa ventana de 12 meses.
 
 ## Fuera de alcance
 
-Sin migraciones. No se toca el prompt, el esquema de respuesta, la tabla `cliente_insights` ni el flujo de generación en segundo plano.
+No se toca el modelo, el bloque de productos, el perfil, la situación ni el saneado de la respuesta.
