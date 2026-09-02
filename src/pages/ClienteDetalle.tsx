@@ -1067,14 +1067,20 @@ const { campo, dir } = ordenProductos;
             <p className="text-sm text-muted-foreground">
               {shown?.generado_en ? `Generado ${new Date(shown.generado_en).toLocaleString("es-ES")}` : "Sin análisis todavía"}
             </p>
-            <Button onClick={() => generar.mutate()} disabled={generar.isPending}>
-              {generar.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+            <Button onClick={() => generar.mutate()} disabled={generando}>
+              {generando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
               {shown ? "Regenerar" : "Generar análisis"}
             </Button>
           </div>
 
+          {generando && !shown && (
+            <div className="flex items-center gap-2 rounded-md border p-6 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Generando informe…
+            </div>
+          )}
+
           {shown && (
-            <div className="space-y-3">
+            <div className={`space-y-3 ${generando ? "opacity-60" : ""}`}>
               <Card>
                 <CardHeader><CardTitle className="text-base">Resumen</CardTitle></CardHeader>
                 <CardContent><p className="text-sm leading-relaxed">{shown.resumen}</p></CardContent>
