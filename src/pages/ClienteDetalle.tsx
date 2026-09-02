@@ -1160,6 +1160,83 @@ const { campo, dir } = ordenProductos;
               )}
             </div>
           )}
+
+          {role === "admin" && (
+            <Card className="border-dashed">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Comparar modelos</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Pruebas no guardadas. El informe del cliente no se modifica.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <Select value={modeloPrueba} onValueChange={setModeloPrueba}>
+                    <SelectTrigger className="sm:w-64"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {MODELOS_IA.map((m) => (
+                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex gap-2">
+                    <Button variant="secondary" onClick={() => probar.mutate(modeloPrueba)} disabled={probar.isPending}>
+                      {probar.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                      Probar
+                    </Button>
+                    {pruebas.length > 0 && (
+                      <Button variant="ghost" onClick={() => setPruebas([])}>Limpiar pruebas</Button>
+                    )}
+                  </div>
+                </div>
+
+                {probar.isPending && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Probando {modeloPrueba}…
+                  </div>
+                )}
+
+                {pruebas.map((p, idx) => (
+                  <Card key={`${p.modelo}-${idx}`}>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm">{p.modelo}</CardTitle>
+                      <p className="text-xs text-muted-foreground">
+                        Entrada: {p.meta?.prompt_tokens ?? "—"} tokens · Salida: {p.meta?.completion_tokens ?? "—"} tokens ·{" "}
+                        {p.meta?.duracion_ms != null ? `${num(p.meta.duracion_ms / 1000, 1)} s` : "— s"}
+                      </p>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div>
+                        <p className="mb-1 text-xs font-medium text-muted-foreground">Resumen</p>
+                        <p className="text-sm leading-relaxed">{p.resumen}</p>
+                      </div>
+                      {[
+                        { title: "Alertas", icon: AlertTriangle, items: p.alertas },
+                        { title: "Oportunidades", icon: Target, items: p.oportunidades },
+                        { title: "Argumentario para la próxima visita", icon: MessageSquareQuote, items: p.argumentario },
+                      ].map(({ title, icon: Icon, items }) =>
+                        items?.length ? (
+                          <div key={title}>
+                            <p className="mb-1 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                              <Icon className="h-3.5 w-3.5" />{title}
+                            </p>
+                            <ul className="space-y-2 text-sm">
+                              {items.map((it, i) => (
+                                <li key={i} className="flex gap-2">
+                                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                                  {it}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null,
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
