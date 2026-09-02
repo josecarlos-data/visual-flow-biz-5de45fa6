@@ -185,15 +185,30 @@ Deno.serve(async (req) => {
           `frecuencia de compra cada ${kpis.frecuencia_compra_dias ?? "—"} días · canal principal ${kpis.canal_principal ?? "—"}`
         : "",
       "",
-      "PRODUCTOS MÁS COMPRADOS:",
-      (productosRes.data ?? []).slice(0, 20).map((p: Record<string, unknown>) =>
-        `  ${p.referencia}${p.descripcion ? ` (${p.descripcion})` : ""}${p.familia ? ` [${p.familia}]` : ""} — ${Math.round(Number(p.importe)).toLocaleString("es-ES")} EUR${p.ultima_compra ? `, última compra ${p.ultima_compra}` : ""}`
-      ).join("\n") || "  Sin datos",
+      "PERFIL DEL TALLER:",
+      perfilLineas.join("\n") || "  Sin datos de perfil",
+      "",
+      "PRODUCTOS (últimos 12 meses vs. 12 anteriores):",
+      (productosRes.data ?? []).slice(0, 20).map((p: Record<string, unknown>) => {
+        const act = Number(p.importe ?? 0);
+        const ant = Number(p.importe_anterior ?? 0);
+        let comparativa: string;
+        if (ant === 0) comparativa = "(nueva)";
+        else if (act === 0) comparativa = `(antes ${eur0(ant)} EUR, perdida)`;
+        else {
+          const pct = Math.round(((act - ant) / ant) * 100);
+          comparativa = `(antes ${eur0(ant)} EUR, ${pct >= 0 ? "+" : "−"}${Math.abs(pct)} %)`;
+        }
+        return `  ${p.referencia}${p.descripcion ? ` (${p.descripcion})` : ""}${p.familia ? ` [${p.familia}]` : ""} — ${eur0(act)} EUR ${comparativa}${p.ultima_compra ? `, última compra ${p.ultima_compra}` : ""}`;
+      }).join("\n") || "  Sin datos",
       "",
       "ÚLTIMAS VISITAS:",
       (visitasRes.data ?? []).map((v) => {
         const campos = v.campos && typeof v.campos === "object"
-          ? Object.entries(v.campos as Record<string, unknown>).filter(([, val]) => val).map(([k, val]) => `${k}: ${val}`).join(" | ")
+          ? Object.entries(v.campos as Record<string, unknown>)
+              .filter(([, val]) => val)
+              .map(([k, val]) => `${etiquetaCampo.get(k) ?? k}: ${val}`)
+              .join(" | ")
           : "";
         return `  ${v.fecha} [${v.motivo_key ?? "—"}] ${campos || v.observaciones || ""}`;
       }).join("\n") || "  Sin visitas registradas",
