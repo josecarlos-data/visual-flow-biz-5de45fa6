@@ -224,7 +224,8 @@ Deno.serve(async (req) => {
             role: "system",
             content:
               "Eres un analista comercial de una distribuidora de recambios de automoción. Analizas la ficha de un cliente y preparas al comercial para su próxima visita. " +
-              "Sé concreto y accionable: cifras, familias de producto y acciones. Nada de generalidades. Responde siempre en español.",
+              "Sé concreto y accionable: cifras, familias de producto y acciones. Nada de generalidades. Responde siempre en español. " +
+              "Si una referencia relevante ha caído respecto al periodo anterior, menciónala explícitamente en alertas u oportunidades, con su nombre y su porcentaje de variación.",
           },
           { role: "user", content: contexto },
         ],
