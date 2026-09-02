@@ -3,6 +3,22 @@ import { corsHeaders } from "../_shared/cors.ts";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 
+/** Marcadores de basura que a veces cuelan los modelos al final del texto. */
+const MARCADORES = ["<|endoftext|>", "#+#+", "billing:", "COST:", "[PLUGIN]", "TOKEN ", "END asr"];
+
+/** Corta la cola de basura, quita controles no imprimibles y normaliza espacios. */
+function limpiar(texto: string): string {
+  let s = String(texto ?? "");
+  for (const m of MARCADORES) {
+    const i = s.indexOf(m);
+    if (i >= 0) s = s.slice(0, i);
+  }
+  // deno-lint-ignore no-control-regex
+  s = s.replace(/[\u0000-\u0009\u000B-\u001F\u007F]/g, "");
+  s = s.replace(/[^\S\n]{2,}/g, " ").trim();
+  return s.length < 3 ? "" : s;
+}
+
 const SCHEMA = {
   type: "object",
   properties: {
@@ -66,22 +82,41 @@ Deno.serve(async (req) => {
       });
     }
 
-// Fecha local (no UTC) para "hasta hoy" en la consulta de productos
+// Fechas locales (no UTC) para los rangos de producto
+    const isoLocal = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const hoyLocal = new Date();
-    const hoyIso = `${hoyLocal.getFullYear()}-${String(hoyLocal.getMonth() + 1).padStart(2, "0")}-${String(hoyLocal.getDate()).padStart(2, "0")}`;
+    const hoyIso = isoLocal(hoyLocal);
+    const mesesAtras = (n: number) => {
+      const d = new Date(hoyLocal.getFullYear(), hoyLocal.getMonth() - n, hoyLocal.getDate());
+      return d;
+    };
+    const desde12 = mesesAtras(12);
+    const desde24 = mesesAtras(24);
+    const hastaPrev = new Date(desde12.getFullYear(), desde12.getMonth(), desde12.getDate() - 1);
 
-    const [clienteRes, ventasRes, productosRes, visitasRes, kpisRes] = await Promise.all([
+    const [clienteRes, ventasRes, productosRes, visitasRes, kpisRes, perfilRes, atributosRes, camposRes, situacionesRes] =
+      await Promise.all([
       userClient.from("clientes").select("*").eq("cod_cliente", cod_cliente).maybeSingle(),
       userClient.from("resumen_cliente_mes").select("anio, mes, importe").eq("cod_cliente", cod_cliente),
       userClient.rpc("cliente_top_productos", {
         _cod: cod_cliente,
-        _desde: "2000-01-01",
+        _desde: isoLocal(desde12),
         _hasta: hoyIso,
-        _desde_prev: null,
-        _hasta_prev: null,
+        _desde_prev: isoLocal(desde24),
+        _hasta_prev: isoLocal(hastaPrev),
       }),
       userClient.from("visitas").select("fecha, motivo_key, campos, observaciones").eq("cod_cliente", cod_cliente).order("fecha", { ascending: false }).limit(8),
       userClient.from("cliente_kpis").select("*").eq("cod_cliente", cod_cliente).maybeSingle(),
+      userClient.from("v_cliente_perfil_vigente")
+        .select("atributo_key, valor_texto, valor_num, observado_en")
+        .eq("cod_cliente", cod_cliente),
+      userClient.from("perfil_atributos").select("key, nombre, unidad"),
+      userClient.from("motivo_campos").select("campo_key, label"),
+      userClient.from("situaciones_cliente")
+        .select("etiqueta, activo, desde, hasta")
+        .eq("cod_cliente", cod_cliente)
+        .order("updated_at", { ascending: false }),
     ]);
 
     if (!clienteRes.data) {
@@ -97,11 +132,47 @@ Deno.serve(async (req) => {
     }
     const kpis = kpisRes.data;
 
+    // Etiquetas legibles de los catálogos
+    const etiquetaAtributo = new Map<string, string>();
+    const unidadAtributo = new Map<string, string>();
+    for (const a of atributosRes.data ?? []) {
+      etiquetaAtributo.set(a.key as string, (a.nombre as string) ?? (a.key as string));
+      if (a.unidad) unidadAtributo.set(a.key as string, a.unidad as string);
+    }
+    const etiquetaCampo = new Map<string, string>();
+    for (const c of camposRes.data ?? []) {
+      if (!etiquetaCampo.has(c.campo_key as string)) etiquetaCampo.set(c.campo_key as string, (c.label as string) ?? (c.campo_key as string));
+    }
+
+    // Situación vigente: mismo criterio que la cabecera de la ficha
+    const situacion = (situacionesRes.data ?? []).find(
+      (s) => s.activo && (s.desde as string) <= hoyIso && (!s.hasta || (s.hasta as string) >= hoyIso),
+    );
+
+    const ddmm = (f: string | null | undefined) => {
+      if (!f) return "";
+      const [, m, d] = String(f).split("-");
+      return m && d ? `${d}/${m}` : String(f);
+    };
+
+    const perfilLineas = (perfilRes.data ?? []).map((p) => {
+      const label = etiquetaAtributo.get(p.atributo_key as string) ?? (p.atributo_key as string);
+      const unidad = unidadAtributo.get(p.atributo_key as string);
+      const valor = p.valor_num !== null && p.valor_num !== undefined
+        ? `${Number(p.valor_num).toLocaleString("es-ES")}${unidad ? ` ${unidad}` : ""}`
+        : (p.valor_texto as string) ?? "";
+      const obs = ddmm(p.observado_en as string);
+      return `  ${label}: ${valor}${obs ? ` (observado ${obs})` : ""}`;
+    });
+
+    const eur0 = (n: number) => Math.round(n).toLocaleString("es-ES");
+
     const cliente = clienteRes.data;
     const contexto = [
       `CLIENTE: ${cliente.cliente} (código ${cliente.cod_cliente})`,
       `Delegación: ${cliente.delegacion ?? "—"} · Localidad: ${cliente.localidad ?? "—"} · Comercial: ${cliente.vendedor ?? "—"}`,
       cliente.tipo_cliente ? `Tipo: ${cliente.tipo_cliente}` : "",
+      situacion ? `SITUACIÓN: ${situacion.etiqueta}` : "",
       cliente.observaciones ? `Observaciones de ficha: ${cliente.observaciones}` : "",
       "",
       "VENTAS POR AÑO (EUR):",
@@ -114,15 +185,30 @@ Deno.serve(async (req) => {
           `frecuencia de compra cada ${kpis.frecuencia_compra_dias ?? "—"} días · canal principal ${kpis.canal_principal ?? "—"}`
         : "",
       "",
-      "PRODUCTOS MÁS COMPRADOS:",
-      (productosRes.data ?? []).slice(0, 20).map((p: Record<string, unknown>) =>
-        `  ${p.referencia}${p.descripcion ? ` (${p.descripcion})` : ""}${p.familia ? ` [${p.familia}]` : ""} — ${Math.round(Number(p.importe)).toLocaleString("es-ES")} EUR${p.ultima_compra ? `, última compra ${p.ultima_compra}` : ""}`
-      ).join("\n") || "  Sin datos",
+      "PERFIL DEL TALLER:",
+      perfilLineas.join("\n") || "  Sin datos de perfil",
+      "",
+      "PRODUCTOS (últimos 12 meses vs. 12 anteriores):",
+      (productosRes.data ?? []).slice(0, 20).map((p: Record<string, unknown>) => {
+        const act = Number(p.importe ?? 0);
+        const ant = Number(p.importe_anterior ?? 0);
+        let comparativa: string;
+        if (ant === 0) comparativa = "(nueva)";
+        else if (act === 0) comparativa = `(antes ${eur0(ant)} EUR, perdida)`;
+        else {
+          const pct = Math.round(((act - ant) / ant) * 100);
+          comparativa = `(antes ${eur0(ant)} EUR, ${pct >= 0 ? "+" : "−"}${Math.abs(pct)} %)`;
+        }
+        return `  ${p.referencia}${p.descripcion ? ` (${p.descripcion})` : ""}${p.familia ? ` [${p.familia}]` : ""} — ${eur0(act)} EUR ${comparativa}${p.ultima_compra ? `, última compra ${p.ultima_compra}` : ""}`;
+      }).join("\n") || "  Sin datos",
       "",
       "ÚLTIMAS VISITAS:",
       (visitasRes.data ?? []).map((v) => {
         const campos = v.campos && typeof v.campos === "object"
-          ? Object.entries(v.campos as Record<string, unknown>).filter(([, val]) => val).map(([k, val]) => `${k}: ${val}`).join(" | ")
+          ? Object.entries(v.campos as Record<string, unknown>)
+              .filter(([, val]) => val)
+              .map(([k, val]) => `${etiquetaCampo.get(k) ?? k}: ${val}`)
+              .join(" | ")
           : "";
         return `  ${v.fecha} [${v.motivo_key ?? "—"}] ${campos || v.observaciones || ""}`;
       }).join("\n") || "  Sin visitas registradas",
@@ -138,7 +224,8 @@ Deno.serve(async (req) => {
             role: "system",
             content:
               "Eres un analista comercial de una distribuidora de recambios de automoción. Analizas la ficha de un cliente y preparas al comercial para su próxima visita. " +
-              "Sé concreto y accionable: cifras, familias de producto y acciones. Nada de generalidades. Responde siempre en español.",
+              "Sé concreto y accionable: cifras, familias de producto y acciones. Nada de generalidades. Responde siempre en español. " +
+              "Si una referencia relevante ha caído respecto al periodo anterior, menciónala explícitamente en alertas u oportunidades, con su nombre y su porcentaje de variación.",
           },
           { role: "user", content: contexto },
         ],
@@ -165,23 +252,54 @@ Deno.serve(async (req) => {
     }
 
     const chatJson = await chat.json();
-    const parsed = JSON.parse(chatJson.choices?.[0]?.message?.content ?? "{}");
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(chatJson.choices?.[0]?.message?.content ?? "{}");
+    } catch (e) {
+      console.error("cliente-insights: JSON inválido del modelo", e);
+      return new Response(
+        JSON.stringify({ error: "La IA ha devuelto una respuesta no válida. Inténtalo de nuevo." }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Saneado: recorta colas de basura antes de guardar y de responder
+    const avisar = (original: string, limpio: string) => {
+      if (original !== limpio) {
+        console.warn(`cliente-insights: texto recortado (cliente ${cod_cliente}): ${original.slice(0, 200)}`);
+      }
+    };
+    const limpiarLista = (v: unknown): string[] =>
+      (Array.isArray(v) ? v : []).map((x) => {
+        const orig = String(x ?? "");
+        const out = limpiar(orig);
+        avisar(orig, out);
+        return out;
+      }).filter(Boolean);
+
+    const resumenOriginal = String(parsed.resumen ?? "");
+    const resumen = limpiar(resumenOriginal);
+    avisar(resumenOriginal, resumen);
+
+    const saneado = {
+      resumen,
+      alertas: limpiarLista(parsed.alertas),
+      oportunidades: limpiarLista(parsed.oportunidades),
+      argumentario: limpiarLista(parsed.argumentario),
+    };
 
     // Guardar en caché con service role (la tabla solo permite escritura a admin)
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     await admin.from("cliente_insights").upsert(
       {
         cod_cliente,
-        resumen: parsed.resumen ?? "",
-        alertas: parsed.alertas ?? [],
-        oportunidades: parsed.oportunidades ?? [],
-        argumentario: parsed.argumentario ?? [],
+        ...saneado,
         generado_en: new Date().toISOString(),
       },
       { onConflict: "cod_cliente" },
     );
 
-    return new Response(JSON.stringify({ ...parsed, generado_en: new Date().toISOString() }), {
+    return new Response(JSON.stringify({ ...saneado, generado_en: new Date().toISOString() }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

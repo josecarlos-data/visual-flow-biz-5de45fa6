@@ -6,7 +6,7 @@ import {
   TrendingUp, TrendingDown, Package, Plus, AlertTriangle, Target, MessageSquareQuote,
   Truck, User, Info, ChevronDown, ChevronUp, CalendarPlus, CalendarCheck, Search,
 } from "lucide-react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useMutationState, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -105,7 +105,7 @@ export default function ClienteDetalle() {
   const { data: verMargen } = usePuedeVerMargen();
   const { mapa: situaciones } = useSituacionesVigentes();
   const situacion = codNum != null ? situaciones.get(codNum) : undefined;
-  const [insights, setInsights] = useState<Insights | null>(null);
+  const queryClient = useQueryClient();
 const [periodoProd, setPeriodoProd] = useState<string>("12m");
   const [busquedaProductos, setBusquedaProductos] = useState("");
   const [ordenProductos, setOrdenProductos] = useState<{ campo: CampoOrden; dir: "asc" | "desc" }>({
@@ -292,9 +292,10 @@ const { campo, dir } = ordenProductos;
     },
   });
 
-  const shown = insights ?? cached ?? null;
+  const shown = cached ?? null;
 
   const generar = useMutation({
+    mutationKey: ["crm_insights_generar", codNum],
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("cliente-insights", {
         body: { cod_cliente: codNum },
@@ -303,10 +304,19 @@ const { campo, dir } = ordenProductos;
       if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
       return data as Insights;
     },
-    onSuccess: (d) => setInsights(d),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crm_insights", codNum] });
+    },
     onError: (e: Error) =>
       toast({ title: "No se ha podido generar el análisis", description: e.message, variant: "destructive" }),
   });
+
+  /** Estado "generando" leído del caché global: sobrevive al desmontaje de la pestaña. */
+  const generando =
+    useMutationState({
+      filters: { mutationKey: ["crm_insights_generar", codNum], status: "pending" },
+    }).length > 0;
+
 
   const anios = useMemo(
     () => Array.from(new Set((ventas ?? []).map((v) => v.anio))).sort((a, b) => b - a),
@@ -1057,14 +1067,20 @@ const { campo, dir } = ordenProductos;
             <p className="text-sm text-muted-foreground">
               {shown?.generado_en ? `Generado ${new Date(shown.generado_en).toLocaleString("es-ES")}` : "Sin análisis todavía"}
             </p>
-            <Button onClick={() => generar.mutate()} disabled={generar.isPending}>
-              {generar.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+            <Button onClick={() => generar.mutate()} disabled={generando}>
+              {generando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
               {shown ? "Regenerar" : "Generar análisis"}
             </Button>
           </div>
 
+          {generando && !shown && (
+            <div className="flex items-center gap-2 rounded-md border p-6 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Generando informe…
+            </div>
+          )}
+
           {shown && (
-            <div className="space-y-3">
+            <div className={`space-y-3 ${generando ? "opacity-60" : ""}`}>
               <Card>
                 <CardHeader><CardTitle className="text-base">Resumen</CardTitle></CardHeader>
                 <CardContent><p className="text-sm leading-relaxed">{shown.resumen}</p></CardContent>
