@@ -317,6 +317,36 @@ const { campo, dir } = ordenProductos;
       filters: { mutationKey: ["crm_insights_generar", codNum], status: "pending" },
     }).length > 0;
 
+  // --- Comparación de modelos (solo admin, pruebas no guardadas) ---
+  const [modeloPrueba, setModeloPrueba] = useState<string>(MODELOS_IA[0]);
+  const [pruebas, setPruebas] = useState<PruebaModelo[]>([]);
+  const probar = useMutation({
+    mutationFn: async (modelo: string) => {
+      const { data, error } = await supabase.functions.invoke("cliente-insights", {
+        body: { cod_cliente: codNum, modelo },
+      });
+      if (error) throw error;
+      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+      return data as PruebaRespuesta;
+    },
+    onSuccess: (data, modelo) => {
+      setPruebas((prev) => [
+        ...prev,
+        {
+          modelo: data._meta?.modelo ?? modelo,
+          meta: data._meta ?? null,
+          resumen: data.resumen,
+          alertas: data.alertas ?? [],
+          oportunidades: data.oportunidades ?? [],
+          argumentario: data.argumentario ?? [],
+        },
+      ]);
+    },
+    onError: (e: Error) =>
+      toast({ title: "La prueba ha fallado", description: e.message, variant: "destructive" }),
+  });
+
+
 
   const anios = useMemo(
     () => Array.from(new Set((ventas ?? []).map((v) => v.anio))).sort((a, b) => b - a),
