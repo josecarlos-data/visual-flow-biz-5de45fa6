@@ -82,22 +82,41 @@ Deno.serve(async (req) => {
       });
     }
 
-// Fecha local (no UTC) para "hasta hoy" en la consulta de productos
+// Fechas locales (no UTC) para los rangos de producto
+    const isoLocal = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const hoyLocal = new Date();
-    const hoyIso = `${hoyLocal.getFullYear()}-${String(hoyLocal.getMonth() + 1).padStart(2, "0")}-${String(hoyLocal.getDate()).padStart(2, "0")}`;
+    const hoyIso = isoLocal(hoyLocal);
+    const mesesAtras = (n: number) => {
+      const d = new Date(hoyLocal.getFullYear(), hoyLocal.getMonth() - n, hoyLocal.getDate());
+      return d;
+    };
+    const desde12 = mesesAtras(12);
+    const desde24 = mesesAtras(24);
+    const hastaPrev = new Date(desde12.getFullYear(), desde12.getMonth(), desde12.getDate() - 1);
 
-    const [clienteRes, ventasRes, productosRes, visitasRes, kpisRes] = await Promise.all([
+    const [clienteRes, ventasRes, productosRes, visitasRes, kpisRes, perfilRes, atributosRes, camposRes, situacionesRes] =
+      await Promise.all([
       userClient.from("clientes").select("*").eq("cod_cliente", cod_cliente).maybeSingle(),
       userClient.from("resumen_cliente_mes").select("anio, mes, importe").eq("cod_cliente", cod_cliente),
       userClient.rpc("cliente_top_productos", {
         _cod: cod_cliente,
-        _desde: "2000-01-01",
+        _desde: isoLocal(desde12),
         _hasta: hoyIso,
-        _desde_prev: null,
-        _hasta_prev: null,
+        _desde_prev: isoLocal(desde24),
+        _hasta_prev: isoLocal(hastaPrev),
       }),
       userClient.from("visitas").select("fecha, motivo_key, campos, observaciones").eq("cod_cliente", cod_cliente).order("fecha", { ascending: false }).limit(8),
       userClient.from("cliente_kpis").select("*").eq("cod_cliente", cod_cliente).maybeSingle(),
+      userClient.from("v_cliente_perfil_vigente")
+        .select("atributo_key, valor_texto, valor_num, observado_en")
+        .eq("cod_cliente", cod_cliente),
+      userClient.from("perfil_atributos").select("key, nombre, unidad"),
+      userClient.from("motivo_campos").select("campo_key, label"),
+      userClient.from("situaciones_cliente")
+        .select("etiqueta, activo, desde, hasta")
+        .eq("cod_cliente", cod_cliente)
+        .order("updated_at", { ascending: false }),
     ]);
 
     if (!clienteRes.data) {
