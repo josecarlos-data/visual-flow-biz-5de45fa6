@@ -252,23 +252,54 @@ Deno.serve(async (req) => {
     }
 
     const chatJson = await chat.json();
-    const parsed = JSON.parse(chatJson.choices?.[0]?.message?.content ?? "{}");
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(chatJson.choices?.[0]?.message?.content ?? "{}");
+    } catch (e) {
+      console.error("cliente-insights: JSON inválido del modelo", e);
+      return new Response(
+        JSON.stringify({ error: "La IA ha devuelto una respuesta no válida. Inténtalo de nuevo." }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Saneado: recorta colas de basura antes de guardar y de responder
+    const avisar = (original: string, limpio: string) => {
+      if (original !== limpio) {
+        console.warn(`cliente-insights: texto recortado (cliente ${cod_cliente}): ${original.slice(0, 200)}`);
+      }
+    };
+    const limpiarLista = (v: unknown): string[] =>
+      (Array.isArray(v) ? v : []).map((x) => {
+        const orig = String(x ?? "");
+        const out = limpiar(orig);
+        avisar(orig, out);
+        return out;
+      }).filter(Boolean);
+
+    const resumenOriginal = String(parsed.resumen ?? "");
+    const resumen = limpiar(resumenOriginal);
+    avisar(resumenOriginal, resumen);
+
+    const saneado = {
+      resumen,
+      alertas: limpiarLista(parsed.alertas),
+      oportunidades: limpiarLista(parsed.oportunidades),
+      argumentario: limpiarLista(parsed.argumentario),
+    };
 
     // Guardar en caché con service role (la tabla solo permite escritura a admin)
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     await admin.from("cliente_insights").upsert(
       {
         cod_cliente,
-        resumen: parsed.resumen ?? "",
-        alertas: parsed.alertas ?? [],
-        oportunidades: parsed.oportunidades ?? [],
-        argumentario: parsed.argumentario ?? [],
+        ...saneado,
         generado_en: new Date().toISOString(),
       },
       { onConflict: "cod_cliente" },
     );
 
-    return new Response(JSON.stringify({ ...parsed, generado_en: new Date().toISOString() }), {
+    return new Response(JSON.stringify({ ...saneado, generado_en: new Date().toISOString() }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
