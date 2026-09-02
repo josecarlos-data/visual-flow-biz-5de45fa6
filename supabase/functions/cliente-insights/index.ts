@@ -234,11 +234,12 @@ Deno.serve(async (req) => {
       }).join("\n") || "  Sin visitas registradas",
     ].filter(Boolean).join("\n");
 
+    const t0 = performance.now();
     const chat = await fetch(`${GATEWAY}/chat/completions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "openai/gpt-5.5",
+        model: modeloUsado,
         messages: [
           {
             role: "system",
