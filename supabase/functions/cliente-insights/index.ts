@@ -3,6 +3,15 @@ import { corsHeaders } from "../_shared/cors.ts";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 
+/** Modelos permitidos para pruebas comparativas desde la ficha. */
+const MODELOS_PERMITIDOS = [
+  "openai/gpt-5.5",
+  "openai/gpt-5.6-luna",
+  "openai/gpt-5.6-terra",
+  "openai/gpt-5.6-sol",
+] as const;
+const MODELO_POR_DEFECTO = "openai/gpt-5.5";
+
 /** Marcadores de basura que a veces cuelan los modelos al final del texto. */
 const MARCADORES = ["<|endoftext|>", "#+#+", "billing:", "COST:", "[PLUGIN]", "TOKEN ", "END asr"];
 
@@ -58,13 +67,24 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { cod_cliente } = await req.json();
+    const { cod_cliente, modelo } = await req.json();
     if (!cod_cliente) {
       return new Response(JSON.stringify({ error: "Falta el código de cliente" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Modo prueba: si viene "modelo", se usa ese y NO se guarda el informe.
+    if (modelo !== undefined && !MODELOS_PERMITIDOS.includes(modelo)) {
+      return new Response(
+        JSON.stringify({ error: `Modelo no permitido. Opciones: ${MODELOS_PERMITIDOS.join(", ")}` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    const esPrueba = modelo !== undefined;
+    const modeloUsado = esPrueba ? (modelo as string) : MODELO_POR_DEFECTO;
+
 
     // Cliente con el JWT del usuario: las RLS garantizan que solo ve los suyos
     const authHeader = req.headers.get("Authorization") ?? "";
@@ -214,11 +234,12 @@ Deno.serve(async (req) => {
       }).join("\n") || "  Sin visitas registradas",
     ].filter(Boolean).join("\n");
 
+    const t0 = performance.now();
     const chat = await fetch(`${GATEWAY}/chat/completions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "openai/gpt-5.5",
+        model: modeloUsado,
         messages: [
           {
             role: "system",
@@ -251,7 +272,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    const duracion_ms = Math.round(performance.now() - t0);
     const chatJson = await chat.json();
+    const usage = chatJson.usage ?? {};
+    const numOnull = (v: unknown) => (typeof v === "number" ? v : null);
+    const _meta = {
+      modelo: modeloUsado,
+      prompt_tokens: numOnull(usage.prompt_tokens),
+      completion_tokens: numOnull(usage.completion_tokens),
+      total_tokens: numOnull(usage.total_tokens),
+      duracion_ms,
+    };
     let parsed: Record<string, unknown>;
     try {
       parsed = JSON.parse(chatJson.choices?.[0]?.message?.content ?? "{}");
@@ -288,18 +319,21 @@ Deno.serve(async (req) => {
       argumentario: limpiarLista(parsed.argumentario),
     };
 
-    // Guardar en caché con service role (la tabla solo permite escritura a admin)
-    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    await admin.from("cliente_insights").upsert(
-      {
-        cod_cliente,
-        ...saneado,
-        generado_en: new Date().toISOString(),
-      },
-      { onConflict: "cod_cliente" },
-    );
+    // Guardar en caché con service role (la tabla solo permite escritura a admin).
+    // En modo prueba NO se guarda: no debe sobrescribir el informe bueno del cliente.
+    if (!esPrueba) {
+      const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      await admin.from("cliente_insights").upsert(
+        {
+          cod_cliente,
+          ...saneado,
+          generado_en: new Date().toISOString(),
+        },
+        { onConflict: "cod_cliente" },
+      );
+    }
 
-    return new Response(JSON.stringify({ ...saneado, generado_en: new Date().toISOString() }), {
+    return new Response(JSON.stringify({ ...saneado, generado_en: new Date().toISOString(), _meta }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
