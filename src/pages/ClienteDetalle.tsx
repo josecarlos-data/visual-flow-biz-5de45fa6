@@ -53,6 +53,28 @@ interface Insights {
   generado_en?: string;
 }
 
+/** Modelos disponibles para las pruebas comparativas (lista blanca de la edge function). */
+const MODELOS_IA = ["openai/gpt-5.5", "openai/gpt-5.6-luna", "openai/gpt-5.6-terra", "openai/gpt-5.6-sol"];
+
+interface MetaPrueba {
+  modelo: string;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  duracion_ms: number | null;
+}
+
+type PruebaRespuesta = Insights & { _meta?: MetaPrueba };
+
+interface PruebaModelo {
+  modelo: string;
+  meta: MetaPrueba | null;
+  resumen: string;
+  alertas: string[];
+  oportunidades: string[];
+  argumentario: string[];
+}
+
 type CampoOrden = "referencia" | "familia" | "marca" | "unidades" | "importe" | "margen" | "ultima" | "variacion";
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
