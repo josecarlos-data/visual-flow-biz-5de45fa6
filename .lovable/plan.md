@@ -1,40 +1,32 @@
-# Informe de cliente: saneado, generación en segundo plano y contexto más rico
+# Comparar modelos de IA en la ficha de cliente
 
-Ficheros: `supabase/functions/cliente-insights/index.ts` y `src/pages/ClienteDetalle.tsx`. Sin migraciones.
+Los cuatro modelos de la lista blanca existen en el gateway (`openai/gpt-5.5`, `openai/gpt-5.6-luna`, `openai/gpt-5.6-terra`, `openai/gpt-5.6-sol`), verificado contra el listado del gateway. No hace falta cambiar la lista.
 
-## Verificación previa (punto E)
+## A) La edge function acepta un modelo opcional
 
-- **Situación vigente (C4)**: la cabecera de `ClienteDetalle.tsx` la pinta con `useSituacionesVigentes()` (línea 106), que en `useCrm.ts` consulta la tabla **`situaciones_cliente`** y se queda con la primera fila que cumple `activo = true AND desde <= hoy AND (hasta IS NULL OR hasta >= hoy)`, ordenada por `updated_at` descendente. La edge function usará exactamente esa tabla y ese criterio, con la fecha local `hoyIso` ya existente.
-- **RLS**: todas las consultas nuevas (`situaciones_cliente`, `v_cliente_perfil_vigente`, `perfil_atributos`, `motivo_campos`) van con `userClient` dentro del `Promise.all` existente. El cliente de servicio se sigue usando solo para el upsert de caché al final.
-- `v_cliente_perfil_vigente`, `perfil_atributos`, `motivo_campos` y `situaciones_cliente` existen en la base de datos; `v_cliente_perfil_vigente` ya se lee desde el frontend con el cliente normal, así que es accesible con RLS de usuario.
+En `supabase/functions/cliente-insights/index.ts`:
 
-## A) Saneado de la respuesta del modelo (edge function)
+- Lista blanca `MODELOS_PERMITIDOS` declarada en el fichero con los cuatro identificadores; `MODELO_POR_DEFECTO = "openai/gpt-5.5"`.
+- El body admite `modelo?: string`. Si viene y no está en la lista, respuesta 400 con mensaje claro. Si no viene, se usa el modelo por defecto.
+- Modo prueba: si el body trae `modelo`, se omite por completo el upsert a `cliente_insights`. Sin `modelo`, el flujo es idéntico al actual (upsert incluido).
+- La respuesta incluye siempre `_meta`: `{ modelo, prompt_tokens, completion_tokens, total_tokens, duracion_ms }`. Los tres contadores se leen de `chatJson.usage` y valen `null` si el gateway no los informa (nunca 0). `duracion_ms` se mide con `performance.now()` alrededor del `fetch` al gateway.
 
-- Función `limpiar(texto: string): string`: corta en la primera aparición de `<|endoftext|>`, `#+#+`, `billing:`, `COST:`, `[PLUGIN]`, `TOKEN `, `END asr`; elimina controles no imprimibles salvo `\n`; `trim` y colapso de espacios repetidos; devuelve `""` si quedan menos de 3 caracteres.
-- Se aplica a `resumen` y a cada elemento de `alertas`, `oportunidades` y `argumentario`, descartando vacíos, antes del upsert y antes de la respuesta al cliente.
-- Si el texto cambió, `console.warn` con `cod_cliente` y los primeros 200 caracteres del original. Nunca falla.
-- `JSON.parse` envuelto en `try/catch`: al fallar, respuesta 502 con `"La IA ha devuelto una respuesta no válida. Inténtalo de nuevo."` y cabeceras CORS.
+Prompt, esquema de respuesta, saneado y manejo de errores se quedan como están.
 
-## B) Generación en segundo plano (ClienteDetalle.tsx)
+## B) Panel de comparación en la ficha (solo admin)
 
-- Se elimina el `useState` `insights`; `shown` pasa a ser solo `cached`.
-- La mutación recibe `mutationKey: ["crm_insights_generar", codNum]` y en `onSuccess` invalida `["crm_insights", codNum]` en vez de guardar en estado.
-- Estado de carga con `useMutationState({ filters: { mutationKey: ["crm_insights_generar", codNum], status: "pending" } }).length > 0` → `generando`, usado en el `disabled` del botón y en el spinner, de modo que sobreviva al desmontaje de la pestaña.
-- Con `generando` y sin informe previo: bloque con `Loader2` girando y "Generando informe…". Con informe previo: se mantiene visible con `opacity-60`.
-- Sin `AbortController` ni `signal`.
+En `src/pages/ClienteDetalle.tsx`, pestaña "Análisis IA", debajo del botón actual:
 
-## C) Contexto enviado al modelo (edge function)
+- Visibilidad: `role === "admin"` leído de `useAuth()`, que la página ya importa. Nota: el gate de margen (`usePuedeVerMargen`) no sirve aquí porque `ver_margen` es un permiso de perfil independiente y lo pueden tener no administradores; el panel de pruebas se limita a administradores como pide el objetivo.
+- Bloque "Comparar modelos" con un `Select` de los cuatro modelos y un botón "Probar" que invoca la edge function con `{ cod_cliente, modelo }`.
+- Estado local `pruebas: Array<{ modelo, meta, resumen, alertas, oportunidades, argumentario }>`; cada resultado se **añade** al array para poder acumular y comparar.
+- Cada prueba se pinta en su propia `Card`: título con el nombre del modelo, línea pequeña con tokens de entrada, tokens de salida y segundos (`duracion_ms / 1000`, un decimal), y debajo las cuatro secciones del informe con el mismo formato visual que el informe normal.
+- Botón "Limpiar pruebas" que vacía el array.
+- Aviso pequeño permanente: "Pruebas no guardadas. El informe del cliente no se modifica."
+- Spinner y desactivación del botón "Probar" mientras hay una prueba en curso; errores por toast, igual que el flujo actual.
 
-- **C1 Variación por referencia**: `cliente_top_productos` con `_desde` = hoy − 12 meses, `_hasta` = hoy, `_desde_prev` = hoy − 24 meses, `_hasta_prev` = (hoy − 12 meses) − 1 día, todo con fechas locales al estilo de `hoyIso` (nunca `toISOString()`). Título del bloque: "PRODUCTOS (últimos 12 meses vs. 12 anteriores)". Cada línea añade `" — 12.400 EUR (antes 18.900 EUR, −34 %)"`, con `(nueva)` si el anterior es 0 y `(perdida)` si el actual es 0 y el anterior no.
-- **C2 Perfil del taller**: consultas a `v_cliente_perfil_vigente` (por `cod_cliente`) y a `perfil_atributos` (catálogo `key → nombre`). Bloque "PERFIL DEL TALLER:" con una línea por atributo usando la etiqueta legible y `valor_texto` o `valor_num`, más "(observado DD/MM)". Si no hay nada: "  Sin datos de perfil".
-- **C3 Etiquetas reales en visitas**: consulta a `motivo_campos` (`campo_key → label`) y sustitución de la clave cruda al serializar `v.campos`; si la clave no está en el catálogo, se deja igual.
-- **C4 Situación**: consulta a `situaciones_cliente` del cliente; si hay una vigente según el criterio descrito arriba, se añade `SITUACIÓN: {etiqueta}` junto a los datos de ficha, al principio del contexto.
-- **C5 System prompt**: se añade una frase pidiendo que, si una referencia relevante ha caído respecto al periodo anterior, se mencione explícitamente en alertas u oportunidades con su nombre y su porcentaje. Mismo modelo y mismo `response_format`.
+El informe normal, su botón "Generar análisis" y la generación en segundo plano no cambian.
 
 ## Fuera de alcance
 
-Modelo y gateway, análisis de abonos y material no retirado, esquema de `cliente_insights`.
-
-## Verificación final
-
-Redespliegue de la edge function y una llamada real desde la ficha de un cliente para comprobar el informe saneado y los bloques nuevos; build y typecheck limpios; comprobación de que el estado "generando" persiste al cambiar de pestaña y volver.
+Sin migraciones. No se toca el prompt, el esquema de respuesta, la tabla `cliente_insights` ni el flujo de generación en segundo plano.
