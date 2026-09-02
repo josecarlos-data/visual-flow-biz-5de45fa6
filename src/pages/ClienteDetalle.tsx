@@ -6,7 +6,7 @@ import {
   TrendingUp, TrendingDown, Package, Plus, AlertTriangle, Target, MessageSquareQuote,
   Truck, User, Info, ChevronDown, ChevronUp, CalendarPlus, CalendarCheck, Search,
 } from "lucide-react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useMutationState, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -105,7 +105,7 @@ export default function ClienteDetalle() {
   const { data: verMargen } = usePuedeVerMargen();
   const { mapa: situaciones } = useSituacionesVigentes();
   const situacion = codNum != null ? situaciones.get(codNum) : undefined;
-  const [insights, setInsights] = useState<Insights | null>(null);
+  const queryClient = useQueryClient();
 const [periodoProd, setPeriodoProd] = useState<string>("12m");
   const [busquedaProductos, setBusquedaProductos] = useState("");
   const [ordenProductos, setOrdenProductos] = useState<{ campo: CampoOrden; dir: "asc" | "desc" }>({
@@ -292,9 +292,10 @@ const { campo, dir } = ordenProductos;
     },
   });
 
-  const shown = insights ?? cached ?? null;
+  const shown = cached ?? null;
 
   const generar = useMutation({
+    mutationKey: ["crm_insights_generar", codNum],
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("cliente-insights", {
         body: { cod_cliente: codNum },
