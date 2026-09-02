@@ -304,10 +304,19 @@ const { campo, dir } = ordenProductos;
       if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
       return data as Insights;
     },
-    onSuccess: (d) => setInsights(d),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crm_insights", codNum] });
+    },
     onError: (e: Error) =>
       toast({ title: "No se ha podido generar el análisis", description: e.message, variant: "destructive" }),
   });
+
+  /** Estado "generando" leído del caché global: sobrevive al desmontaje de la pestaña. */
+  const generando =
+    useMutationState({
+      filters: { mutationKey: ["crm_insights_generar", codNum], status: "pending" },
+    }).length > 0;
+
 
   const anios = useMemo(
     () => Array.from(new Set((ventas ?? []).map((v) => v.anio))).sort((a, b) => b - a),
