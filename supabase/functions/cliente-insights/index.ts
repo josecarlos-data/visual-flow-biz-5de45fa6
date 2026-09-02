@@ -319,18 +319,21 @@ Deno.serve(async (req) => {
       argumentario: limpiarLista(parsed.argumentario),
     };
 
-    // Guardar en caché con service role (la tabla solo permite escritura a admin)
-    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    await admin.from("cliente_insights").upsert(
-      {
-        cod_cliente,
-        ...saneado,
-        generado_en: new Date().toISOString(),
-      },
-      { onConflict: "cod_cliente" },
-    );
+    // Guardar en caché con service role (la tabla solo permite escritura a admin).
+    // En modo prueba NO se guarda: no debe sobrescribir el informe bueno del cliente.
+    if (!esPrueba) {
+      const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      await admin.from("cliente_insights").upsert(
+        {
+          cod_cliente,
+          ...saneado,
+          generado_en: new Date().toISOString(),
+        },
+        { onConflict: "cod_cliente" },
+      );
+    }
 
-    return new Response(JSON.stringify({ ...saneado, generado_en: new Date().toISOString() }), {
+    return new Response(JSON.stringify({ ...saneado, generado_en: new Date().toISOString(), _meta }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
