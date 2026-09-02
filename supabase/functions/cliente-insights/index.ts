@@ -3,6 +3,15 @@ import { corsHeaders } from "../_shared/cors.ts";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 
+/** Modelos permitidos para pruebas comparativas desde la ficha. */
+const MODELOS_PERMITIDOS = [
+  "openai/gpt-5.5",
+  "openai/gpt-5.6-luna",
+  "openai/gpt-5.6-terra",
+  "openai/gpt-5.6-sol",
+] as const;
+const MODELO_POR_DEFECTO = "openai/gpt-5.5";
+
 /** Marcadores de basura que a veces cuelan los modelos al final del texto. */
 const MARCADORES = ["<|endoftext|>", "#+#+", "billing:", "COST:", "[PLUGIN]", "TOKEN ", "END asr"];
 
