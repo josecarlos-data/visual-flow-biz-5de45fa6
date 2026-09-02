@@ -67,13 +67,24 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { cod_cliente } = await req.json();
+    const { cod_cliente, modelo } = await req.json();
     if (!cod_cliente) {
       return new Response(JSON.stringify({ error: "Falta el código de cliente" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Modo prueba: si viene "modelo", se usa ese y NO se guarda el informe.
+    if (modelo !== undefined && !MODELOS_PERMITIDOS.includes(modelo)) {
+      return new Response(
+        JSON.stringify({ error: `Modelo no permitido. Opciones: ${MODELOS_PERMITIDOS.join(", ")}` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    const esPrueba = modelo !== undefined;
+    const modeloUsado = esPrueba ? (modelo as string) : MODELO_POR_DEFECTO;
+
 
     // Cliente con el JWT del usuario: las RLS garantizan que solo ve los suyos
     const authHeader = req.headers.get("Authorization") ?? "";
