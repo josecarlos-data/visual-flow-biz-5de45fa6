@@ -272,7 +272,9 @@ Deno.serve(async (req) => {
             content:
               "Eres un analista comercial de una distribuidora de recambios de automoción. Analizas la ficha de un cliente y preparas al comercial para su próxima visita. " +
               "Sé concreto y accionable: cifras, familias de producto y acciones. Nada de generalidades. Responde siempre en español. " +
-              "Si una referencia relevante ha caído respecto al periodo anterior, menciónala explícitamente en alertas u oportunidades, con su nombre y su porcentaje de variación.",
+              "Si una referencia relevante ha caído respecto al periodo anterior (últimos 12 meses vs. 12 anteriores), menciónala explícitamente en alertas u oportunidades, con su nombre y su porcentaje de variación. " +
+              "El año en curso está incompleto. NUNCA compares su importe con el total de un año cerrado ni presentes esa diferencia como una caída o una subida. " +
+              "Para cualquier afirmación sobre la evolución anual usa exclusivamente el bloque COMPARACIÓN VÁLIDA. Si ese bloque no aparece, no afirmes nada sobre la tendencia anual.",
           },
           { role: "user", content: contexto },
         ],
