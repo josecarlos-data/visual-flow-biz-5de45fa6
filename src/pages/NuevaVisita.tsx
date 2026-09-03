@@ -880,7 +880,6 @@ export default function NuevaVisita() {
 
                     {!b.manual && selectorMotivo}
 
-
                     {bloques.length > 1 && (
                       <Button
                         variant="ghost"
