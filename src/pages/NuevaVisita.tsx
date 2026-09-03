@@ -121,7 +121,7 @@ export default function NuevaVisita() {
       const abiertos = bloques
         .filter((b) => (estadoDe(b) !== "listo" || setPrev.has(b.uid)) && !setPrev.has(b.uid))
         .map((b) => b.uid);
-return abiertos.length ? [...prev, ...abiertos] : prev;
+      return abiertos.length ? [...prev, ...abiertos] : prev;
     });
     setZonasBAbiertas((prev) => {
       const next = { ...prev };
@@ -231,7 +231,7 @@ return abiertos.length ? [...prev, ...abiertos] : prev;
 
       if (res.resultado_visita && RESULTADOS.includes(res.resultado_visita)) setResultado(res.resultado_visita);
 
-const propuestos: BloqueForm[] = (res.bloques ?? [])
+      const propuestos: BloqueForm[] = (res.bloques ?? [])
         .filter((b) => motivoDe(b.motivo_key))
         .map((b) => ({
           uid: crypto.randomUUID(),
@@ -348,7 +348,7 @@ const propuestos: BloqueForm[] = (res.bloques ?? [])
     if (!motivo) return [];
     const bloqueantes = new Set(bloqueantesDe(b).map((c) => c.campo_key));
     const pendientes = new Set(pendientesDe(b).map((c) => c.campo_key));
-return camposVisibles(motivo.campos).filter(
+    return camposVisibles(motivo.campos).filter(
       (c) => bloqueantes.has(c.campo_key) || pendientes.has(c.campo_key) || b.meta[c.campo_key]?.confianza === "baja",
     );
   };
@@ -773,7 +773,7 @@ return camposVisibles(motivo.campos).filter(
       {esEfectiva && (
         <Accordion type="multiple" value={bloquesAbiertos} onValueChange={setBloquesAbiertos} className="w-full space-y-2">
           {bloques.map((b) => {
-const motivo = motivoDe(b.motivoKey);
+            const motivo = motivoDe(b.motivoKey);
             const estado = estadoDe(b);
             const hayResultado = Object.keys(b.valores).length > 0;
             const atencion = b.manual ? camposVisibles(motivo?.campos ?? []) : zonaADe(b);
@@ -815,7 +815,7 @@ const motivo = motivoDe(b.motivoKey);
               <AccordionItem key={b.uid} value={b.uid} className="rounded-md border px-3 py-1">
                 <AccordionTrigger className="py-2 hover:no-underline">
                   <div className="flex flex-1 items-center justify-between pr-2">
-<span className="text-sm font-medium">{motivo?.nombre ?? "Sin motivo"}</span>
+                    <span className="text-sm font-medium">{motivo?.nombre ?? "Sin motivo"}</span>
                     <div className="flex items-center gap-1.5">
                       {hayResultado && !b.manual && (
                         <Badge variant="secondary" className="gap-1 text-[10px]">
@@ -836,7 +836,7 @@ const motivo = motivoDe(b.motivoKey);
                     </div>
                   </div>
                 </AccordionTrigger>
-<AccordionContent className="pb-2 pt-1">
+                <AccordionContent className="pb-2 pt-1">
                   <div className="space-y-3">
                     {b.manual && selectorMotivo}
                     {atencion.length > 0 && (
@@ -878,7 +878,7 @@ const motivo = motivoDe(b.motivoKey);
                       </Collapsible>
                     )}
 
-{!b.manual && selectorMotivo}
+                    {!b.manual && selectorMotivo}
 
 
                     {bloques.length > 1 && (
