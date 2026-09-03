@@ -87,7 +87,7 @@ export default function NuevaVisita() {
   const [chuletaAbierta, setChuletaAbierta] = useState(false);
   const [extrasAbiertos, setExtrasAbiertos] = useState(false);
   const [bloquesAbiertos, setBloquesAbiertos] = useState<string[]>([]);
-const [zonasBAbiertas, setZonasBAbiertas] = useState<Record<string, boolean>>({});
+  const [zonasBAbiertas, setZonasBAbiertas] = useState<Record<string, boolean>>({});
   /** Partición de zonas congelada al nacer cada bloque: un campo no cambia de zona mientras se edita. */
   const [zonaAFijada, setZonaAFijada] = useState<Record<string, string[]>>({});
 
