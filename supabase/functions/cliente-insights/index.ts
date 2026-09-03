@@ -187,6 +187,31 @@ Deno.serve(async (req) => {
 
     const eur0 = (n: number) => Math.round(n).toLocaleString("es-ES");
 
+    // Ventas por año con etiqueta completo/parcial, y comparación homogénea
+    // del año en curso contra el mismo periodo del año anterior.
+    const anioActual = hoyLocal.getFullYear();
+    const hastaDM = ddmm(hoyIso);
+    const ventasLineas = Object.entries(porAnio).sort().map(([a, t]) => {
+      const esParcial = Number(a) === anioActual;
+      const marca = esParcial ? `parcial, hasta ${hastaDM}` : "año completo";
+      return `  ${a} (${marca}): ${eur0(t)} EUR`;
+    }).join("\n");
+
+    let comparativaYtd = "";
+    {
+      const ytdAnterior = kpis?.importe_anio_anterior_ytd != null ? Number(kpis.importe_anio_anterior_ytd) : 0;
+      const actual = porAnio[anioActual];
+      if (ytdAnterior !== 0 && actual !== undefined) {
+        const pct = ((actual - ytdAnterior) / Math.abs(ytdAnterior)) * 100;
+        const pctTxt = `${pct >= 0 ? "+" : ""}${pct.toLocaleString("es-ES", { maximumFractionDigits: 1, minimumFractionDigits: 1 })} %`;
+        comparativaYtd = [
+          "",
+          "COMPARACIÓN VÁLIDA (mismo periodo del año anterior):",
+          `  ${anioActual - 1} hasta ${hastaDM}: ${eur0(ytdAnterior)} EUR  ·  ${anioActual} hasta ${hastaDM}: ${eur0(actual)} EUR  ·  ${pctTxt}`,
+        ].join("\n");
+      }
+    }
+
     const cliente = clienteRes.data;
     const contexto = [
       `CLIENTE: ${cliente.cliente} (código ${cliente.cod_cliente})`,
@@ -196,7 +221,8 @@ Deno.serve(async (req) => {
       cliente.observaciones ? `Observaciones de ficha: ${cliente.observaciones}` : "",
       "",
       "VENTAS POR AÑO (EUR):",
-      Object.entries(porAnio).sort().map(([a, t]) => `  ${a}: ${Math.round(t).toLocaleString("es-ES")}`).join("\n") || "  Sin datos",
+      ventasLineas || "  Sin datos",
+      comparativaYtd,
       "",
       kpis
         ? `INDICADORES: última compra ${kpis.ultima_compra ?? "—"} · ${kpis.dias_sin_comprar ?? "—"} días sin comprar · ` +
