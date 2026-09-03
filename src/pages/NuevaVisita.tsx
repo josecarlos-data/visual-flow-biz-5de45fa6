@@ -28,6 +28,7 @@ interface BloqueForm {
   motivoKey: string;
   valores: Record<string, string>;
   meta: Meta;
+  manual: boolean;
 }
 
 const nuevoBloque = (motivoKey: string): BloqueForm => ({
@@ -35,6 +36,7 @@ const nuevoBloque = (motivoKey: string): BloqueForm => ({
   motivoKey,
   valores: {},
   meta: {},
+  manual: true,
 });
 
 const RESULTADOS = ["efectiva", "cliente_ausente", "cerrado", "sin_acceso"];
@@ -85,7 +87,9 @@ export default function NuevaVisita() {
   const [chuletaAbierta, setChuletaAbierta] = useState(false);
   const [extrasAbiertos, setExtrasAbiertos] = useState(false);
   const [bloquesAbiertos, setBloquesAbiertos] = useState<string[]>([]);
-  const [zonasBAbiertas, setZonasBAbiertas] = useState<Record<string, boolean>>({});
+const [zonasBAbiertas, setZonasBAbiertas] = useState<Record<string, boolean>>({});
+  /** Partición de zonas congelada al nacer cada bloque: un campo no cambia de zona mientras se edita. */
+  const [zonaAFijada, setZonaAFijada] = useState<Record<string, string[]>>({});
 
   const motivosActivos = useMemo(() => (motivos ?? []).filter((m) => m.is_active), [motivos]);
   const motivoDe = (key: string): Motivo | undefined => motivos?.find((m) => m.key === key);
@@ -119,7 +123,7 @@ export default function NuevaVisita() {
         .map((b) => b.uid);
       return abiertos.length ? [...prev, ...abiertos] : prev;
     });
-    setZonasBAbiertas((prev) => {
+setZonasBAbiertas((prev) => {
       const next = { ...prev };
       for (const b of bloques) {
         if (!(b.uid in next)) {
@@ -127,6 +131,17 @@ export default function NuevaVisita() {
         }
       }
       return next;
+    });
+    // Partición de zonas congelada: se fija una sola vez, la primera vez que se ve el bloque.
+    setZonaAFijada((prev) => {
+      let cambiado = false;
+      const next = { ...prev };
+      for (const b of bloques) {
+        if (b.uid in next) continue;
+        cambiado = true;
+        next[b.uid] = atencionDe(b).map((c) => c.campo_key);
+      }
+      return cambiado ? next : prev;
     });
   }, [bloques]);
 
@@ -218,11 +233,12 @@ export default function NuevaVisita() {
 
       const propuestos: BloqueForm[] = (res.bloques ?? [])
         .filter((b) => motivoDe(b.motivo_key))
-        .map((b) => ({
+.map((b) => ({
           uid: crypto.randomUUID(),
           motivoKey: b.motivo_key,
           valores: { ...b.campos },
           meta: { ...(b.campos_meta ?? {}) },
+          manual: false,
         }));
 
       const avisos = await resolverReferencias(propuestos);
@@ -335,13 +351,23 @@ export default function NuevaVisita() {
     return camposVisibles(motivo.campos).filter(
       (c) => bloqueantes.has(c.campo_key) || pendientes.has(c.campo_key) || b.meta[c.campo_key]?.confianza === "baja",
     );
+};
+
+  /** Zona A congelada al nacer el bloque: un campo no cambia de zona mientras se edita. */
+  const zonaADe = (b: BloqueForm): MotivoCampo[] => {
+    const motivo = motivoDe(b.motivoKey);
+    if (!motivo) return [];
+    const fijadas = zonaAFijada[b.uid];
+    if (!fijadas) return atencionDe(b);
+    const set = new Set(fijadas);
+    return camposVisibles(motivo.campos).filter((c) => set.has(c.campo_key));
   };
 
   const otrosCamposDe = (b: BloqueForm): MotivoCampo[] => {
     const motivo = motivoDe(b.motivoKey);
     if (!motivo) return [];
-    const atencion = new Set(atencionDe(b).map((c) => c.campo_key));
-    return camposVisibles(motivo.campos).filter((c) => !atencion.has(c.campo_key));
+    const zonaA = new Set(zonaADe(b).map((c) => c.campo_key));
+    return camposVisibles(motivo.campos).filter((c) => !zonaA.has(c.campo_key));
   };
 
   const estadoDe = (b: BloqueForm): "listo" | "faltan" | "revisar" => {
@@ -677,7 +703,7 @@ export default function NuevaVisita() {
                       if (res.error) throw new Error(res.error);
                       const propuestos: BloqueForm[] = (res.bloques ?? [])
                         .filter((b) => motivoDe(b.motivo_key))
-                        .map((b) => ({ uid: crypto.randomUUID(), motivoKey: b.motivo_key, valores: { ...b.campos }, meta: { ...(b.campos_meta ?? {}) } }));
+                        .map((b) => ({ uid: crypto.randomUUID(), motivoKey: b.motivo_key, valores: { ...b.campos }, meta: { ...(b.campos_meta ?? {}) }, manual: false }));
                       setAvisosRef(await resolverReferencias(propuestos));
                       if (propuestos.length) setBloques(propuestos);
                     } catch (e) {
@@ -750,8 +776,8 @@ export default function NuevaVisita() {
             const motivo = motivoDe(b.motivoKey);
             const estado = estadoDe(b);
             const hayResultado = Object.keys(b.valores).length > 0;
-            const atencion = atencionDe(b);
-            const otros = otrosCamposDe(b);
+const atencion = b.manual ? camposVisibles(motivo?.campos ?? []) : zonaADe(b);
+            const otros = b.manual ? [] : otrosCamposDe(b);
             const zonaBAbierta = zonasBAbiertas[b.uid] ?? atencion.length === 0;
 
             return (
@@ -760,7 +786,7 @@ export default function NuevaVisita() {
                   <div className="flex flex-1 items-center justify-between pr-2">
                     <span className="text-sm font-medium">{motivo?.nombre ?? "Sin motivo"}</span>
                     <div className="flex items-center gap-1.5">
-                      {hayResultado && (
+{hayResultado && !b.manual && (
                         <Badge variant="secondary" className="gap-1 text-[10px]">
                           <Wand2 className="h-3 w-3" />IA
                         </Badge>
@@ -824,7 +850,15 @@ export default function NuevaVisita() {
                       <Label className="text-xs text-muted-foreground">Motivo</Label>
                       <Select
                         value={b.motivoKey}
-                        onValueChange={(val) => actualizarBloque(b.uid, { motivoKey: val, valores: {}, meta: {} })}
+onValueChange={(val) => {
+                          actualizarBloque(b.uid, { motivoKey: val, valores: {}, meta: {} });
+                          setZonaAFijada((prev) => {
+                            if (!(b.uid in prev)) return prev;
+                            const next = { ...prev };
+                            delete next[b.uid];
+                            return next;
+                          });
+                        }}
                       >
                         <SelectTrigger><SelectValue placeholder="Selecciona motivo" /></SelectTrigger>
                         <SelectContent>
