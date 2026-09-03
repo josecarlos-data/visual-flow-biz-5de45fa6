@@ -1,43 +1,120 @@
-# Evitar comparaciones engañosas de año en curso en el análisis IA
+# NuevaVisita.tsx: zona A pegajosa y bloques manuales sin colapsable
 
-Solo `supabase/functions/cliente-insights/index.ts`. Sin migraciones ni cambios de frontend.
+Cambio en un solo fichero: `src/pages/NuevaVisita.tsx`. Sin SQL, migraciones, edge functions ni `CampoVisita.tsx`.
 
-## 1. Etiquetar los años en la lista de ventas
+## Problema (confirmado en el código actual)
 
-En el bloque "VENTAS POR AÑO (EUR)", cada año se marca como completo o parcial comparando con el año natural de `hoyLocal`:
+- `atencionDe(b)` (líneas 330-338) recalcula en cada render: un campo está en la zona A solo mientras está vacío (o con confianza baja). Al escribir el primer carácter, el campo sale de `atencionDe` y pasa a `otrosCamposDe`, que se renderiza dentro del `<Collapsible>`; React desmonta el input y lo remonta oculto: se pierde el foco al teclear la primera letra.
+- `zonasBAbiertas[uid]` se fija una sola vez en el efecto (líneas 122-130) con `atencionDe(b).length === 0`; en un bloque manual con campos obligatorios vacíos la zona B nace cerrada y nunca se reabre sola.
+- Los bloques creados a mano (`nuevoBloque`, líneas 33-38) y los extraídos por voz (líneas 221-226 y 680) no se distinguen en el estado, así que no hay forma de tratarlos distinto en el render.
 
-```text
-VENTAS POR AÑO (EUR):
-  2024 (año completo): 247.371 EUR
-  2025 (año completo): 290.478 EUR
-  2026 (parcial, hasta 01/09): 184.914 EUR
+## Cambio 1 — zona A pegajosa
+
+**1. Nuevo estado.** Tras la línea 88 (`zonasBAbiertas`):
+
+```ts
+/** Claves de campo que ya entraron en la zona A: se quedan aunque dejen de estar vacías. */
+const [zonaAFijada, setZonaAFijada] = useState<Record<string, string[]>>({});
 ```
 
-El "hasta" es la fecha local de hoy en formato DD/MM (se reutiliza el helper `ddmm` ya existente sobre `hoyIso`). Importes con `eur0` (separador de miles es-ES).
+**2. Unión en el efecto existente (líneas 114-131).** Añadir al final del mismo efecto, después del `setZonasBAbiertas`:
 
-## 2. Bloque COMPARACIÓN VÁLIDA
-
-Justo debajo de la lista, y solo si `kpis.importe_anio_anterior_ytd` viene informado y es distinto de 0:
-
-```text
-COMPARACIÓN VÁLIDA (mismo periodo del año anterior):
-  2025 hasta 01/09: 201.640 EUR  ·  2026 hasta 01/09: 184.914 EUR  ·  -8,3 %
+```ts
+setZonaAFijada((prev) => {
+  let cambiado = false;
+  const next = { ...prev };
+  for (const b of bloques) {
+    const fijadas = next[b.uid] ?? [];
+    const nuevas = atencionDe(b).map((c) => c.campo_key).filter((k) => !fijadas.includes(k));
+    if (nuevas.length) {
+      cambiado = true;
+      next[b.uid] = [...fijadas, ...nuevas];
+    }
+  }
+  return cambiado ? next : prev;
+});
 ```
 
-- Año en curso: `kpis.importe_anio_actual`; año anterior mismo periodo: `kpis.importe_anio_anterior_ytd`.
-- Porcentaje calculado en la función: `(actual - ytd) / ytd * 100`, un decimal, formato es-ES, con signo.
-- Si `importe_anio_anterior_ytd` es null o 0, o no hay registro de KPIs, se omite el bloque entero (nunca división por cero).
+Solo añade, nunca quita. Si no hay claves nuevas devuelve `prev` (misma referencia) para no provocar un bucle de renders. El efecto no se re-ejecuta al cambiar `zonaAFijada` (depende solo de `[bloques]`), así que no hay bucle posible.
 
-## 3. Regla en el system prompt
+**3. Nueva función `zonaADe`.** Insertar entre `atencionDe` (termina en línea 338) y `otrosCamposDe` (línea 340):
 
-Se añade al final del mensaje de sistema, sin quitar nada de lo actual:
+```ts
+/** Zona A: lo que atencionDe marca hoy más lo ya fijado para este bloque. */
+const zonaADe = (b: BloqueForm): MotivoCampo[] => {
+  const motivo = motivoDe(b.motivoKey);
+  if (!motivo) return [];
+  const fijadas = new Set(zonaAFijada[b.uid] ?? []);
+  const enAtencion = new Set(atencionDe(b).map((c) => c.campo_key));
+  return camposVisibles(motivo.campos).filter((c) => fijadas.has(c.campo_key) || enAtencion.has(c.campo_key));
+};
+```
 
-"El año en curso está incompleto. NUNCA compares su importe con el total de un año cerrado ni presentes esa diferencia como una caída o una subida. Para cualquier afirmación sobre la evolución anual usa exclusivamente el bloque COMPARACIÓN VÁLIDA. Si ese bloque no aparece, no afirmes nada sobre la tendencia anual."
+`atencionDe` se deja intacta y en vivo: los badges "Faltan N" / "Listo" / "Revisar" y `estadoDe` siguen recalculándose con los valores actuales (no cambian).
 
-## 4. Revisión del resto del prompt
+**4. `otrosCamposDe` pasa a basarse en `zonaADe`** (líneas 340-345):
 
-Se revisa el resto de instrucciones y del contexto por si alguna invita a comparar años completos con el año en curso. La única frase con riesgo hoy es la de referencias caídas, que se refiere a "últimos 12 meses vs. 12 anteriores" (comparación ya homogénea) y se deja como está; si al revisar aparece algo ambiguo, se ajusta la redacción para acotarlo a esa ventana de 12 meses.
+```ts
+const otrosCamposDe = (b: BloqueForm): MotivoCampo[] => {
+  const motivo = motivoDe(b.motivoKey);
+  if (!motivo) return [];
+  const zonaA = new Set(zonaADe(b).map((c) => c.campo_key));
+  return camposVisibles(motivo.campos).filter((c) => !zonaA.has(c.campo_key));
+};
+```
+
+**5. Limpiar al cambiar el motivo.** El `onValueChange` del Select de la línea 827 pasa a:
+
+```tsx
+onValueChange={(val) => {
+  actualizarBloque(b.uid, { motivoKey: val, valores: {}, meta: {} });
+  setZonaAFijada((prev) => {
+    if (!(b.uid in prev)) return prev;
+    const next = { ...prev };
+    delete next[b.uid];
+    return next;
+  });
+}}
+```
+
+## Cambio 2 — bloques manuales sin zonas
+
+**1. Interfaz** (líneas 26-31): añadir el campo:
+
+```ts
+interface BloqueForm {
+  uid: string;
+  motivoKey: string;
+  valores: Record<string, string>;
+  meta: Meta;
+  manual: boolean;
+}
+```
+
+**2. `nuevoBloque()`** (líneas 33-38): añadir `manual: true,`.
+
+**3. Extracción por voz** (objeto de las líneas 221-226 y el de la línea 680): añadir `manual: false,` en ambos.
+
+No se deriva de `meta`: `responderRepregunta` (línea 291) construye con `{ ...bloque, ... }`, así que el flag se conserva aunque la repregunta añada `meta` a un bloque manual.
+
+**4. Render** (líneas 753-755):
+
+```tsx
+const atencion = b.manual ? camposVisibles(motivo?.campos ?? []) : zonaADe(b);
+const otros = b.manual ? [] : otrosCamposDe(b);
+const zonaBAbierta = zonasBAbiertas[b.uid] ?? atencion.length === 0;
+```
+
+Con `otros = []` el bloque `<Collapsible>` "Ver los otros N campos" (líneas 799-821) no se renderiza: el bloque manual lista todos los campos en el orden de la plantilla dentro del mismo contenedor de la zona A (líneas 784-797). Cuando `b.manual === false` se mantiene exactamente el comportamiento actual de dos zonas.
+
+**5. (Opcional, propuesta marcada) Etiqueta "IA".** En el badge de la línea 763, `{hayResultado && (` pasa a `{hayResultado && !b.manual && (`. Un bloque rellenado a mano no debe mostrar el icono "IA"; hoy en día lo muestra en cuanto tiene un valor, y con `manual` ya hay señal limpia para corregirlo. Se puede descartar sin afectar al resto.
 
 ## Fuera de alcance
 
-No se toca el modelo, el bloque de productos, el perfil, la situación ni el saneado de la respuesta.
+No se tocan: lógica de guardado, `pendientesDe`, `bloqueantesDe`, `estadoDe`, la repregunta, el orden de las tarjetas, el layout responsive, `CampoVisita.tsx`, SQL, migraciones ni edge functions.
+
+## Verificación
+
+- Build y typecheck limpios: TypeScript obliga a cubrir `manual` en todos los sitios que construyen `BloqueForm` (los tres de este fichero).
+- Manual: "Añadir bloque a mano" → todos los campos visibles en una sola lista sin colapsable; teclear en un campo de la zona A no pierde el foco (el input no se desmonta).
+- Voz: bloque extraído conserva las dos zonas; al corregir un campo marcado como dudoso sigue en la zona A; la repregunta por voz no cambia `manual`.
