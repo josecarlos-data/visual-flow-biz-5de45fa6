@@ -121,8 +121,8 @@ export default function NuevaVisita() {
       const abiertos = bloques
         .filter((b) => (estadoDe(b) !== "listo" || setPrev.has(b.uid)) && !setPrev.has(b.uid))
         .map((b) => b.uid);
-      return abiertos.length ? [...prev, ...abiertos] : prev;
-});
+return abiertos.length ? [...prev, ...abiertos] : prev;
+    });
     setZonasBAbiertas((prev) => {
       const next = { ...prev };
       for (const b of bloques) {
@@ -231,8 +231,8 @@ export default function NuevaVisita() {
 
       if (res.resultado_visita && RESULTADOS.includes(res.resultado_visita)) setResultado(res.resultado_visita);
 
-      const propuestos: BloqueForm[] = (res.bloques ?? [])
-.filter((b) => motivoDe(b.motivo_key))
+const propuestos: BloqueForm[] = (res.bloques ?? [])
+        .filter((b) => motivoDe(b.motivo_key))
         .map((b) => ({
           uid: crypto.randomUUID(),
           motivoKey: b.motivo_key,
@@ -348,8 +348,8 @@ export default function NuevaVisita() {
     if (!motivo) return [];
     const bloqueantes = new Set(bloqueantesDe(b).map((c) => c.campo_key));
     const pendientes = new Set(pendientesDe(b).map((c) => c.campo_key));
-    return camposVisibles(motivo.campos).filter(
-(c) => bloqueantes.has(c.campo_key) || pendientes.has(c.campo_key) || b.meta[c.campo_key]?.confianza === "baja",
+return camposVisibles(motivo.campos).filter(
+      (c) => bloqueantes.has(c.campo_key) || pendientes.has(c.campo_key) || b.meta[c.campo_key]?.confianza === "baja",
     );
   };
 
@@ -773,19 +773,50 @@ export default function NuevaVisita() {
       {esEfectiva && (
         <Accordion type="multiple" value={bloquesAbiertos} onValueChange={setBloquesAbiertos} className="w-full space-y-2">
           {bloques.map((b) => {
-            const motivo = motivoDe(b.motivoKey);
+const motivo = motivoDe(b.motivoKey);
             const estado = estadoDe(b);
-const hayResultado = Object.keys(b.valores).length > 0;
+            const hayResultado = Object.keys(b.valores).length > 0;
             const atencion = b.manual ? camposVisibles(motivo?.campos ?? []) : zonaADe(b);
             const otros = b.manual ? [] : otrosCamposDe(b);
             const zonaBAbierta = zonasBAbiertas[b.uid] ?? atencion.length === 0;
+            const selectorMotivo = (
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Motivo</Label>
+                <Select
+                  value={b.motivoKey}
+                  onValueChange={(val) => {
+                    actualizarBloque(b.uid, { motivoKey: val, valores: {}, meta: {} });
+                    setZonaAFijada((prev) => {
+                      if (!(b.uid in prev)) return prev;
+                      const next = { ...prev };
+                      delete next[b.uid];
+                      return next;
+                    });
+                    setZonasBAbiertas((prev) => {
+                      if (!(b.uid in prev)) return prev;
+                      const next = { ...prev };
+                      delete next[b.uid];
+                      return next;
+                    });
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Selecciona motivo" /></SelectTrigger>
+                  <SelectContent>
+                    {motivosActivos.map((m) => (
+                      <SelectItem key={m.key} value={m.key}>{m.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {motivo?.descripcion && <p className="text-xs text-muted-foreground">{motivo.descripcion}</p>}
+              </div>
+            );
 
             return (
               <AccordionItem key={b.uid} value={b.uid} className="rounded-md border px-3 py-1">
                 <AccordionTrigger className="py-2 hover:no-underline">
                   <div className="flex flex-1 items-center justify-between pr-2">
-                    <span className="text-sm font-medium">{motivo?.nombre ?? "Sin motivo"}</span>
-<div className="flex items-center gap-1.5">
+<span className="text-sm font-medium">{motivo?.nombre ?? "Sin motivo"}</span>
+                    <div className="flex items-center gap-1.5">
                       {hayResultado && !b.manual && (
                         <Badge variant="secondary" className="gap-1 text-[10px]">
                           <Wand2 className="h-3 w-3" />IA
@@ -805,8 +836,9 @@ const hayResultado = Object.keys(b.valores).length > 0;
                     </div>
                   </div>
                 </AccordionTrigger>
-                <AccordionContent className="pb-2 pt-1">
+<AccordionContent className="pb-2 pt-1">
                   <div className="space-y-3">
+                    {b.manual && selectorMotivo}
                     {atencion.length > 0 && (
                       <div className="space-y-3">
                         {atencion.map((c) => (
@@ -846,29 +878,7 @@ const hayResultado = Object.keys(b.valores).length > 0;
                       </Collapsible>
                     )}
 
-                    <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">Motivo</Label>
-                      <Select
-value={b.motivoKey}
-                        onValueChange={(val) => {
-                          actualizarBloque(b.uid, { motivoKey: val, valores: {}, meta: {} });
-                          setZonaAFijada((prev) => {
-                            if (!(b.uid in prev)) return prev;
-                            const next = { ...prev };
-                            delete next[b.uid];
-                            return next;
-                          });
-                        }}
-                      >
-                        <SelectTrigger><SelectValue placeholder="Selecciona motivo" /></SelectTrigger>
-                        <SelectContent>
-                          {motivosActivos.map((m) => (
-                            <SelectItem key={m.key} value={m.key}>{m.nombre}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {motivo?.descripcion && <p className="text-xs text-muted-foreground">{motivo.descripcion}</p>}
-                    </div>
+{!b.manual && selectorMotivo}
 
 
                     {bloques.length > 1 && (
