@@ -122,8 +122,8 @@ const [zonasBAbiertas, setZonasBAbiertas] = useState<Record<string, boolean>>({}
         .filter((b) => (estadoDe(b) !== "listo" || setPrev.has(b.uid)) && !setPrev.has(b.uid))
         .map((b) => b.uid);
       return abiertos.length ? [...prev, ...abiertos] : prev;
-    });
-setZonasBAbiertas((prev) => {
+});
+    setZonasBAbiertas((prev) => {
       const next = { ...prev };
       for (const b of bloques) {
         if (!(b.uid in next)) {
@@ -232,8 +232,8 @@ setZonasBAbiertas((prev) => {
       if (res.resultado_visita && RESULTADOS.includes(res.resultado_visita)) setResultado(res.resultado_visita);
 
       const propuestos: BloqueForm[] = (res.bloques ?? [])
-        .filter((b) => motivoDe(b.motivo_key))
-.map((b) => ({
+.filter((b) => motivoDe(b.motivo_key))
+        .map((b) => ({
           uid: crypto.randomUUID(),
           motivoKey: b.motivo_key,
           valores: { ...b.campos },
@@ -349,9 +349,9 @@ setZonasBAbiertas((prev) => {
     const bloqueantes = new Set(bloqueantesDe(b).map((c) => c.campo_key));
     const pendientes = new Set(pendientesDe(b).map((c) => c.campo_key));
     return camposVisibles(motivo.campos).filter(
-      (c) => bloqueantes.has(c.campo_key) || pendientes.has(c.campo_key) || b.meta[c.campo_key]?.confianza === "baja",
+(c) => bloqueantes.has(c.campo_key) || pendientes.has(c.campo_key) || b.meta[c.campo_key]?.confianza === "baja",
     );
-};
+  };
 
   /** Zona A congelada al nacer el bloque: un campo no cambia de zona mientras se edita. */
   const zonaADe = (b: BloqueForm): MotivoCampo[] => {
@@ -775,8 +775,8 @@ setZonasBAbiertas((prev) => {
           {bloques.map((b) => {
             const motivo = motivoDe(b.motivoKey);
             const estado = estadoDe(b);
-            const hayResultado = Object.keys(b.valores).length > 0;
-const atencion = b.manual ? camposVisibles(motivo?.campos ?? []) : zonaADe(b);
+const hayResultado = Object.keys(b.valores).length > 0;
+            const atencion = b.manual ? camposVisibles(motivo?.campos ?? []) : zonaADe(b);
             const otros = b.manual ? [] : otrosCamposDe(b);
             const zonaBAbierta = zonasBAbiertas[b.uid] ?? atencion.length === 0;
 
@@ -785,8 +785,8 @@ const atencion = b.manual ? camposVisibles(motivo?.campos ?? []) : zonaADe(b);
                 <AccordionTrigger className="py-2 hover:no-underline">
                   <div className="flex flex-1 items-center justify-between pr-2">
                     <span className="text-sm font-medium">{motivo?.nombre ?? "Sin motivo"}</span>
-                    <div className="flex items-center gap-1.5">
-{hayResultado && !b.manual && (
+<div className="flex items-center gap-1.5">
+                      {hayResultado && !b.manual && (
                         <Badge variant="secondary" className="gap-1 text-[10px]">
                           <Wand2 className="h-3 w-3" />IA
                         </Badge>
@@ -849,8 +849,8 @@ const atencion = b.manual ? camposVisibles(motivo?.campos ?? []) : zonaADe(b);
                     <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">Motivo</Label>
                       <Select
-                        value={b.motivoKey}
-onValueChange={(val) => {
+value={b.motivoKey}
+                        onValueChange={(val) => {
                           actualizarBloque(b.uid, { motivoKey: val, valores: {}, meta: {} });
                           setZonaAFijada((prev) => {
                             if (!(b.uid in prev)) return prev;
