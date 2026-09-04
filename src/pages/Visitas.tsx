@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Search, CalendarDays, MapPin } from "lucide-react";
+import { Plus, Search, CalendarDays, MapPin, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useVisitas, useClientes, useMotivos, useVisitaBloques, fechaCorta } from "@/hooks/useCrm";
 import { useScrollRestore } from "@/hooks/useScrollRestore";
+import { abrirDocumento, type DocVisita } from "@/components/DocumentosVisita";
 
 export default function Visitas() {
   const { data: visitas, isLoading } = useVisitas(300);
@@ -17,6 +18,9 @@ export default function Visitas() {
   const { data: motivos } = useMotivos();
   const [q, setQ] = useState("");
   const [motivoFiltro, setMotivoFiltro] = useState("todos");
+
+  const docsDe = (v: { campos: Record<string, unknown> }): DocVisita[] =>
+    ((v.campos as { documentos?: DocVisita[] } | null)?.documentos ?? []).filter((d) => d?.path);
 
   const nombreCliente = useMemo(() => {
     const m = new Map<number, string>();
