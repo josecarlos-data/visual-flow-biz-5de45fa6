@@ -39,5 +39,6 @@ Sin SQL, migraciones ni edge functions. No se toca `RevisionVisitas.tsx`. Los fi
 - Build y typecheck limpios.
 - Elegir cuatro fotos y salir sin guardar: nada en la nube.
 - Misma foto dos veces: la segunda se rechaza con aviso.
-- Al guardar: aparecen como `visita_AAAAMMDD_cliente_n_xxxx.ext` dentro de la carpeta del uid.
+- Al guardar: aparecen como `visita_AAAAMMDD_cliente_n_xxxx.ext` dentro de la carpeta del uid, y el botón muestra el progreso de subida.
+- Una visita guardada antes de este cambio sigue mostrando el nombre de sus documentos.
 - El diseñador ya no ofrece "Foto o documento"; una plantilla que ya lo tenga se sigue pintando.
