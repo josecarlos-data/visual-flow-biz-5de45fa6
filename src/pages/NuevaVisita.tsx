@@ -14,6 +14,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { VoiceRecorder } from "@/components/VoiceRecorder";
 import { CampoVisita } from "@/components/CampoVisita";
+import { DocumentosVisita, type DocVisita } from "@/components/DocumentosVisita";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -446,7 +447,7 @@ export default function NuevaVisita() {
         vendedor: employeeCode ?? null,
         transcripcion: transcripcion || null,
         observaciones: observaciones || null,
-        campos: {},
+        campos: documentos.length ? { documentos } : {},
         estado: "registrada",
         origen: "app",
         latitud: pos?.lat ?? null,
@@ -659,6 +660,8 @@ export default function NuevaVisita() {
               hasResult={transcripcion !== ""}
             />
           </div>
+
+          <DocumentosVisita documentos={documentos} onChange={setDocumentos} />
 
           {transcripcion && (
             <div className="space-y-2 rounded-md border bg-muted/40 p-3">
