@@ -72,6 +72,7 @@ export default function NuevaVisita() {
   const [bloques, setBloques] = useState<BloqueForm[]>([]);
   const [observaciones, setObservaciones] = useState("");
   const [transcripcion, setTranscripcion] = useState("");
+  const [documentos, setDocumentos] = useState<DocVisita[]>([]);
   const [analisis, setAnalisis] = useState<{ modelo: string | null; version: string | null }>({ modelo: null, version: null });
   const [transcribiendo, setTranscribiendo] = useState(false);
   const [extrayendo, setExtrayendo] = useState(false);
