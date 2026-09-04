@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Search, CalendarDays, MapPin } from "lucide-react";
+import { Plus, Search, CalendarDays, MapPin, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useVisitas, useClientes, useMotivos, useVisitaBloques, fechaCorta } from "@/hooks/useCrm";
 import { useScrollRestore } from "@/hooks/useScrollRestore";
+import { abrirDocumento, type DocVisita } from "@/components/DocumentosVisita";
 
 export default function Visitas() {
   const { data: visitas, isLoading } = useVisitas(300);
@@ -17,6 +18,9 @@ export default function Visitas() {
   const { data: motivos } = useMotivos();
   const [q, setQ] = useState("");
   const [motivoFiltro, setMotivoFiltro] = useState("todos");
+
+  const docsDe = (v: { campos: Record<string, unknown> }): DocVisita[] =>
+    ((v.campos as { documentos?: DocVisita[] } | null)?.documentos ?? []).filter((d) => d?.path);
 
   const nombreCliente = useMemo(() => {
     const m = new Map<number, string>();
@@ -125,6 +129,25 @@ export default function Visitas() {
                   <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
                     {v.observaciones || v.transcripcion}
                   </p>
+                )}
+                {docsDe(v).length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {docsDe(v).map((d) => (
+                      <button
+                        key={d.path}
+                        type="button"
+                        className="flex max-w-full items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          void abrirDocumento(d.path);
+                        }}
+                      >
+                        <Paperclip className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{d.nombre}</span>
+                      </button>
+                    ))}
+                  </div>
                 )}
                 {v.latitud != null && v.longitud != null && (
                   <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
