@@ -126,6 +126,25 @@ export default function Visitas() {
                     {v.observaciones || v.transcripcion}
                   </p>
                 )}
+                {docsDe(v).length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {docsDe(v).map((d) => (
+                      <button
+                        key={d.path}
+                        type="button"
+                        className="flex max-w-full items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          void abrirDocumento(d.path);
+                        }}
+                      >
+                        <Paperclip className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{d.nombre}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {v.latitud != null && v.longitud != null && (
                   <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                     <MapPin className="h-3 w-3" />Visita geolocalizada
