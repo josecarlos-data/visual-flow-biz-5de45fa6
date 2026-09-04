@@ -15,16 +15,17 @@ Hoy la foto se sube en el instante de elegirla. Si el comercial se arrepiente o 
 `src/components/DocumentosVisita.tsx`
 - `DocVisita` pasa a `{ file?: File; path?: string; nombre_original: string; tipo: string; tamano: number; hash: string; motivo_key: string | null }`.
 - Al seleccionar: `crypto.subtle.digest("SHA-256", await file.arrayBuffer())` → hash hex; si ya está en el array, toast y descarte. Sin subida.
-- Nueva `export async function subirDocumentos(docs, userId, fecha, codCliente): Promise<DocVisita[]>`: nombre `${userId}/visita_${fecha sin guiones}_${codCliente}_${i}_${4 hex}.${ext}` en el bucket `visitas-adjuntos` (la primera carpeta sigue siendo el uid, lo exige la política INSERT). Devuelve los docs con `path` y sin `file`; ante error lanza excepción con el nombre del fichero (nada de `break` silencioso).
+- Nueva `export async function subirDocumentos(docs, userId, fecha, codCliente, onProgreso?: (hecho: number, total: number) => void): Promise<DocVisita[]>`: nombre `${userId}/visita_${fecha sin guiones}_${codCliente}_${i}_${4 hex}.${ext}` en el bucket `visitas-adjuntos` (la primera carpeta sigue siendo el uid, lo exige la política INSERT). `onProgreso` se invoca antes de cada fichero. Devuelve los docs con `path` y sin `file`; ante error lanza excepción con el nombre del fichero (nada de `break` silencioso).
 - Cada fila añade un Select con `useMotivos()` filtrado por `is_active` más opción "Sin asignar". Sin casilla de análisis IA.
-- Estado de progreso reutilizado para la subida diferida.
 
 `src/pages/NuevaVisita.tsx`
-- En `guardar()`, tras `setSaving(true)` y antes del insert (línea ~438): `try { docsSubidos = documentos.length ? await subirDocumentos(documentos, user.id, fecha, codCliente) : [] } catch { toast + setSaving(false) + return }`.
+- Estado nuevo `subiendoDocs: { hecho: number; total: number } | null`, pasado como `onProgreso`; mientras no sea null el botón de guardar muestra "Subiendo documentos 2 de 4…". Vuelve a null al terminar o fallar.
+- En `guardar()`, tras `setSaving(true)` y antes del insert (línea ~438): `try { docsSubidos = documentos.length ? await subirDocumentos(documentos, user.id, fecha, codCliente, (h, t) => setSubiendoDocs({ hecho: h, total: t })) : [] } catch { toast + setSubiendoDocs(null) + setSaving(false) + return }`.
 - Línea 451 pasa a `campos: docsSubidos.length ? { documentos: docsSubidos } : {}`.
 
 `src/pages/Visitas.tsx`
-- Filtra por `d.path` y etiqueta con `d.nombre_original`.
+- Filtra por `d.path` y la etiqueta es `d.nombre_original ?? (d as { nombre?: string }).nombre ?? d.path.split("/").pop()`, para que las visitas guardadas antes de este cambio (que llevan `nombre`) sigan mostrando el nombre. `nombre_original` se declara opcional en `DocVisita` si hace falta para compilar. Sin migración de datos.
+
 
 `src/lib/motivoCampos.ts`
 - Se quita `{ value: "adjunto", label: "Foto o documento" }` de `TIPOS_CAMPO` para que el diseñador no cree campos nuevos de ese tipo. Se MANTIENE el `case "adjunto"` y el componente `Adjunto` en `CampoVisita.tsx`, porque puede haber campos ya creados en `motivo_campos` y visitas antiguas con rutas guardadas.
