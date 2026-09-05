@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Save, Loader2, Wand2, FileText, Plus, Trash2, Lightbulb, AlertTriangle, Mic, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,16 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { VoiceRecorder } from "@/components/VoiceRecorder";
@@ -85,6 +95,7 @@ export default function NuevaVisita() {
   const [avisoCliente, setAvisoCliente] = useState(false);
   const [saving, setSaving] = useState(false);
   const [subiendoDocs, setSubiendoDocs] = useState<{ hecho: number; total: number } | null>(null);
+  const [salirDialogo, setSalirDialogo] = useState(false);
 
   const [detallesAbiertos, setDetallesAbiertos] = useState(false);
   const [chuletaAbierta, setChuletaAbierta] = useState(false);
@@ -163,6 +174,18 @@ export default function NuevaVisita() {
   /** Solo las visitas efectivas llevan bloques; el resto son intentos fallidos. */
   const esEfectiva = resultado === "efectiva";
   const requiereGeo = tipo !== "llamada";
+  const hayCambios =
+    transcripcion.trim().length > 0 ||
+    observaciones.trim().length > 0 ||
+    documentos.length > 0 ||
+    bloques.some((b) => Object.keys(b.valores).length > 0);
+
+  useEffect(() => {
+    if (!hayCambios || saving) return;
+    const h = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", h);
+    return () => window.removeEventListener("beforeunload", h);
+  }, [hayCambios, saving]);
 
   const fechaLabel = fecha === hoyISO() ? "hoy" : fecha.split("-").reverse().join("/");
 
@@ -538,9 +561,31 @@ export default function NuevaVisita() {
 
   return (
     <div className="space-y-3 pb-24">
-      <Link to="/visitas" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <button
+        type="button"
+        onClick={() => {
+          if (!hayCambios) navigate("/visitas");
+          else setSalirDialogo(true);
+        }}
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
         <ArrowLeft className="h-4 w-4" /> Visitas
-      </Link>
+      </button>
+
+      <AlertDialog open={salirDialogo} onOpenChange={setSalirDialogo}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tienes una visita sin guardar</AlertDialogTitle>
+            <AlertDialogDescription>
+              Si sales se perderá la nota, los bloques y los documentos adjuntos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Seguir editando</AlertDialogCancel>
+            <AlertDialogAction onClick={() => navigate("/visitas")}>Salir sin guardar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Registrar visita</h1>

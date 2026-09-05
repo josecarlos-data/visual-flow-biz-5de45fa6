@@ -28,6 +28,12 @@ export default function Visitas() {
     return m;
   }, [clientes]);
 
+  const motivoNombre = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const mo of motivos ?? []) m.set(mo.key, mo.nombre);
+    return m;
+  }, [motivos]);
+
   const titulo = (v: { cod_cliente: number | null; cliente_externo: string | null }) =>
     v.cod_cliente != null
       ? nombreCliente.get(v.cod_cliente) ?? `Cliente #${v.cod_cliente}`
@@ -145,6 +151,11 @@ export default function Visitas() {
                       >
                         <Paperclip className="h-3 w-3 shrink-0" />
                         <span className="truncate">{nombreDoc(d)}</span>
+                        {d.motivo_key && motivoNombre.get(d.motivo_key) && (
+                          <Badge variant="secondary" className="ml-1 px-1 py-0 text-[10px]">
+                            {motivoNombre.get(d.motivo_key)}
+                          </Badge>
+                        )}
                       </button>
                     ))}
                   </div>
