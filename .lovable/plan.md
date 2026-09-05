@@ -1,44 +1,38 @@
-# Documentos de visita: subir solo al guardar
+# Fase B v1 — Analizar la foto de un albarán de la competencia
 
-Hoy la foto se sube en el instante de elegirla. Si el comercial se arrepiente o abandona la visita, el fichero se queda en la nube para siempre. A partir de ahora los documentos se quedan en el móvil y solo viajan a la nube cuando se guarda la visita.
+Un documento por análisis, solo el motivo "competencia". Sin migraciones ni SQL.
 
-## Qué cambia para el comercial
+## Qué verá el comercial
 
-- Elegir una foto o un archivo es instantáneo: no hay subida ni espera.
-- Si añade dos veces el mismo documento, aviso "Este documento ya está en la lista" y no se duplica (se compara el contenido, no el nombre, porque los móviles repiten IMG_0001).
-- Cada documento puede llevar, opcionalmente, un motivo asignado desde una lista pequeña en su fila.
-- Al guardar la visita se suben todos con una barra de progreso. Si uno falla, aviso con el nombre del archivo y la visita NO se crea; los documentos siguen en pantalla para reintentar.
-- Quitar un documento antes de guardar no deja rastro en la nube.
+En la lista de documentos de la visita, cuando una foto tiene asignado el motivo "Competencia" y aún no se ha guardado, aparece un botón "Analizar". Al pulsarlo, la foto se reduce en el móvil, se envía a la IA y se añaden al final de la visita tantos bloques como líneas de artículo tenga el albarán, sin borrar nada de lo ya dictado o escrito. Aviso al terminar: "N líneas extraídas. Revísalas antes de guardar." Todos los campos llegan marcados como poco fiables, para que se revisen uno a uno.
 
-## Detalle técnico
+## Cambios
 
-`src/components/DocumentosVisita.tsx`
-- `DocVisita` pasa a `{ file?: File; path?: string; nombre_original: string; tipo: string; tamano: number; hash: string; motivo_key: string | null }`.
-- Al seleccionar: `crypto.subtle.digest("SHA-256", await file.arrayBuffer())` → hash hex; si ya está en el array, toast y descarte. Sin subida.
-- Nueva `export async function subirDocumentos(docs, userId, fecha, codCliente, onProgreso?: (hecho: number, total: number) => void): Promise<DocVisita[]>`: nombre `${userId}/visita_${fecha sin guiones}_${codCliente}_${i}_${4 hex}.${ext}` en el bucket `visitas-adjuntos` (la primera carpeta sigue siendo el uid, lo exige la política INSERT). `onProgreso` se invoca antes de cada fichero. Devuelve los docs con `path` y sin `file`; ante error lanza excepción con el nombre del fichero (nada de `break` silencioso).
-- Cada fila añade un Select con `useMotivos()` filtrado por `is_active` más opción "Sin asignar". Sin casilla de análisis IA.
+1. **Nuevo `src/lib/imagen.ts`**
+   - `reducirImagen(file, maxLado = 1600, calidad = 0.8)`: canvas, escala proporcional solo si el lado mayor supera `maxLado`, exporta a `image/jpeg`. Si el fichero no es imagen (PDF), devuelve el original sin tocar.
+   - `aBase64(blob)`: data URL completo vía `FileReader`.
 
-`src/pages/NuevaVisita.tsx`
-- Estado nuevo `subiendoDocs: { hecho: number; total: number } | null`, pasado como `onProgreso`; mientras no sea null el botón de guardar muestra "Subiendo documentos 2 de 4…". Vuelve a null al terminar o fallar.
-- En `guardar()`, tras `setSaving(true)` y antes del insert (línea ~438): `try { docsSubidos = documentos.length ? await subirDocumentos(documentos, user.id, fecha, codCliente, (h, t) => setSubiendoDocs({ hecho: h, total: t })) : [] } catch { toast + setSubiendoDocs(null) + setSaving(false) + return }`.
-- Línea 451 pasa a `campos: docsSubidos.length ? { documentos: docsSubidos } : {}`.
+2. **`supabase/functions/_shared/visita-voz-prompt.ts`**: nueva constante `MODELO_VISION`.
 
-`src/pages/Visitas.tsx`
-- Filtra por `d.path` y la etiqueta es `d.nombre_original ?? (d as { nombre?: string }).nombre ?? d.path.split("/").pop()`, para que las visitas guardadas antes de este cambio (que llevan `nombre`) sigan mostrando el nombre. `nombre_original` se declara opcional en `DocVisita` si hace falta para compilar. Sin migración de datos.
+3. **`supabase/functions/visita-voz/index.ts` — `chatJson`**: la firma pasa a aceptar `usuario: string | unknown[]` y dos parámetros opcionales `modelo = MODELO_EXTRACCION` y `esfuerzo = "none"`, usados en el cuerpo. Las dos llamadas existentes no se tocan: con los valores por defecto se comportan igual que hoy.
 
+4. **`analizarDocumento(key, imagen, motivoKey, clienteNombre)`** junto a `extraer()`: carga el catálogo, busca el motivo (400 si no existe), esquema `{ bloques: [esquemaBloque(motivo)] }`, system prompt de lectura de albarán de la competencia (una entrada por línea de artículo, nada deducido, referencias alfanuméricas transcritas tal cual sin corregir, evidencia = fragmento literal leído), mensaje de usuario como array de partes con `text` + `image_url`, llamada con `MODELO_VISION` y esfuerzo `"low"`. Filtra cada campo con `valorValido()` y devuelve el mismo formato que `extraer()`: `{ bloques: [{ motivo_key, campos, campos_meta }] }`.
+   - La confianza de **todos** los campos devueltos se fuerza a `"baja"`, ignorando la del modelo; un campo relleno sin evidencia recibe igualmente su entrada en `campos_meta` con confianza `"baja"`, para que ninguno escape de la zona de atención.
 
-`src/lib/motivoCampos.ts`
-- Se quita `{ value: "adjunto", label: "Foto o documento" }` de `TIPOS_CAMPO` para que el diseñador no cree campos nuevos de ese tipo. Se MANTIENE el `case "adjunto"` y el componente `Adjunto` en `CampoVisita.tsx`, porque puede haber campos ya creados en `motivo_campos` y visitas antiguas con rutas guardadas.
+5. **Enrutado del handler**: `body` se lee primero y la rama `accion === "documento"` se atiende antes del guardián de transcripción (valida que `imagen` empiece por `data:image/`, si no 400). El resto del flujo queda igual.
+
+6. **`src/components/DocumentosVisita.tsx`**: dos props nuevas (`clienteNombre`, `onBloques`). Botón "Analizar" con icono `Wand2` junto al Select de motivo, visible solo si `motivo_key === "competencia"`, hay `file` en memoria y el tipo es imagen. Al pulsar: `reducirImagen` → `aBase64` → `supabase.functions.invoke("visita-voz", { body: { accion: "documento", ... } })`, con spinner y botón deshabilitado mientras dura. Sin bloques en la respuesta: aviso "No se han encontrado líneas en el documento".
+
+7. **`src/pages/NuevaVisita.tsx`**: pasa `clienteNombre` y un `onBloques` que **añade** los bloques al final de `bloques` (nunca reemplaza), cada uno con `uid` nuevo y `manual: false`, y muestra el aviso con el número de líneas.
+
+## Nota técnica sobre el modelo
+
+El id `google/gemini-2.5-flash` propuesto es de una generación anterior y puede no estar servido ya por el gateway. Antes de dejarlo fijo consultaré el catálogo de modelos del gateway y pondré en `MODELO_VISION` el id vigente equivalente (Gemini Flash con entrada de imagen). Si aun así el gateway devuelve 400, el detalle queda en los logs y se ajusta ahí.
 
 ## Fuera de alcance
 
-Sin SQL, migraciones ni edge functions. No se toca `RevisionVisitas.tsx`. Los ficheros huérfanos ya subidos se limpian a mano. Sin análisis de documentos por IA.
+Un solo documento por análisis; solo el motivo competencia; sin tocar la ruta de voz, `transcribir()`, `repreguntar()`, el guardado, `subirDocumentos`, el bucket, ni `motivo_campos`.
 
 ## Verificación
 
-- Build y typecheck limpios.
-- Elegir cuatro fotos y salir sin guardar: nada en la nube.
-- Misma foto dos veces: la segunda se rechaza con aviso.
-- Al guardar: aparecen como `visita_AAAAMMDD_cliente_n_xxxx.ext` dentro de la carpeta del uid, y el botón muestra el progreso de subida.
-- Una visita guardada antes de este cambio sigue mostrando el nombre de sus documentos.
-- El diseñador ya no ofrece "Foto o documento"; una plantilla que ya lo tenga se sigue pintando.
+Build y typecheck limpios; las dos llamadas existentes a `chatJson` siguen con `MODELO_EXTRACCION` y esfuerzo `"none"`; sin motivo o con motivo distinto no aparece el botón; con una foto real se generan tantos bloques como líneas, todos en zona de atención; los bloques dictados antes siguen ahí.
