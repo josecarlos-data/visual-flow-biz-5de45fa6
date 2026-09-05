@@ -84,6 +84,7 @@ export default function NuevaVisita() {
   const [clienteAnalizado, setClienteAnalizado] = useState<string>("");
   const [avisoCliente, setAvisoCliente] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [subiendoDocs, setSubiendoDocs] = useState<{ hecho: number; total: number } | null>(null);
 
   const [detallesAbiertos, setDetallesAbiertos] = useState(false);
   const [chuletaAbierta, setChuletaAbierta] = useState(false);
