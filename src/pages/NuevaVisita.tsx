@@ -128,13 +128,6 @@ export default function NuevaVisita() {
     if (resultado !== "efectiva") setDetallesAbiertos(true);
   }, [resultado]);
 
-  useEffect(() => {
-    if (!hayCambios || saving) return;
-    const h = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
-    window.addEventListener("beforeunload", h);
-    return () => window.removeEventListener("beforeunload", h);
-  }, [hayCambios, saving]);
-
   // Abre automáticamente los bloques que no están listos y los nuevos; respeta los ya vistos.
   useEffect(() => {
     setBloquesAbiertos((prev) => {
