@@ -140,11 +140,11 @@ export default function Visitas() {
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          void abrirDocumento(d.path);
+                          void abrirDocumento(d.path!);
                         }}
                       >
                         <Paperclip className="h-3 w-3 shrink-0" />
-                        <span className="truncate">{d.nombre}</span>
+                        <span className="truncate">{nombreDoc(d)}</span>
                       </button>
                     ))}
                   </div>

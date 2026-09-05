@@ -470,7 +470,7 @@ export default function NuevaVisita() {
         vendedor: employeeCode ?? null,
         transcripcion: transcripcion || null,
         observaciones: observaciones || null,
-        campos: documentos.length ? { documentos } : {},
+        campos: docsSubidos.length ? { documentos: docsSubidos } : {},
         estado: "registrada",
         origen: "app",
         latitud: pos?.lat ?? null,
