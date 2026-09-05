@@ -151,6 +151,11 @@ export default function Visitas() {
                       >
                         <Paperclip className="h-3 w-3 shrink-0" />
                         <span className="truncate">{nombreDoc(d)}</span>
+                        {d.motivo_key && motivoNombre.get(d.motivo_key) && (
+                          <Badge variant="secondary" className="ml-1 px-1 py-0 text-[10px]">
+                            {motivoNombre.get(d.motivo_key)}
+                          </Badge>
+                        )}
                       </button>
                     ))}
                   </div>
