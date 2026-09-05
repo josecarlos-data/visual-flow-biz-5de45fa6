@@ -180,6 +180,13 @@ export default function NuevaVisita() {
     documentos.length > 0 ||
     bloques.some((b) => Object.keys(b.valores).length > 0);
 
+  useEffect(() => {
+    if (!hayCambios || saving) return;
+    const h = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", h);
+    return () => window.removeEventListener("beforeunload", h);
+  }, [hayCambios, saving]);
+
   const fechaLabel = fecha === hoyISO() ? "hoy" : fecha.split("-").reverse().join("/");
 
   // ---------------------------------------------------------------- referencias
