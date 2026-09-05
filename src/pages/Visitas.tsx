@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useVisitas, useClientes, useMotivos, useVisitaBloques, fechaCorta } from "@/hooks/useCrm";
 import { useScrollRestore } from "@/hooks/useScrollRestore";
-import { abrirDocumento, type DocVisita } from "@/components/DocumentosVisita";
+import { abrirDocumento, nombreDoc, type DocVisita } from "@/components/DocumentosVisita";
 
 export default function Visitas() {
   const { data: visitas, isLoading } = useVisitas(300);
@@ -140,11 +140,11 @@ export default function Visitas() {
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          void abrirDocumento(d.path);
+                          void abrirDocumento(d.path!);
                         }}
                       >
                         <Paperclip className="h-3 w-3 shrink-0" />
-                        <span className="truncate">{d.nombre}</span>
+                        <span className="truncate">{nombreDoc(d)}</span>
                       </button>
                     ))}
                   </div>

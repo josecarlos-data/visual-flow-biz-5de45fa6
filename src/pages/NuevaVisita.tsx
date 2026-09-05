@@ -14,7 +14,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { VoiceRecorder } from "@/components/VoiceRecorder";
 import { CampoVisita } from "@/components/CampoVisita";
-import { DocumentosVisita, type DocVisita } from "@/components/DocumentosVisita";
+import { DocumentosVisita, subirDocumentos, type DocVisita } from "@/components/DocumentosVisita";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -84,6 +84,7 @@ export default function NuevaVisita() {
   const [clienteAnalizado, setClienteAnalizado] = useState<string>("");
   const [avisoCliente, setAvisoCliente] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [subiendoDocs, setSubiendoDocs] = useState<{ hecho: number; total: number } | null>(null);
 
   const [detallesAbiertos, setDetallesAbiertos] = useState(false);
   const [chuletaAbierta, setChuletaAbierta] = useState(false);
@@ -427,6 +428,27 @@ export default function NuevaVisita() {
     }
 
     setSaving(true);
+
+    // Los documentos viven en memoria hasta aquí: se suben justo antes de crear la visita.
+    let docsSubidos: DocVisita[] = [];
+    if (documentos.length) {
+      try {
+        docsSubidos = await subirDocumentos(documentos, user?.id ?? "", fecha, codCliente, (hecho, total) =>
+          setSubiendoDocs({ hecho, total }),
+        );
+      } catch (e) {
+        toast({
+          title: "No se han podido subir los documentos",
+          description: e instanceof Error ? e.message : String(e),
+          variant: "destructive",
+        });
+        setSubiendoDocs(null);
+        setSaving(false);
+        return;
+      }
+      setSubiendoDocs(null);
+    }
+
     const pos = await obtenerPosicion();
     if (!pos && requiereGeo) {
       toast({
@@ -448,7 +470,7 @@ export default function NuevaVisita() {
         vendedor: employeeCode ?? null,
         transcripcion: transcripcion || null,
         observaciones: observaciones || null,
-        campos: documentos.length ? { documentos } : {},
+        campos: docsSubidos.length ? { documentos: docsSubidos } : {},
         estado: "registrada",
         origen: "app",
         latitud: pos?.lat ?? null,
@@ -1004,7 +1026,9 @@ export default function NuevaVisita() {
         <div className="mx-auto flex max-w-3xl gap-2">
           <Button className="flex-1" onClick={guardar} disabled={saving || !codCliente || (esEfectiva && !bloques.length)}>
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            Guardar visita
+            {subiendoDocs
+              ? `Subiendo documentos ${Math.min(subiendoDocs.hecho + 1, subiendoDocs.total)} de ${subiendoDocs.total}…`
+              : "Guardar visita"}
           </Button>
         </div>
       </div>
