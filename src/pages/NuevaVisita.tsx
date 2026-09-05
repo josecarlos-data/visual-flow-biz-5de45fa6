@@ -95,6 +95,7 @@ export default function NuevaVisita() {
   const [avisoCliente, setAvisoCliente] = useState(false);
   const [saving, setSaving] = useState(false);
   const [subiendoDocs, setSubiendoDocs] = useState<{ hecho: number; total: number } | null>(null);
+  const [salirDialogo, setSalirDialogo] = useState(false);
 
   const [detallesAbiertos, setDetallesAbiertos] = useState(false);
   const [chuletaAbierta, setChuletaAbierta] = useState(false);
