@@ -1026,7 +1026,9 @@ export default function NuevaVisita() {
         <div className="mx-auto flex max-w-3xl gap-2">
           <Button className="flex-1" onClick={guardar} disabled={saving || !codCliente || (esEfectiva && !bloques.length)}>
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            Guardar visita
+            {subiendoDocs
+              ? `Subiendo documentos ${Math.min(subiendoDocs.hecho + 1, subiendoDocs.total)} de ${subiendoDocs.total}…`
+              : "Guardar visita"}
           </Button>
         </div>
       </div>
