@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useVisitas, useClientes, useMotivos, useVisitaBloques, fechaCorta } from "@/hooks/useCrm";
 import { useScrollRestore } from "@/hooks/useScrollRestore";
-import { abrirDocumento, type DocVisita } from "@/components/DocumentosVisita";
+import { abrirDocumento, nombreDoc, type DocVisita } from "@/components/DocumentosVisita";
 
 export default function Visitas() {
   const { data: visitas, isLoading } = useVisitas(300);

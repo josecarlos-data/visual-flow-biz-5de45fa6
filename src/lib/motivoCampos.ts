@@ -64,7 +64,7 @@ export const TIPOS_CAMPO: { value: string; label: string }[] = [
   { value: "booleano", label: "Sí / No" },
   { value: "fecha", label: "Fecha" },
   { value: "referencia", label: "Referencia de producto" },
-  { value: "adjunto", label: "Foto o documento" },
+  
   { value: "referencia_campana", label: "Campaña" },
 ];
 

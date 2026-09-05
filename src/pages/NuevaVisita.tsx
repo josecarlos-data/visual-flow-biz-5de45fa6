@@ -14,7 +14,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { VoiceRecorder } from "@/components/VoiceRecorder";
 import { CampoVisita } from "@/components/CampoVisita";
-import { DocumentosVisita, type DocVisita } from "@/components/DocumentosVisita";
+import { DocumentosVisita, subirDocumentos, type DocVisita } from "@/components/DocumentosVisita";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -428,6 +428,27 @@ export default function NuevaVisita() {
     }
 
     setSaving(true);
+
+    // Los documentos viven en memoria hasta aquí: se suben justo antes de crear la visita.
+    let docsSubidos: DocVisita[] = [];
+    if (documentos.length) {
+      try {
+        docsSubidos = await subirDocumentos(documentos, user?.id ?? "", fecha, codCliente, (hecho, total) =>
+          setSubiendoDocs({ hecho, total }),
+        );
+      } catch (e) {
+        toast({
+          title: "No se han podido subir los documentos",
+          description: e instanceof Error ? e.message : String(e),
+          variant: "destructive",
+        });
+        setSubiendoDocs(null);
+        setSaving(false);
+        return;
+      }
+      setSubiendoDocs(null);
+    }
+
     const pos = await obtenerPosicion();
     if (!pos && requiereGeo) {
       toast({
