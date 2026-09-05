@@ -561,9 +561,31 @@ export default function NuevaVisita() {
 
   return (
     <div className="space-y-3 pb-24">
-      <Link to="/visitas" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <button
+        type="button"
+        onClick={() => {
+          if (!hayCambios) navigate("/visitas");
+          else setSalirDialogo(true);
+        }}
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
         <ArrowLeft className="h-4 w-4" /> Visitas
-      </Link>
+      </button>
+
+      <AlertDialog open={salirDialogo} onOpenChange={setSalirDialogo}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tienes una visita sin guardar</AlertDialogTitle>
+            <AlertDialogDescription>
+              Si sales se perderá la nota, los bloques y los documentos adjuntos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Seguir editando</AlertDialogCancel>
+            <AlertDialogAction onClick={() => navigate("/visitas")}>Salir sin guardar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Registrar visita</h1>
