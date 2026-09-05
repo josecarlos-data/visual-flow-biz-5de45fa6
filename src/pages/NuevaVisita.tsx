@@ -174,6 +174,11 @@ export default function NuevaVisita() {
   /** Solo las visitas efectivas llevan bloques; el resto son intentos fallidos. */
   const esEfectiva = resultado === "efectiva";
   const requiereGeo = tipo !== "llamada";
+  const hayCambios =
+    transcripcion.trim().length > 0 ||
+    observaciones.trim().length > 0 ||
+    documentos.length > 0 ||
+    bloques.some((b) => Object.keys(b.valores).length > 0);
 
   const fechaLabel = fecha === hoyISO() ? "hoy" : fecha.split("-").reverse().join("/");
 
