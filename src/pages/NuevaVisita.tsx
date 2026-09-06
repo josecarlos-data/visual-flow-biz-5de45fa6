@@ -729,7 +729,29 @@ export default function NuevaVisita() {
             />
           </div>
 
-          <DocumentosVisita documentos={documentos} onChange={setDocumentos} />
+          <DocumentosVisita
+            documentos={documentos}
+            onChange={setDocumentos}
+            clienteNombre={nombreCliente}
+            onBloques={(nuevos) => {
+              // El documento AÑADE: nunca borra lo que el comercial ya haya dictado o escrito.
+              const propuestos: BloqueForm[] = nuevos
+                .filter((b) => motivoDe(b.motivo_key))
+                .map((b) => ({
+                  uid: crypto.randomUUID(),
+                  motivoKey: b.motivo_key,
+                  valores: { ...b.campos },
+                  meta: { ...(b.campos_meta ?? {}) },
+                  manual: false,
+                }));
+              if (!propuestos.length) return;
+              setBloques((bs) => [...bs, ...propuestos]);
+              toast({
+                title: `${propuestos.length} líneas extraídas`,
+                description: "Revísalas antes de guardar.",
+              });
+            }}
+          />
 
           {transcripcion && (
             <div className="space-y-2 rounded-md border bg-muted/40 p-3">
