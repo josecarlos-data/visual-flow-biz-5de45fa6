@@ -732,7 +732,7 @@ export default function NuevaVisita() {
           <DocumentosVisita
             documentos={documentos}
             onChange={setDocumentos}
-            clienteNombre={nombreCliente}
+            clienteNombre={cliente?.cliente ?? ""}
             onBloques={(nuevos) => {
               // El documento AÑADE: nunca borra lo que el comercial ya haya dictado o escrito.
               const propuestos: BloqueForm[] = nuevos
