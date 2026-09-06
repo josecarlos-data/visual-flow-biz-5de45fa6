@@ -86,11 +86,14 @@ export async function subirDocumentos(
 interface Props {
   documentos: DocVisita[];
   onChange: (docs: DocVisita[]) => void;
+  clienteNombre: string;
+  onBloques: (bloques: BloqueSalida[]) => void;
 }
 
-export function DocumentosVisita({ documentos, onChange }: Props) {
+export function DocumentosVisita({ documentos, onChange, clienteNombre, onBloques }: Props) {
   const { data: motivos } = useMotivos();
   const motivosActivos = (motivos ?? []).filter((m) => m.is_active);
+  const [analizando, setAnalizando] = useState<string | null>(null);
 
   const anadir = async (files: File[]) => {
     const nuevos: DocVisita[] = [];
