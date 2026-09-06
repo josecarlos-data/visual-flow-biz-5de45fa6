@@ -6,6 +6,7 @@ import {
   esquemaCampos,
   esquemaExtraccion,
   MODELO_EXTRACCION,
+  MODELO_VISION,
   sistemaExtraccion,
   usuarioExtraccion,
   VERSION_PROMPT,
