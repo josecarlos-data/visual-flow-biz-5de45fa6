@@ -196,11 +196,19 @@ async function vocabularioTranscripcion(): Promise<string> {
 
 // ---------------------------------------------------------------- gateway
 
-async function chatJson(key: string, sistema: string, usuario: string, nombre: string, schema: unknown) {
+async function chatJson(
+  key: string,
+  sistema: string,
+  usuario: string | unknown[],
+  nombre: string,
+  schema: unknown,
+  modelo: string = MODELO_EXTRACCION,
+  esfuerzo: string = "none",
+) {
   const cuerpo = (conTemperatura: boolean) =>
     JSON.stringify({
-      model: MODELO_EXTRACCION,
-      reasoning_effort: "none",
+      model: modelo,
+      reasoning_effort: esfuerzo,
       ...(conTemperatura ? { temperature: 0 } : {}),
       messages: [
         // El system va SIEMPRE primero e idéntico: es lo que permite el prompt caching.
