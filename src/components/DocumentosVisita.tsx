@@ -1,9 +1,18 @@
-import { Camera, Paperclip, X } from "lucide-react";
+import { useState } from "react";
+import { Camera, Loader2, Paperclip, Wand2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useMotivos } from "@/hooks/useCrm";
+import { aBase64, reducirImagen } from "@/lib/imagen";
+
+/** Bloque propuesto por la IA a partir de la foto de un documento. */
+export interface BloqueSalida {
+  motivo_key: string;
+  campos: Record<string, string>;
+  campos_meta: Record<string, { cita: string; confianza: string }>;
+}
 
 /**
  * Documento adjunto a la visita completa (no a un bloque concreto).
