@@ -125,6 +125,39 @@ export function DocumentosVisita({ documentos, onChange, clienteNombre, onBloque
   const setMotivo = (i: number, val: string) =>
     onChange(documentos.map((d, idx) => (idx === i ? { ...d, motivo_key: val === SIN_MOTIVO ? null : val } : d)));
 
+  /** Solo albaranes de competencia todavía en memoria: la foto se reduce antes de mandarla. */
+  const puedeAnalizar = (d: DocVisita) =>
+    d.motivo_key === "competencia" && !!d.file && (d.tipo?.startsWith("image/") ?? false);
+
+  const analizar = async (d: DocVisita, id: string) => {
+    if (!d.file) return;
+    setAnalizando(id);
+    try {
+      const imagen = await aBase64(await reducirImagen(d.file));
+      const { data, error } = await supabase.functions.invoke("visita-voz", {
+        body: { accion: "documento", imagen, motivo_key: d.motivo_key, cliente_nombre: clienteNombre },
+      });
+      if (error) throw new Error((await (error as { context?: Response }).context?.text?.()) || error.message);
+      const res = data as { bloques?: BloqueSalida[]; error?: string };
+      if (res.error) throw new Error(res.error);
+      const bloques = res.bloques ?? [];
+      if (!bloques.length) {
+        toast({ title: "No se han encontrado líneas en el documento" });
+        return;
+      }
+      onBloques(bloques);
+    } catch (e) {
+      toast({
+        title: "No se ha podido analizar el documento",
+        description: (e as Error).message,
+        variant: "destructive",
+      });
+    } finally {
+      setAnalizando(null);
+    }
+  };
+
+
   return (
     <div className="space-y-2 rounded-md border bg-muted/40 p-3">
       <div className="flex items-center gap-2 text-sm font-medium">
