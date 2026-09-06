@@ -508,6 +508,14 @@ Deno.serve(async (req) => {
     // 2) Transcripción -> bloques (o respuesta a la repregunta). Reanalizar entra por aquí:
     //    llega la transcripción ya guardada y NO se vuelve a transcribir.
     const body = await req.json();
+
+    // 3) Foto de un documento de la competencia -> bloques. Va antes del guardián de transcripción.
+    if (body?.accion === "documento") {
+      const imagen = String(body?.imagen ?? "");
+      if (!imagen.startsWith("data:image/")) return json({ error: "No se ha recibido una imagen válida" }, 400);
+      return await analizarDocumento(key, imagen, String(body?.motivo_key ?? ""), String(body?.cliente_nombre ?? ""));
+    }
+
     const transcripcion = sanear(body?.transcripcion, "transcripcion").trim();
     if (!transcripcion) return json({ error: "No hay transcripción que analizar" }, 400);
 
