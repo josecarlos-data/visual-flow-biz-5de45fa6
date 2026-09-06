@@ -6,6 +6,7 @@ import {
   esquemaCampos,
   esquemaExtraccion,
   MODELO_EXTRACCION,
+  MODELO_VISION,
   sistemaExtraccion,
   usuarioExtraccion,
   VERSION_PROMPT,
@@ -196,11 +197,19 @@ async function vocabularioTranscripcion(): Promise<string> {
 
 // ---------------------------------------------------------------- gateway
 
-async function chatJson(key: string, sistema: string, usuario: string, nombre: string, schema: unknown) {
+async function chatJson(
+  key: string,
+  sistema: string,
+  usuario: string | unknown[],
+  nombre: string,
+  schema: unknown,
+  modelo: string = MODELO_EXTRACCION,
+  esfuerzo: string = "none",
+) {
   const cuerpo = (conTemperatura: boolean) =>
     JSON.stringify({
-      model: MODELO_EXTRACCION,
-      reasoning_effort: "none",
+      model: modelo,
+      reasoning_effort: esfuerzo,
       ...(conTemperatura ? { temperature: 0 } : {}),
       messages: [
         // El system va SIEMPRE primero e idéntico: es lo que permite el prompt caching.
@@ -349,6 +358,75 @@ async function extraer(key: string, transcripcion: string, clienteNombre: string
   });
 }
 
+/**
+ * Fase B: foto de un albarán o presupuesto de la competencia -> un bloque por línea de artículo.
+ * La confianza se fuerza a "baja" siempre: una referencia ajena no se puede validar contra el maestro,
+ * así que todos los campos caen en la zona de atención y el comercial los revisa uno a uno.
+ */
+async function analizarDocumento(key: string, imagen: string, motivoKey: string, clienteNombre: string) {
+  const { motivos } = await cargarCatalogo();
+  const motivo = motivos.find((m) => m.key === motivoKey);
+  if (!motivo) return json({ error: "Motivo desconocido" }, 400);
+
+  const schema = {
+    type: "object",
+    properties: { bloques: { type: "array", items: esquemaBloque(motivo) } },
+    required: ["bloques"],
+    additionalProperties: false,
+  };
+
+  const res = await chatJson(
+    key,
+    "Eres el asistente de un comercial de recambios de automoción. Recibes la FOTO de un albarán o presupuesto de un " +
+      "proveedor de la competencia y extraes su contenido. Devuelve UNA entrada por cada línea de artículo del documento: " +
+      "dos líneas distintas nunca se agrupan en una. Si un dato no aparece con claridad en la imagen, va a null: no lo " +
+      "deduzcas ni lo completes. Las referencias son alfanuméricas: transcríbelas TAL CUAL se leen, sin corregirlas, " +
+      "sin normalizarlas y sin completarlas. Por cada campo relleno, la evidencia es el fragmento literal del documento " +
+      "donde lo has leído.",
+    [
+      {
+        type: "text",
+        text: `Motivo: ${motivo.nombre}. Cliente: ${clienteNombre}. Extrae una entrada por línea de artículo.`,
+      },
+      { type: "image_url", image_url: { url: imagen } },
+    ],
+    "lineas_documento",
+    schema,
+    MODELO_VISION,
+    "low",
+  );
+  if (!res.ok) {
+    return json(
+      { bloques: [], error: mensajeError(res.status, "No se ha podido analizar el documento."), details: res.details },
+      res.status,
+    );
+  }
+
+  const salida = res.data as { bloques?: unknown[] };
+  const bloques: BloqueSalida[] = [];
+  for (const item of Array.isArray(salida.bloques) ? salida.bloques : []) {
+    const crudos = ((item as { campos?: Record<string, unknown> })?.campos ?? {}) as Record<string, unknown>;
+    const campos: Record<string, string> = {};
+    for (const c of motivo.campos) {
+      const v = valorValido(c, crudos[c.campo_key]);
+      if (v !== null) campos[c.campo_key] = v;
+    }
+    if (!Object.keys(campos).length) continue;
+
+    const citas: Record<string, string> = {};
+    for (const e of ((item as { evidencias?: { campo?: string; cita?: string }[] })?.evidencias ?? [])) {
+      if (e?.campo) citas[e.campo] = recortarCita(String(e.cita ?? ""));
+    }
+    const campos_meta: BloqueSalida["campos_meta"] = {};
+    // Confianza siempre "baja", diga lo que diga el modelo, y también para los campos sin evidencia.
+    for (const k of Object.keys(campos)) campos_meta[k] = { cita: citas[k] ?? "", confianza: "baja" };
+
+    bloques.push({ motivo_key: motivo.key, campos, campos_meta });
+  }
+
+  return json({ bloques, analisis_modelo: MODELO_VISION, analisis_prompt_version: VERSION_PROMPT });
+}
+
 /** Segunda tanda: solo los campos que faltan para que el director dé la visita por válida. */
 async function repreguntar(key: string, transcripcion: string, motivoKey: string, claves: string[]) {
   const { motivos } = await cargarCatalogo();
@@ -431,6 +509,14 @@ Deno.serve(async (req) => {
     // 2) Transcripción -> bloques (o respuesta a la repregunta). Reanalizar entra por aquí:
     //    llega la transcripción ya guardada y NO se vuelve a transcribir.
     const body = await req.json();
+
+    // 3) Foto de un documento de la competencia -> bloques. Va antes del guardián de transcripción.
+    if (body?.accion === "documento") {
+      const imagen = String(body?.imagen ?? "");
+      if (!imagen.startsWith("data:image/")) return json({ error: "No se ha recibido una imagen válida" }, 400);
+      return await analizarDocumento(key, imagen, String(body?.motivo_key ?? ""), String(body?.cliente_nombre ?? ""));
+    }
+
     const transcripcion = sanear(body?.transcripcion, "transcripcion").trim();
     if (!transcripcion) return json({ error: "No hay transcripción que analizar" }, 400);
 

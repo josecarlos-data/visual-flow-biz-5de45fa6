@@ -39,6 +39,12 @@ export const VERSION_PROMPT = "fase4.4";
  */
 export const MODELO_EXTRACCION = "openai/gpt-5.6-luna";
 
+/**
+ * Lectura de albaranes fotografiados (fase B): necesita entrada de imagen.
+ * Si la pasarela lo rechaza, el 400 queda en los logs con el detalle y se cambia aquí.
+ */
+export const MODELO_VISION = "google/gemini-3.6-flash";
+
 export interface CampoDef {
   motivo_key: string;
   campo_key: string;

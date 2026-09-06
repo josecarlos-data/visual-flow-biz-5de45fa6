@@ -1,9 +1,18 @@
-import { Camera, Paperclip, X } from "lucide-react";
+import { useState } from "react";
+import { Camera, Loader2, Paperclip, Wand2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useMotivos } from "@/hooks/useCrm";
+import { aBase64, reducirImagen } from "@/lib/imagen";
+
+/** Bloque propuesto por la IA a partir de la foto de un documento. */
+export interface BloqueSalida {
+  motivo_key: string;
+  campos: Record<string, string>;
+  campos_meta: Record<string, { cita: string; confianza: string }>;
+}
 
 /**
  * Documento adjunto a la visita completa (no a un bloque concreto).
@@ -77,11 +86,14 @@ export async function subirDocumentos(
 interface Props {
   documentos: DocVisita[];
   onChange: (docs: DocVisita[]) => void;
+  clienteNombre: string;
+  onBloques: (bloques: BloqueSalida[]) => void;
 }
 
-export function DocumentosVisita({ documentos, onChange }: Props) {
+export function DocumentosVisita({ documentos, onChange, clienteNombre, onBloques }: Props) {
   const { data: motivos } = useMotivos();
   const motivosActivos = (motivos ?? []).filter((m) => m.is_active);
+  const [analizando, setAnalizando] = useState<string | null>(null);
 
   const anadir = async (files: File[]) => {
     const nuevos: DocVisita[] = [];
@@ -113,6 +125,39 @@ export function DocumentosVisita({ documentos, onChange }: Props) {
   const setMotivo = (i: number, val: string) =>
     onChange(documentos.map((d, idx) => (idx === i ? { ...d, motivo_key: val === SIN_MOTIVO ? null : val } : d)));
 
+  /** Solo albaranes de competencia todavía en memoria: la foto se reduce antes de mandarla. */
+  const puedeAnalizar = (d: DocVisita) =>
+    d.motivo_key === "competencia" && !!d.file && (d.tipo?.startsWith("image/") ?? false);
+
+  const analizar = async (d: DocVisita, id: string) => {
+    if (!d.file) return;
+    setAnalizando(id);
+    try {
+      const imagen = await aBase64(await reducirImagen(d.file));
+      const { data, error } = await supabase.functions.invoke("visita-voz", {
+        body: { accion: "documento", imagen, motivo_key: d.motivo_key, cliente_nombre: clienteNombre },
+      });
+      if (error) throw new Error((await (error as { context?: Response }).context?.text?.()) || error.message);
+      const res = data as { bloques?: BloqueSalida[]; error?: string };
+      if (res.error) throw new Error(res.error);
+      const bloques = res.bloques ?? [];
+      if (!bloques.length) {
+        toast({ title: "No se han encontrado líneas en el documento" });
+        return;
+      }
+      onBloques(bloques);
+    } catch (e) {
+      toast({
+        title: "No se ha podido analizar el documento",
+        description: (e as Error).message,
+        variant: "destructive",
+      });
+    } finally {
+      setAnalizando(null);
+    }
+  };
+
+
   return (
     <div className="space-y-2 rounded-md border bg-muted/40 p-3">
       <div className="flex items-center gap-2 text-sm font-medium">
@@ -130,15 +175,33 @@ export function DocumentosVisita({ documentos, onChange }: Props) {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <Select value={d.motivo_key ?? SIN_MOTIVO} onValueChange={(v) => setMotivo(i, v)}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={SIN_MOTIVO}>Sin asignar</SelectItem>
-                  {motivosActivos.map((m) => (
-                    <SelectItem key={m.key} value={m.key}>{m.nombre}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <Select value={d.motivo_key ?? SIN_MOTIVO} onValueChange={(v) => setMotivo(i, v)}>
+                  <SelectTrigger className="h-8 flex-1 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={SIN_MOTIVO}>Sin asignar</SelectItem>
+                    {motivosActivos.map((m) => (
+                      <SelectItem key={m.key} value={m.key}>{m.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {puedeAnalizar(d) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 shrink-0 px-2 text-xs"
+                    disabled={analizando !== null}
+                    onClick={() => void analizar(d, d.hash ?? String(i))}
+                  >
+                    {analizando === (d.hash ?? String(i)) ? (
+                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Wand2 className="mr-1 h-3.5 w-3.5" />
+                    )}
+                    Analizar
+                  </Button>
+                )}
+              </div>
             </li>
           ))}
         </ul>
