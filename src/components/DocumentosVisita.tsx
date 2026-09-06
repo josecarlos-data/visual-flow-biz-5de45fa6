@@ -175,15 +175,33 @@ export function DocumentosVisita({ documentos, onChange, clienteNombre, onBloque
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <Select value={d.motivo_key ?? SIN_MOTIVO} onValueChange={(v) => setMotivo(i, v)}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={SIN_MOTIVO}>Sin asignar</SelectItem>
-                  {motivosActivos.map((m) => (
-                    <SelectItem key={m.key} value={m.key}>{m.nombre}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <Select value={d.motivo_key ?? SIN_MOTIVO} onValueChange={(v) => setMotivo(i, v)}>
+                  <SelectTrigger className="h-8 flex-1 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={SIN_MOTIVO}>Sin asignar</SelectItem>
+                    {motivosActivos.map((m) => (
+                      <SelectItem key={m.key} value={m.key}>{m.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {puedeAnalizar(d) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 shrink-0 px-2 text-xs"
+                    disabled={analizando !== null}
+                    onClick={() => void analizar(d, d.hash ?? String(i))}
+                  >
+                    {analizando === (d.hash ?? String(i)) ? (
+                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Wand2 className="mr-1 h-3.5 w-3.5" />
+                    )}
+                    Analizar
+                  </Button>
+                )}
+              </div>
             </li>
           ))}
         </ul>
