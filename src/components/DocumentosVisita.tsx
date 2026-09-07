@@ -187,13 +187,13 @@ export function DocumentosVisita({ documentos, onChange, clienteNombre, onBloque
                     ))}
                   </SelectContent>
                 </Select>
-                {puedeAnalizar(d) && (
+                {puedeAnalizar(d) && !d.analizado && (
                   <Button
                     variant="outline"
                     size="sm"
                     className="h-8 shrink-0 px-2 text-xs"
                     disabled={analizando !== null}
-                    onClick={() => void analizar(d, d.hash ?? String(i))}
+                    onClick={() => void analizar(d, i)}
                   >
                     {analizando === (d.hash ?? String(i)) ? (
                       <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
@@ -201,6 +201,16 @@ export function DocumentosVisita({ documentos, onChange, clienteNombre, onBloque
                       <Wand2 className="mr-1 h-3.5 w-3.5" />
                     )}
                     Analizar
+                  </Button>
+                )}
+                {d.analizado && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 shrink-0 px-2 text-xs"
+                    disabled
+                  >
+                    Analizado
                   </Button>
                 )}
               </div>
