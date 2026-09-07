@@ -28,10 +28,13 @@ Nota: la RPC de listado ya cubre la consulta, pero mantengo también el `GRANT S
 
 - `verify_jwt = false` (debe aceptar logins fallidos sin sesión); CORS desde `_shared/cors.ts`.
 - Si llega `Authorization`, valida con `getUser()` y toma de ahí el `user_id`; el cuerpo nunca puede fijarlo.
-- IP desde `x-forwarded-for` (primer valor) y user agent desde la cabecera; nunca del cuerpo.
+- Sin token válido solo se acepta `tipo='login'` con `resultado='fallo'`; cualquier otra combinación responde 204 sin insertar. Con token válido se acepta toda la lista blanca.
+- El `detalle` jsonb incluye siempre `"autenticado": true|false`, fijado en servidor, para distinguir después un evento forjado.
+- IP: se guarda el ÚLTIMO valor de `x-forwarded-for` en la columna `ip` y la cadena completa en `detalle.x_forwarded_for`; user agent desde la cabecera. Nunca del cuerpo.
 - Inserta con la clave de servicio.
 - Cuerpo aceptado: `{ tipo, resultado, email?, entidad?, entidad_id?, ruta?, detalle? }`, validado con lista blanca de `tipo` definida en el fichero: `login`, `logout`, `acceso_denegado`, `cambio_rol`, `aprobacion_usuario`, `baja_usuario`, `cambio_ver_margen`.
 - Responde 204 siempre que pueda; nunca propaga error al cliente.
+
 
 ## 3. Cliente `src/lib/auditoria.ts`
 
