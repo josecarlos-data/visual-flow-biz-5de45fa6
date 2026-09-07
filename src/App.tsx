@@ -1,13 +1,14 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { AppLayout } from "@/components/AppLayout";
 import LoadingScreen from "@/components/LoadingScreen";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { registrarEvento } from "@/lib/auditoria";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -80,6 +81,25 @@ function ProtectedRoute({
   dashboardKey?: string;
 }) {
   const { user, isApproved, role, isLoading, hasDashboard, dashboards, authError, signOut } = useAuth();
+  const location = useLocation();
+  const denegadoRef = useRef<string | null>(null);
+
+  const denegadoAdmin =
+    !isLoading && !!user && !authError && isApproved && adminOnly && role !== "admin" && !(allowedRoles ?? []).includes(role ?? "");
+  const denegadoDashboard =
+    !isLoading && !!user && !authError && isApproved && !denegadoAdmin && !!dashboardKey && !hasDashboard(dashboardKey);
+
+  useEffect(() => {
+    if (!denegadoAdmin && !denegadoDashboard) return;
+    const clave = `${location.pathname}|${denegadoAdmin ? "admin" : "dashboard"}`;
+    if (denegadoRef.current === clave) return;
+    denegadoRef.current = clave;
+    registrarEvento("acceso_denegado", {
+      resultado: "denegado",
+      ruta: location.pathname,
+      detalle: { motivo: denegadoAdmin ? "admin_requerido" : "dashboard_no_asignado", dashboard_key: dashboardKey ?? null, rol: role ?? null },
+    });
+  }, [denegadoAdmin, denegadoDashboard, location.pathname, dashboardKey, role]);
 
   if (isLoading) {
     return <LoadingScreen />;

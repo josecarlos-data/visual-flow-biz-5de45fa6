@@ -196,6 +196,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => {
+    registrarEvento("logout", { resultado: "ok", email: user?.email ?? null });
+    try {
+      sessionStorage.removeItem(`auditoria_login_${user?.id ?? ""}`);
+    } catch {
+      // ignorado
+    }
     try {
       await Promise.race([
         supabase.auth.signOut(),
