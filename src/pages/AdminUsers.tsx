@@ -99,20 +99,29 @@ export default function AdminUsers() {
   const approveUser = async (userId: string) => {
     const { error } = await supabase.from("profiles").update({ is_approved: true }).eq("user_id", userId);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-    else { toast({ title: "Usuario aprobado" }); fetchData(); }
+    else {
+      registrarEvento("aprobacion_usuario", { entidad: "usuario", entidad_id: userId, detalle: { is_approved: true } });
+      toast({ title: "Usuario aprobado" }); fetchData();
+    }
   };
 
   const rejectUser = async (userId: string) => {
     const { error } = await supabase.from("profiles").update({ is_approved: false }).eq("user_id", userId);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-    else { toast({ title: "Acceso revocado" }); fetchData(); }
+    else {
+      registrarEvento("baja_usuario", { entidad: "usuario", entidad_id: userId, detalle: { is_approved: false } });
+      toast({ title: "Acceso revocado" }); fetchData();
+    }
   };
 
   const assignRole = async (userId: string, role: AppRole) => {
     await supabase.from("user_roles").delete().eq("user_id", userId);
     const { error } = await supabase.from("user_roles").insert({ user_id: userId, role });
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-    else { toast({ title: "Rol asignado" }); fetchData(); }
+    else {
+      registrarEvento("cambio_rol", { entidad: "usuario", entidad_id: userId, detalle: { role } });
+      toast({ title: "Rol asignado" }); fetchData();
+    }
   };
 
   const assignVendedor = async (userId: string, vendedor: string) => {
