@@ -36,7 +36,15 @@ export async function registrarEvento(tipo: TipoEvento, opts: OpcionesEvento = {
       ruta: opts.ruta ?? (typeof window !== "undefined" ? window.location.pathname : undefined),
       detalle: opts.detalle ?? undefined,
     };
-    void supabase.functions.invoke("registrar-evento", { body }).catch(() => {});
+    const invocacion = supabase.functions.invoke("registrar-evento", { body });
+    if (opts.esperar) {
+      await Promise.race([
+        invocacion,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("auditoria timeout")), 2000)),
+      ]);
+    } else {
+      void invocacion.catch(() => {});
+    }
   } catch {
     // silencio intencionado
   }
