@@ -28,6 +28,7 @@ export interface DocVisita {
   tamano?: number;
   hash?: string;
   motivo_key?: string | null;
+  analizado?: boolean;
 }
 
 const SIN_MOTIVO = "__sin__";
@@ -129,8 +130,9 @@ export function DocumentosVisita({ documentos, onChange, clienteNombre, onBloque
   const puedeAnalizar = (d: DocVisita) =>
     d.motivo_key === "competencia" && !!d.file && (d.tipo?.startsWith("image/") ?? false);
 
-  const analizar = async (d: DocVisita, id: string) => {
+  const analizar = async (d: DocVisita, i: number) => {
     if (!d.file) return;
+    const id = d.hash ?? String(i);
     setAnalizando(id);
     try {
       const imagen = await aBase64(await reducirImagen(d.file));
@@ -146,6 +148,7 @@ export function DocumentosVisita({ documentos, onChange, clienteNombre, onBloque
         return;
       }
       onBloques(bloques);
+      onChange(documentos.map((doc, idx) => (idx === i ? { ...doc, analizado: true } : doc)));
     } catch (e) {
       toast({
         title: "No se ha podido analizar el documento",
@@ -156,7 +159,6 @@ export function DocumentosVisita({ documentos, onChange, clienteNombre, onBloque
       setAnalizando(null);
     }
   };
-
 
   return (
     <div className="space-y-2 rounded-md border bg-muted/40 p-3">
@@ -185,13 +187,13 @@ export function DocumentosVisita({ documentos, onChange, clienteNombre, onBloque
                     ))}
                   </SelectContent>
                 </Select>
-                {puedeAnalizar(d) && (
+                {puedeAnalizar(d) && !d.analizado && (
                   <Button
                     variant="outline"
                     size="sm"
                     className="h-8 shrink-0 px-2 text-xs"
                     disabled={analizando !== null}
-                    onClick={() => void analizar(d, d.hash ?? String(i))}
+                    onClick={() => void analizar(d, i)}
                   >
                     {analizando === (d.hash ?? String(i)) ? (
                       <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
@@ -199,6 +201,16 @@ export function DocumentosVisita({ documentos, onChange, clienteNombre, onBloque
                       <Wand2 className="mr-1 h-3.5 w-3.5" />
                     )}
                     Analizar
+                  </Button>
+                )}
+                {d.analizado && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 shrink-0 px-2 text-xs"
+                    disabled
+                  >
+                    Analizado
                   </Button>
                 )}
               </div>
