@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { BarChart3 } from "lucide-react";
+import { registrarEvento } from "@/lib/auditoria";
 
 export default function Auth() {
   const [email, setEmail] = useState("");
@@ -20,6 +21,7 @@ export default function Auth() {
 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
+      registrarEvento("login", { resultado: "fallo", email, detalle: { motivo: error.message } });
       toast({ title: "Error al iniciar sesión", description: error.message, variant: "destructive" });
     } else {
       navigate("/");
