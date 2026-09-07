@@ -42,9 +42,9 @@ Nota: la RPC de listado ya cubre la consulta, pero mantengo también el `GRANT S
 
 ## 4. Enganches (solo estos)
 
-- `useAuth.tsx`: `SIGNED_IN` → `login` ok; en `signOut`, `logout` ok antes de cerrar sesión.
+- `useAuth.tsx`: NO se registra en cada `SIGNED_IN`. Se distingue `INITIAL_SESSION` de `SIGNED_IN` y se usa además una marca en `sessionStorage`, de modo que se registre como máximo un `login` por sesión de navegador (una recarga o un `TOKEN_REFRESHED` no generan evento). En `signOut`, `logout` ok antes de cerrar sesión.
 - `Auth.tsx`: error de acceso → `login` fallo con el email introducido (nunca la contraseña).
-- `App.tsx` `ProtectedRoute`: `acceso_denegado` en las dos ramas de falta de permiso (adminOnly no cumplido y dashboard no autorizado), con la ruta solicitada. No se registran `!user` ni `!isApproved`.
+- `App.tsx` `ProtectedRoute`: `acceso_denegado` en las dos ramas de falta de permiso (adminOnly no cumplido y dashboard no autorizado), con la ruta solicitada. El registro va en un `useEffect` con guarda por `useRef` para no repetirlo en la misma ruta, nunca en el cuerpo del render. No se registran `!user` ni `!isApproved`.
 - `AdminUsers.tsx`: `cambio_rol`, `aprobacion_usuario`, `baja_usuario`, `cambio_ver_margen` con `entidad='usuario'` y `entidad_id` del usuario afectado.
 
 ## 5. Pantalla `src/pages/AdminAuditoria.tsx`
