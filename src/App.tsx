@@ -25,6 +25,7 @@ const RutaDetalle = lazy(() => import("./pages/RutaDetalle"));
 const AdminUsers = lazy(() => import("./pages/AdminUsers"));
 const AdminData = lazy(() => import("./pages/AdminData"));
 const AdminFunctions = lazy(() => import("./pages/AdminFunctions"));
+const AdminAuditoria = lazy(() => import("./pages/AdminAuditoria"));
 const AdminVisitas = lazy(() => import("./pages/AdminVisitas"));
 const RevisionVisitas = lazy(() => import("./pages/RevisionVisitas"));
 const AdminSituaciones = lazy(() => import("./pages/AdminSituaciones"));
