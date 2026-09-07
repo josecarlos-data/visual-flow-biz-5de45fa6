@@ -18,6 +18,7 @@ export interface OpcionesEvento {
   entidad_id?: string | null;
   ruta?: string | null;
   detalle?: Record<string, unknown> | null;
+  esperar?: boolean;
 }
 
 /**
