@@ -55,12 +55,13 @@ Deno.serve(async (req) => {
       return sinContenido();
     }
 
+    const cfIp = req.headers.get("cf-connecting-ip");
     const xff = req.headers.get("x-forwarded-for");
     const partes = (xff ?? "")
       .split(",")
       .map((p) => p.trim())
       .filter(Boolean);
-    const ip = partes.length ? partes[partes.length - 1] : null;
+    const ip = cfIp && cfIp.trim() ? cfIp.trim() : (partes.length ? partes[0] : null);
 
     const detalleCliente =
       body.detalle && typeof body.detalle === "object" && !Array.isArray(body.detalle)
@@ -71,6 +72,7 @@ Deno.serve(async (req) => {
       ...detalleCliente,
       autenticado,
       x_forwarded_for: xff ?? null,
+      cf_connecting_ip: cfIp ?? null,
     };
 
     const admin = createClient(url, serviceKey);

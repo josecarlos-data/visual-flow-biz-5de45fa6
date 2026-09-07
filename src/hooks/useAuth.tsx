@@ -196,7 +196,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => {
-    registrarEvento("logout", { resultado: "ok", email: user?.email ?? null });
+    try {
+      await registrarEvento("logout", { resultado: "ok", email: user?.email ?? null, esperar: true });
+    } catch {
+      // la auditoría no debe impedir el cierre de sesión
+    }
     try {
       sessionStorage.removeItem(`auditoria_login_${user?.id ?? ""}`);
     } catch {
