@@ -28,6 +28,7 @@ export interface DocVisita {
   tamano?: number;
   hash?: string;
   motivo_key?: string | null;
+  analizado?: boolean;
 }
 
 const SIN_MOTIVO = "__sin__";
