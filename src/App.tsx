@@ -168,7 +168,7 @@ const App = () => (
                 <Route path="/admin/users" element={<ProtectedRoute adminOnly><AdminUsers /></ProtectedRoute>} />
                 <Route path="/admin/data" element={<ProtectedRoute adminOnly><AdminData /></ProtectedRoute>} />
                 <Route path="/admin/functions" element={<ProtectedRoute adminOnly><AdminFunctions /></ProtectedRoute>} />
-                <Route path="/admin/auditoria" element={<ProtectedRoute adminOnly><AdminAuditoria /></ProtectedRoute>} />}
+                <Route path="/admin/auditoria" element={<ProtectedRoute adminOnly><AdminAuditoria /></ProtectedRoute>} />
                 <Route path="/admin/visitas" element={<ProtectedRoute adminOnly><AdminVisitas /></ProtectedRoute>} />
                 <Route path="/admin/situaciones" element={<ProtectedRoute adminOnly><AdminSituaciones /></ProtectedRoute>} />
                 <Route path="/admin/objetivos" element={<ProtectedRoute adminOnly allowedRoles={["director_comercial"]}><AdminObjetivos /></ProtectedRoute>} />
