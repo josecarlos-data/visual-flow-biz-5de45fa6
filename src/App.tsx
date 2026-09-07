@@ -1,13 +1,14 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { AppLayout } from "@/components/AppLayout";
 import LoadingScreen from "@/components/LoadingScreen";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { registrarEvento } from "@/lib/auditoria";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -24,6 +25,7 @@ const RutaDetalle = lazy(() => import("./pages/RutaDetalle"));
 const AdminUsers = lazy(() => import("./pages/AdminUsers"));
 const AdminData = lazy(() => import("./pages/AdminData"));
 const AdminFunctions = lazy(() => import("./pages/AdminFunctions"));
+const AdminAuditoria = lazy(() => import("./pages/AdminAuditoria"));
 const AdminVisitas = lazy(() => import("./pages/AdminVisitas"));
 const RevisionVisitas = lazy(() => import("./pages/RevisionVisitas"));
 const AdminSituaciones = lazy(() => import("./pages/AdminSituaciones"));
@@ -80,6 +82,25 @@ function ProtectedRoute({
   dashboardKey?: string;
 }) {
   const { user, isApproved, role, isLoading, hasDashboard, dashboards, authError, signOut } = useAuth();
+  const location = useLocation();
+  const denegadoRef = useRef<string | null>(null);
+
+  const denegadoAdmin =
+    !isLoading && !!user && !authError && isApproved && adminOnly && role !== "admin" && !(allowedRoles ?? []).includes(role ?? "");
+  const denegadoDashboard =
+    !isLoading && !!user && !authError && isApproved && !denegadoAdmin && !!dashboardKey && !hasDashboard(dashboardKey);
+
+  useEffect(() => {
+    if (!denegadoAdmin && !denegadoDashboard) return;
+    const clave = `${location.pathname}|${denegadoAdmin ? "admin" : "dashboard"}`;
+    if (denegadoRef.current === clave) return;
+    denegadoRef.current = clave;
+    registrarEvento("acceso_denegado", {
+      resultado: "denegado",
+      ruta: location.pathname,
+      detalle: { motivo: denegadoAdmin ? "admin_requerido" : "dashboard_no_asignado", dashboard_key: dashboardKey ?? null, rol: role ?? null },
+    });
+  }, [denegadoAdmin, denegadoDashboard, location.pathname, dashboardKey, role]);
 
   if (isLoading) {
     return <LoadingScreen />;
@@ -147,6 +168,7 @@ const App = () => (
                 <Route path="/admin/users" element={<ProtectedRoute adminOnly><AdminUsers /></ProtectedRoute>} />
                 <Route path="/admin/data" element={<ProtectedRoute adminOnly><AdminData /></ProtectedRoute>} />
                 <Route path="/admin/functions" element={<ProtectedRoute adminOnly><AdminFunctions /></ProtectedRoute>} />
+                <Route path="/admin/auditoria" element={<ProtectedRoute adminOnly><AdminAuditoria /></ProtectedRoute>} />
                 <Route path="/admin/visitas" element={<ProtectedRoute adminOnly><AdminVisitas /></ProtectedRoute>} />
                 <Route path="/admin/situaciones" element={<ProtectedRoute adminOnly><AdminSituaciones /></ProtectedRoute>} />
                 <Route path="/admin/objetivos" element={<ProtectedRoute adminOnly allowedRoles={["director_comercial"]}><AdminObjetivos /></ProtectedRoute>} />

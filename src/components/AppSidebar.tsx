@@ -36,6 +36,7 @@ export function AppSidebar() {
         { title: "Plantillas de visita", url: "/admin/visitas", icon: Icons.ClipboardList },
         { title: "Situaciones de cliente", url: "/admin/situaciones", icon: Icons.ShieldAlert },
         objetivosItem,
+        { title: "Auditoría", url: "/admin/auditoria", icon: Icons.ScrollText },
         { title: "Funciones", url: "/admin/functions", icon: Settings },
       ]
     : esDireccion

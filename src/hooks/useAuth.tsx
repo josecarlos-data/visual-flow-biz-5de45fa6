@@ -2,6 +2,7 @@ import { useState, useEffect, createContext, useContext, ReactNode } from "react
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { registrarEvento } from "@/lib/auditoria";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -156,6 +157,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user) {
+          // Registrar como máximo un 'login' por sesión de navegador
+          if (_event === "SIGNED_IN") {
+            try {
+              const marca = `auditoria_login_${session.user.id}`;
+              if (!sessionStorage.getItem(marca)) {
+                sessionStorage.setItem(marca, "1");
+                registrarEvento("login", { resultado: "ok", email: session.user.email ?? null });
+              }
+            } catch {
+              // sessionStorage no disponible: no registramos
+            }
+          }
           // Defer Supabase calls to avoid deadlock inside onAuthStateChange
           setTimeout(async () => {
             if (!mounted) return;
@@ -183,6 +196,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => {
+    registrarEvento("logout", { resultado: "ok", email: user?.email ?? null });
+    try {
+      sessionStorage.removeItem(`auditoria_login_${user?.id ?? ""}`);
+    } catch {
+      // ignorado
+    }
     try {
       await Promise.race([
         supabase.auth.signOut(),
