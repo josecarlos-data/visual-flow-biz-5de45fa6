@@ -38,6 +38,54 @@ export type Database = {
         }
         Relationships: []
       }
+      auditoria_eventos: {
+        Row: {
+          detalle: Json | null
+          dispositivo_id: string | null
+          email: string | null
+          entidad: string | null
+          entidad_id: string | null
+          id: string
+          ip: unknown
+          ocurrido_en: string
+          resultado: string
+          ruta: string | null
+          tipo: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          detalle?: Json | null
+          dispositivo_id?: string | null
+          email?: string | null
+          entidad?: string | null
+          entidad_id?: string | null
+          id?: string
+          ip?: unknown
+          ocurrido_en?: string
+          resultado: string
+          ruta?: string | null
+          tipo: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          detalle?: Json | null
+          dispositivo_id?: string | null
+          email?: string | null
+          entidad?: string | null
+          entidad_id?: string | null
+          id?: string
+          ip?: unknown
+          ocurrido_en?: string
+          resultado?: string
+          ruta?: string | null
+          tipo?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       catalogos_opciones: {
         Row: {
           clave: string
@@ -1990,6 +2038,34 @@ export type Database = {
           ticket_medio: number
         }[]
       }
+      auditoria_listado: {
+        Args: {
+          _desde?: string
+          _hasta?: string
+          _limit?: number
+          _offset?: number
+          _resultado?: string
+          _tipo?: string
+          _user_id?: string
+        }
+        Returns: {
+          detalle: Json
+          dispositivo_id: string
+          email: string
+          entidad: string
+          entidad_id: string
+          full_name: string
+          id: string
+          ip: string
+          ocurrido_en: string
+          resultado: string
+          ruta: string
+          tipo: string
+          total_filas: number
+          user_agent: string
+          user_id: string
+        }[]
+      }
       buscar_productos: {
         Args: { _limite?: number; _q: string }
         Returns: {
@@ -2312,6 +2388,7 @@ export type Database = {
       puede_revisar_visitas: { Args: { _user_id: string }; Returns: boolean }
       puede_ver_bloque: { Args: { _visita_id: string }; Returns: boolean }
       puede_ver_margen: { Args: { _user_id: string }; Returns: boolean }
+      purgar_auditoria: { Args: never; Returns: number }
       quincena_corte: { Args: { _anio: number }; Returns: number }
       quincena_de: { Args: { _f: string }; Returns: number }
       refrescar_documentos_resumen: { Args: never; Returns: undefined }
