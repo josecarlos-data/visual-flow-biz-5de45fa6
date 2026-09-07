@@ -156,6 +156,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user) {
+          // Registrar como máximo un 'login' por sesión de navegador
+          if (_event === "SIGNED_IN") {
+            try {
+              const marca = `auditoria_login_${session.user.id}`;
+              if (!sessionStorage.getItem(marca)) {
+                sessionStorage.setItem(marca, "1");
+                registrarEvento("login", { resultado: "ok", email: session.user.email ?? null });
+              }
+            } catch {
+              // sessionStorage no disponible: no registramos
+            }
+          }
           // Defer Supabase calls to avoid deadlock inside onAuthStateChange
           setTimeout(async () => {
             if (!mounted) return;
