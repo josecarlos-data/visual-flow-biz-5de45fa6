@@ -33,6 +33,11 @@ export async function reducirImagen(file: File, maxLado = 1600, calidad = 0.8): 
     );
     return blob ?? file;
   } catch {
+    if (file.type.startsWith("image/")) {
+      throw new Error(
+        "No se ha podido procesar esta imagen. Puede estar en formato HEIC; prueba a hacer la foto desde la propia aplicación.",
+      );
+    }
     return file;
   } finally {
     URL.revokeObjectURL(url);
