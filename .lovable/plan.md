@@ -20,7 +20,7 @@ Permisos, en este orden:
 
 RPC `public.auditoria_listado(_desde, _hasta, _user_id, _tipo, _resultado, _limit int default 100, _offset int default 0)`, `STABLE SECURITY DEFINER SET search_path = public`, devuelve los campos de la tabla más `full_name` del perfil y `total_filas` (conteo total de la ventana filtrada). Primera línea: si `NOT public.is_admin(auth.uid())` retorna sin filas. `GRANT EXECUTE ... TO authenticated` explícito tras el CREATE.
 
-Retención: `INSERT` en `app_settings` de `auditoria_retencion_dias = '90'` y función `public.purgar_auditoria()` que borra lo anterior a ese número de días leyendo el ajuste. Sin cron.
+Retención: `INSERT` en `app_settings` de `auditoria_retencion_dias = '90'` y función `public.purgar_auditoria()` (`SECURITY DEFINER SET search_path = public`) que borra lo anterior a ese número de días leyendo el ajuste. Sin `GRANT EXECUTE` a `authenticated` ni `anon`: solo `service_role`. Sin cron.
 
 Nota: la RPC de listado ya cubre la consulta, pero mantengo también el `GRANT SELECT` a `authenticated` con la policy de admin tal y como pides.
 
