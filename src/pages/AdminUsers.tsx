@@ -141,7 +141,10 @@ export default function AdminUsers() {
   const toggleMargen = async (userId: string, current: boolean) => {
     const { error } = await supabase.from("profiles").update({ ver_margen: !current } as any).eq("user_id", userId);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-    else { toast({ title: !current ? "Margen visible" : "Margen oculto" }); fetchData(); }
+    else {
+      registrarEvento("cambio_ver_margen", { entidad: "usuario", entidad_id: userId, detalle: { ver_margen: !current } });
+      toast({ title: !current ? "Margen visible" : "Margen oculto" }); fetchData();
+    }
   };
 
   const toggleDashboard = async (userId: string, dashboardKey: string, currentlyHas: boolean) => {
