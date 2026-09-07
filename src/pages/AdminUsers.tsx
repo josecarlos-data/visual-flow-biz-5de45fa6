@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { Check, X, Pencil, Save } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
+import { registrarEvento } from "@/lib/auditoria";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
