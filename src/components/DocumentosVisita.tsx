@@ -130,8 +130,9 @@ export function DocumentosVisita({ documentos, onChange, clienteNombre, onBloque
   const puedeAnalizar = (d: DocVisita) =>
     d.motivo_key === "competencia" && !!d.file && (d.tipo?.startsWith("image/") ?? false);
 
-  const analizar = async (d: DocVisita, id: string) => {
+  const analizar = async (d: DocVisita, i: number) => {
     if (!d.file) return;
+    const id = d.hash ?? String(i);
     setAnalizando(id);
     try {
       const imagen = await aBase64(await reducirImagen(d.file));
@@ -147,6 +148,7 @@ export function DocumentosVisita({ documentos, onChange, clienteNombre, onBloque
         return;
       }
       onBloques(bloques);
+      onChange(documentos.map((doc, idx) => (idx === i ? { ...doc, analizado: true } : doc)));
     } catch (e) {
       toast({
         title: "No se ha podido analizar el documento",
@@ -157,7 +159,6 @@ export function DocumentosVisita({ documentos, onChange, clienteNombre, onBloque
       setAnalizando(null);
     }
   };
-
 
   return (
     <div className="space-y-2 rounded-md border bg-muted/40 p-3">
