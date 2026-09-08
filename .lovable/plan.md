@@ -36,12 +36,15 @@ Cinco funciones `SECURITY DEFINER SET search_path = public`, con `GRANT EXECUTE 
 
 ## B. Auditoría
 
-En `supabase/functions/registrar-evento/index.ts`, añadir a la lista blanca: `dispositivo_alta`, `dispositivo_denegado`, `sesion_expulsada`, `cambio_config_seguridad`. Nada más de esa función cambia.
+En `supabase/functions/registrar-evento/index.ts`, añadir a la lista blanca: `dispositivo_alta`, `dispositivo_denegado`, `sesion_expulsada`, `cambio_config_seguridad`, `codigo_generado`, `codigo_usado`, `codigo_invalido`. Nada más de esa función cambia.
 
 ## C. Cliente
 
 - `src/lib/dispositivo.ts`: `getDispositivoId()` con uuid persistido en `localStorage` bajo `crm_dispositivo_id`.
-- `src/hooks/useAuth.tsx`: tras un inicio de sesión válido genera un `sesion_id` (guardado en `sessionStorage`) y llama a `registrar_sesion`. Si no está permitido, cierra sesión, registra `dispositivo_denegado` y muestra un aviso claro de contactar con el administrador. Si el motivo es `dispositivo_nuevo`, registra `dispositivo_alta`. Comprobación de `verificar_sesion` cada 60 segundos y al recuperar el foco de la ventana; si deja de ser vigente, registra `sesion_expulsada`, cierra sesión y avisa de que se ha entrado desde otro equipo. Intervalo y escuchas limpiados al desmontar. Cualquier error de red deja pasar.
+- `src/hooks/useAuth.tsx`: tras un inicio de sesión válido genera un `sesion_id` (guardado en `sessionStorage`) y llama a `registrar_sesion`. Si el motivo es `dispositivo_nuevo`, registra `dispositivo_alta`.
+- Si no está permitido por dispositivo no autorizado o bloqueado: cierra sesión, registra `dispositivo_denegado` y muestra un mensaje orientado a la acción — equipo no autorizado, contacte con el administrador, identificador de equipo con los 8 primeros caracteres del identificador del equipo. Se llama siempre "identificador de equipo", nunca "código", para no confundirlo con el código de alta.
+- Si el motivo es `codigo_requerido` o `codigo_invalido`, en lugar de cerrar sesión se muestra una pantalla pidiendo el código de alta (campo de 8 caracteres y botón); al enviarlo se vuelve a llamar a `registrar_sesion` con el código. Tras tres intentos fallidos, cierra sesión.
+- Comprobación de `verificar_sesion` cada 60 segundos y al recuperar el foco de la ventana; si deja de ser vigente, registra `sesion_expulsada`, cierra sesión y avisa de que se ha entrado desde otro equipo. El cierre de sesión borra además su propia fila de `sesiones_activas`. Intervalo y escuchas limpiados al desmontar. Cualquier error de red deja pasar.
 
 ## D. Error de módulo tras un despliegue
 
@@ -49,7 +52,7 @@ En `supabase/functions/registrar-evento/index.ts`, añadir a la lista blanca: `d
 
 ## E. Panel de administración
 
-En `src/pages/AdminUsers.tsx`, por usuario: interruptor "Permitir varias sesiones a la vez", número máximo de dispositivos y lista de sus dispositivos (última conexión, renombrar, bloquear, eliminar) vía las funciones nuevas. Arriba, selector global del modo de control de acceso (observación / bloqueo) sobre `app_settings`, solo para administradores, con una advertencia visible de lo que implica el modo bloqueo. Todo cambio en estos ajustes registra `cambio_config_seguridad`. Tarjetas en móvil, sin desplazamiento lateral.
+En `src/pages/AdminUsers.tsx`, por usuario: número máximo de sesiones simultáneas (0 = sin límite), número máximo de dispositivos, lista de sus dispositivos (última conexión, renombrar, bloquear, eliminar) y botón "Generar código de alta" que muestra el código en grande, copiable y con su caducidad. Arriba, dos selectores globales sobre `app_settings`, solo para administradores y cada uno con su advertencia: modo de control de acceso (observación / bloqueo) y modo de alta de dispositivo (automática / con código). Todo cambio en estos ajustes registra `cambio_config_seguridad`. Tarjetas en móvil, sin desplazamiento lateral.
 
 Los dos campos nuevos del perfil se guardan con el mismo patrón que `ver_margen`. Queda prohibido relajar el trigger anti-escalado para dejar pasar estos campos: si al probarlo algo falla, se detiene y se explica en vez de ajustar la policy.
 
