@@ -9,6 +9,13 @@ const TIPOS_PERMITIDOS = [
   "aprobacion_usuario",
   "baja_usuario",
   "cambio_ver_margen",
+  "dispositivo_alta",
+  "dispositivo_denegado",
+  "sesion_expulsada",
+  "cambio_config_seguridad",
+  "codigo_generado",
+  "codigo_usado",
+  "codigo_invalido",
 ] as const;
 
 const RESULTADOS = ["ok", "denegado", "fallo"];
