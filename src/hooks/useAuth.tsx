@@ -219,7 +219,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // la auditoría no debe impedir el cierre de sesión
     }
     try {
+      await (supabase.rpc as any)("cerrar_sesion", { _sesion_id: getSesionId() });
+    } catch {
+      // ignorado: el cierre de sesión debe ocurrir igualmente
+    }
+    try {
       sessionStorage.removeItem(`auditoria_login_${user?.id ?? ""}`);
+      limpiarSesionId();
     } catch {
       // ignorado
     }
