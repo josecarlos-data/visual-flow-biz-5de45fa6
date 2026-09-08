@@ -163,6 +163,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <ErrorBoundary>
+            <ControlAcceso>
             <Suspense fallback={<LoadingScreen />}>
               <Routes>
                 <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
@@ -194,6 +195,7 @@ const App = () => (
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
+            </ControlAcceso>
           </ErrorBoundary>
         </AuthProvider>
       </BrowserRouter>
