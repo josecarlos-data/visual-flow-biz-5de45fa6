@@ -50,6 +50,10 @@ const AuthContext = createContext<AuthContextType>({
   dashboards: [],
   hasDashboard: () => false,
   signOut: async () => {},
+  pideCodigoAlta: false,
+  codigoError: null,
+  enviarCodigoAlta: async () => {},
+  idEquipo: "",
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
