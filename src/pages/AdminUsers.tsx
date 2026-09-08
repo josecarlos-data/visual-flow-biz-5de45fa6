@@ -7,9 +7,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
-import { Check, X, Pencil, Save } from "lucide-react";
+import { Check, X, Pencil, Save, MonitorSmartphone } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 import { registrarEvento } from "@/lib/auditoria";
+import SeguridadAccesoCard from "@/components/SeguridadAccesoCard";
+import DispositivosUsuarioDialog from "@/components/DispositivosUsuarioDialog";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -28,6 +30,8 @@ interface UserRow {
   delegacion: string | null;
   role: AppRole | null;
   dashboardKeys: string[];
+  sesiones_max: number;
+  dispositivos_max: number;
 }
 
 export default function AdminUsers() {
