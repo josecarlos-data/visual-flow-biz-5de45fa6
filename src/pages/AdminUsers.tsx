@@ -224,6 +224,8 @@ export default function AdminUsers() {
         <p className="text-muted-foreground">Aprueba usuarios y asigna roles, vendedores y delegaciones</p>
       </div>
 
+      <SeguridadAccesoCard />
+
       {pendingUsers.length > 0 && (
         <Card>
           <CardHeader>
