@@ -282,6 +282,7 @@ export default function AdminUsers() {
                   <TableHead>Delegación</TableHead>
                   <TableHead>Margen</TableHead>
                   <TableHead>Dashboards</TableHead>
+                  <TableHead>Equipos</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -374,6 +375,12 @@ export default function AdminUsers() {
                         </div>
                       )}
                     </TableCell>
+                    <TableCell>
+                      <Button size="sm" variant="outline" className="gap-1" onClick={() => setDispositivosDe(u)}>
+                        <MonitorSmartphone className="h-4 w-4" />
+                        {u.dispositivos_max} · {u.sesiones_max === 0 ? "∞" : u.sesiones_max}
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -381,6 +388,18 @@ export default function AdminUsers() {
           )}
         </CardContent>
       </Card>
+
+      {dispositivosDe && (
+        <DispositivosUsuarioDialog
+          open={!!dispositivosDe}
+          onOpenChange={(v) => !v && setDispositivosDe(null)}
+          userId={dispositivosDe.user_id}
+          nombreUsuario={dispositivosDe.full_name || dispositivosDe.email || "usuario"}
+          sesionesMax={dispositivosDe.sesiones_max}
+          dispositivosMax={dispositivosDe.dispositivos_max}
+          onGuardado={fetchData}
+        />
+      )}
     </div>
   );
 }
