@@ -531,6 +531,42 @@ export type Database = {
         }
         Relationships: []
       }
+      codigos_alta: {
+        Row: {
+          codigo: string
+          creado_en: string
+          creado_por: string | null
+          dispositivo_id: string | null
+          expira_en: string
+          id: string
+          ultimo_uso_en: string | null
+          user_id: string
+          usos: number
+        }
+        Insert: {
+          codigo: string
+          creado_en?: string
+          creado_por?: string | null
+          dispositivo_id?: string | null
+          expira_en?: string
+          id?: string
+          ultimo_uso_en?: string | null
+          user_id: string
+          usos?: number
+        }
+        Update: {
+          codigo?: string
+          creado_en?: string
+          creado_por?: string | null
+          dispositivo_id?: string | null
+          expira_en?: string
+          id?: string
+          ultimo_uso_en?: string | null
+          user_id?: string
+          usos?: number
+        }
+        Relationships: []
+      }
       dashboards: {
         Row: {
           created_at: string
@@ -564,6 +600,42 @@ export type Database = {
           route?: string
           sort_order?: number
           updated_at?: string
+        }
+        Relationships: []
+      }
+      dispositivos: {
+        Row: {
+          bloqueado: boolean
+          dispositivo_id: string
+          id: string
+          ip_alta: unknown
+          nombre: string | null
+          primera_vez: string
+          ultima_vez: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          bloqueado?: boolean
+          dispositivo_id: string
+          id?: string
+          ip_alta?: unknown
+          nombre?: string | null
+          primera_vez?: string
+          ultima_vez?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          bloqueado?: boolean
+          dispositivo_id?: string
+          id?: string
+          ip_alta?: unknown
+          nombre?: string | null
+          primera_vez?: string
+          ultima_vez?: string
+          user_agent?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -844,11 +916,13 @@ export type Database = {
         Row: {
           created_at: string
           delegacion: string | null
+          dispositivos_max: number
           email: string | null
           employee_code: string | null
           full_name: string | null
           id: string
           is_approved: boolean
+          sesiones_max: number
           updated_at: string
           user_id: string
           ver_margen: boolean
@@ -857,11 +931,13 @@ export type Database = {
         Insert: {
           created_at?: string
           delegacion?: string | null
+          dispositivos_max?: number
           email?: string | null
           employee_code?: string | null
           full_name?: string | null
           id?: string
           is_approved?: boolean
+          sesiones_max?: number
           updated_at?: string
           user_id: string
           ver_margen?: boolean
@@ -870,11 +946,13 @@ export type Database = {
         Update: {
           created_at?: string
           delegacion?: string | null
+          dispositivos_max?: number
           email?: string | null
           employee_code?: string | null
           full_name?: string | null
           id?: string
           is_approved?: boolean
+          sesiones_max?: number
           updated_at?: string
           user_id?: string
           ver_margen?: boolean
@@ -1046,6 +1124,30 @@ export type Database = {
           nombre?: string
           updated_at?: string
           vendedor?: string | null
+        }
+        Relationships: []
+      }
+      sesiones_activas: {
+        Row: {
+          dispositivo_id: string | null
+          iniciada_en: string
+          sesion_id: string
+          ultima_actividad: string
+          user_id: string
+        }
+        Insert: {
+          dispositivo_id?: string | null
+          iniciada_en?: string
+          sesion_id: string
+          ultima_actividad?: string
+          user_id: string
+        }
+        Update: {
+          dispositivo_id?: string | null
+          iniciada_en?: string
+          sesion_id?: string
+          ultima_actividad?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -2038,6 +2140,11 @@ export type Database = {
           ticket_medio: number
         }[]
       }
+      admin_generar_codigo: { Args: { _user_id: string }; Returns: string }
+      admin_gestionar_dispositivo: {
+        Args: { _accion: string; _id: string; _nombre?: string }
+        Returns: Json
+      }
       auditoria_listado: {
         Args: {
           _desde?: string
@@ -2079,6 +2186,7 @@ export type Database = {
         Args: { _cod: number; _user_id: string }
         Returns: boolean
       }
+      cerrar_sesion: { Args: { _sesion_id: string }; Returns: undefined }
       cliente_documento_lineas: {
         Args: { _cod: number; _id_documento: string }
         Returns: {
@@ -2162,6 +2270,19 @@ export type Database = {
           ruta: string
           ultima_compra: string
           vendedor: string
+        }[]
+      }
+      dispositivos_usuario: {
+        Args: { _user_id: string }
+        Returns: {
+          bloqueado: boolean
+          dispositivo_id: string
+          id: string
+          nombre: string
+          primera_vez: string
+          sesiones_abiertas: number
+          ultima_vez: string
+          user_agent: string
         }[]
       }
       documentos_filtros_opciones: {
@@ -2398,6 +2519,15 @@ export type Database = {
         Args: { _cod: number; _lat: number; _lng: number }
         Returns: boolean
       }
+      registrar_sesion: {
+        Args: {
+          _codigo?: string
+          _dispositivo_id: string
+          _sesion_id: string
+          _user_agent?: string
+        }
+        Returns: Json
+      }
       repartir_observaciones_gespromo: {
         Args: { _forzar?: boolean }
         Returns: Json
@@ -2465,6 +2595,7 @@ export type Database = {
           vendedor: string
         }[]
       }
+      verificar_sesion: { Args: { _sesion_id: string }; Returns: Json }
     }
     Enums: {
       app_role: "admin" | "director_comercial" | "jefe_de_zona" | "comercial"

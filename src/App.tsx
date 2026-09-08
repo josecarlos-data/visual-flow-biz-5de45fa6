@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef } from "react";
+import { lazyConRecarga as lazy } from "@/lib/lazyConRecarga";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -33,6 +34,7 @@ const AdminObjetivos = lazy(() => import("./pages/AdminObjetivos"));
 const Objetivos = lazy(() => import("./pages/Objetivos"));
 const Documentos = lazy(() => import("./pages/Documentos"));
 const ActividadInterna = lazy(() => import("./pages/ActividadInterna"));
+const CodigoAlta = lazy(() => import("./pages/CodigoAlta"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -140,6 +142,19 @@ function PendingRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/** Mientras haga falta el código de alta, no se renderiza ninguna sección del CRM. */
+function ControlAcceso({ children }: { children: React.ReactNode }) {
+  const { pideCodigoAlta } = useAuth();
+  if (pideCodigoAlta) {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <CodigoAlta />
+      </Suspense>
+    );
+  }
+  return <>{children}</>;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -148,6 +163,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <ErrorBoundary>
+            <ControlAcceso>
             <Suspense fallback={<LoadingScreen />}>
               <Routes>
                 <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
@@ -179,6 +195,7 @@ const App = () => (
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
+            </ControlAcceso>
           </ErrorBoundary>
         </AuthProvider>
       </BrowserRouter>

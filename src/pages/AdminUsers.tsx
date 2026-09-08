@@ -7,9 +7,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
-import { Check, X, Pencil, Save } from "lucide-react";
+import { Check, X, Pencil, Save, MonitorSmartphone } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 import { registrarEvento } from "@/lib/auditoria";
+import SeguridadAccesoCard from "@/components/SeguridadAccesoCard";
+import DispositivosUsuarioDialog from "@/components/DispositivosUsuarioDialog";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -28,6 +30,8 @@ interface UserRow {
   delegacion: string | null;
   role: AppRole | null;
   dashboardKeys: string[];
+  sesiones_max: number;
+  dispositivos_max: number;
 }
 
 export default function AdminUsers() {
@@ -38,11 +42,12 @@ export default function AdminUsers() {
   const [loading, setLoading] = useState(true);
   const [editingField, setEditingField] = useState<{ userId: string; field: "full_name" } | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [dispositivosDe, setDispositivosDe] = useState<UserRow | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
     const [profilesRes, vendedoresRes, delegacionesRes, dashboardsRes] = await Promise.all([
-      supabase.from("profiles").select("user_id, full_name, email, employee_code, is_approved, delegacion, ver_margen"),
+      supabase.from("profiles").select("user_id, full_name, email, employee_code, is_approved, delegacion, ver_margen, sesiones_max, dispositivos_max"),
       supabase.rpc("get_distinct_vendedores"),
       supabase.rpc("get_distinct_delegaciones"),
       supabase
@@ -90,6 +95,8 @@ export default function AdminUsers() {
         delegacion: (p as any).delegacion ?? null,
         role: rolesMap.get(p.user_id) ?? null,
         dashboardKeys: accessMap.get(p.user_id) ?? [],
+        sesiones_max: (p as any).sesiones_max ?? 1,
+        dispositivos_max: (p as any).dispositivos_max ?? 2,
       }))
     );
     setLoading(false);
@@ -217,6 +224,8 @@ export default function AdminUsers() {
         <p className="text-muted-foreground">Aprueba usuarios y asigna roles, vendedores y delegaciones</p>
       </div>
 
+      <SeguridadAccesoCard />
+
       {pendingUsers.length > 0 && (
         <Card>
           <CardHeader>
@@ -275,6 +284,7 @@ export default function AdminUsers() {
                   <TableHead>Delegación</TableHead>
                   <TableHead>Margen</TableHead>
                   <TableHead>Dashboards</TableHead>
+                  <TableHead>Equipos</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -367,6 +377,12 @@ export default function AdminUsers() {
                         </div>
                       )}
                     </TableCell>
+                    <TableCell>
+                      <Button size="sm" variant="outline" className="gap-1" onClick={() => setDispositivosDe(u)}>
+                        <MonitorSmartphone className="h-4 w-4" />
+                        {u.dispositivos_max} · {u.sesiones_max === 0 ? "∞" : u.sesiones_max}
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -374,6 +390,18 @@ export default function AdminUsers() {
           )}
         </CardContent>
       </Card>
+
+      {dispositivosDe && (
+        <DispositivosUsuarioDialog
+          open={!!dispositivosDe}
+          onOpenChange={(v) => !v && setDispositivosDe(null)}
+          userId={dispositivosDe.user_id}
+          nombreUsuario={dispositivosDe.full_name || dispositivosDe.email || "usuario"}
+          sesionesMax={dispositivosDe.sesiones_max}
+          dispositivosMax={dispositivosDe.dispositivos_max}
+          onGuardado={fetchData}
+        />
+      )}
     </div>
   );
 }
