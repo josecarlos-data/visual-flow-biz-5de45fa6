@@ -1,56 +1,50 @@
-# Registro de auditoría de seguridad
+# Control de dispositivos y sesión única
 
-Registro inmutable de eventos de seguridad (accesos, denegaciones, cambios sobre usuarios) escrito únicamente desde el servidor, con una pantalla de consulta solo para administradores.
+Registro de los equipos desde los que entra cada usuario, límite de dispositivos, opción de sesión única y panel de administración. Con un interruptor global para empezar en modo observación (solo registra) y pasar a bloqueo cuando esté validado.
 
-## Qué verá el usuario
+## Aviso de alcance
 
-- Nueva entrada "Auditoría" en el menú de administración.
-- Una tabla paginada con fecha, usuario, tipo de evento, resultado, ruta e información técnica (IP, navegador), con filtros por fechas, usuario, tipo y resultado. En móvil se muestra como tarjetas, sin desplazamiento lateral.
-- Nadie puede modificar ni borrar el registro desde la aplicación, ni siquiera un administrador.
+Es el cambio más grande hasta ahora y toca autenticación, que es la parte más delicada. Lo construyo tal y como se describe, con dos cautelas que no amplían el alcance:
 
-## 1. Migración única
+- El modo por defecto será observación: nadie puede quedarse fuera hasta que se cambie el selector a mano.
+- Ante cualquier fallo de red en las comprobaciones, se deja pasar; y un administrador nunca puede ser bloqueado.
 
-Tabla `public.auditoria_eventos` con los campos indicados (id, ocurrido_en, user_id, email, tipo, resultado con restricción ok/denegado/fallo, entidad, entidad_id, ruta, detalle jsonb, ip inet, user_agent, dispositivo_id) y los tres índices pedidos.
+## A. Migración única
 
-Permisos, en este orden:
-1. `CREATE TABLE`
-2. `REVOKE ALL ... FROM authenticated, anon;` `GRANT SELECT ... TO authenticated;` `GRANT ALL ... TO service_role;`
-3. `ENABLE ROW LEVEL SECURITY`
-4. Una sola policy permisiva de lectura para `authenticated` con `USING (public.is_admin(auth.uid()))`. Sin policies de escritura: solo `service_role` (que salta RLS) puede insertar.
+Tablas nuevas `public.dispositivos` y `public.sesiones_activas` con los campos, índice y unicidad indicados. En ambas, en este orden: crear tabla, `REVOKE ALL ... FROM authenticated, anon`, `GRANT SELECT ... TO authenticated`, `GRANT ALL ... TO service_role`, activar RLS y una sola policy permisiva de lectura para `authenticated`: el propio usuario o `public.is_admin(auth.uid())`. Sin policies de escritura.
 
-RPC `public.auditoria_listado(_desde, _hasta, _user_id, _tipo, _resultado, _limit int default 100, _offset int default 0)`, `STABLE SECURITY DEFINER SET search_path = public`, devuelve los campos de la tabla más `full_name` del perfil y `total_filas` (conteo total de la ventana filtrada). Primera línea: si `NOT public.is_admin(auth.uid())` retorna sin filas. `GRANT EXECUTE ... TO authenticated` explícito tras el CREATE.
+Columnas nuevas en `public.profiles`: `sesiones_multiples boolean NOT NULL DEFAULT false` y `dispositivos_max int NOT NULL DEFAULT 2`.
 
-Retención: `INSERT` en `app_settings` de `auditoria_retencion_dias = '90'` y función `public.purgar_auditoria()` (`SECURITY DEFINER SET search_path = public`) que borra lo anterior a ese número de días leyendo el ajuste. Sin `GRANT EXECUTE` a `authenticated` ni `anon`: solo `service_role`. Sin cron.
+Filas en `app_settings`: `control_acceso_modo = 'observacion'` y `control_dispositivos_activo = 'true'`.
 
-Nota: la RPC de listado ya cubre la consulta, pero mantengo también el `GRANT SELECT` a `authenticated` con la policy de admin tal y como pides.
+Cuatro funciones `SECURITY DEFINER SET search_path = public`, con `GRANT EXECUTE ... TO authenticated` explícito tras cada `CREATE` y nada a `anon`:
 
-## 2. Edge function `registrar-evento`
+- `registrar_sesion(_dispositivo_id, _sesion_id, _user_agent)` → jsonb `{permitido, motivo, modo}`, con la lógica y el orden descritos (alta automática por debajo del máximo, `dispositivo_no_autorizado` al superarlo, `dispositivo_bloqueado`, upsert de sesión solo si `sesiones_multiples` es falso, admin nunca denegado, en observación siempre permitido con motivo relleno).
+- `verificar_sesion(_sesion_id)` → jsonb `{vigente}`, `STABLE`, actualiza `ultima_actividad` cuando es vigente.
+- `dispositivos_usuario(_user_id)` → tabla para el panel, 0 filas si el llamante no es admin.
+- `admin_gestionar_dispositivo(_id, _accion, _nombre)` → bloquear / desbloquear / renombrar / eliminar, con verificación de admin al entrar.
 
-- `verify_jwt = false` (debe aceptar logins fallidos sin sesión); CORS desde `_shared/cors.ts`.
-- Si llega `Authorization`, valida con `getUser()` y toma de ahí el `user_id`; el cuerpo nunca puede fijarlo.
-- Sin token válido solo se acepta `tipo='login'` con `resultado='fallo'`; cualquier otra combinación responde 204 sin insertar. Con token válido se acepta toda la lista blanca.
-- El `detalle` jsonb incluye siempre `"autenticado": true|false`, fijado en servidor, para distinguir después un evento forjado.
-- IP: se guarda el ÚLTIMO valor de `x-forwarded-for` en la columna `ip` y la cadena completa en `detalle.x_forwarded_for`; user agent desde la cabecera. Nunca del cuerpo.
-- Inserta con la clave de servicio.
-- Cuerpo aceptado: `{ tipo, resultado, email?, entidad?, entidad_id?, ruta?, detalle? }`, validado con lista blanca de `tipo` definida en el fichero: `login`, `logout`, `acceso_denegado`, `cambio_rol`, `aprobacion_usuario`, `baja_usuario`, `cambio_ver_margen`.
-- Responde 204 siempre que pueda; nunca propaga error al cliente.
+Nota técnica: `verificar_sesion` se declara `STABLE` según lo pedido, así que la actualización de `ultima_actividad` se hace desde una función auxiliar `VOLATILE` interna; si el motor lo rechaza, la alternativa es dejarla `VOLATILE` (lo indicaría antes de cambiarlo).
 
+## B. Auditoría
 
-## 3. Cliente `src/lib/auditoria.ts`
+En `supabase/functions/registrar-evento/index.ts`, añadir a la lista blanca: `dispositivo_alta`, `dispositivo_denegado`, `sesion_expulsada`, `cambio_config_seguridad`. Nada más de esa función cambia.
 
-`registrarEvento(tipo, opts)` en modo "dispara y olvida": invoca la función, envuelve todo en try/catch, no bloquea la interfaz ni muestra avisos.
+## C. Cliente
 
-## 4. Enganches (solo estos)
+- `src/lib/dispositivo.ts`: `getDispositivoId()` con uuid persistido en `localStorage` bajo `crm_dispositivo_id`.
+- `src/hooks/useAuth.tsx`: tras un inicio de sesión válido genera un `sesion_id` (guardado en `sessionStorage`) y llama a `registrar_sesion`. Si no está permitido, cierra sesión, registra `dispositivo_denegado` y muestra un aviso claro de contactar con el administrador. Si el motivo es `dispositivo_nuevo`, registra `dispositivo_alta`. Comprobación de `verificar_sesion` cada 60 segundos y al recuperar el foco de la ventana; si deja de ser vigente, registra `sesion_expulsada`, cierra sesión y avisa de que se ha entrado desde otro equipo. Intervalo y escuchas limpiados al desmontar. Cualquier error de red deja pasar.
 
-- `useAuth.tsx`: NO se registra en cada `SIGNED_IN`. Se distingue `INITIAL_SESSION` de `SIGNED_IN` y se usa además una marca en `sessionStorage`, de modo que se registre como máximo un `login` por sesión de navegador (una recarga o un `TOKEN_REFRESHED` no generan evento). En `signOut`, `logout` ok antes de cerrar sesión.
-- `Auth.tsx`: error de acceso → `login` fallo con el email introducido (nunca la contraseña).
-- `App.tsx` `ProtectedRoute`: `acceso_denegado` en las dos ramas de falta de permiso (adminOnly no cumplido y dashboard no autorizado), con la ruta solicitada. El registro va en un `useEffect` con guarda por `useRef` para no repetirlo en la misma ruta, nunca en el cuerpo del render. No se registran `!user` ni `!isApproved`.
-- `AdminUsers.tsx`: `cambio_rol`, `aprobacion_usuario`, `baja_usuario`, `cambio_ver_margen` con `entidad='usuario'` y `entidad_id` del usuario afectado.
+## D. Error de módulo tras un despliegue
 
-## 5. Pantalla `src/pages/AdminAuditoria.tsx`
+`src/lib/lazyConRecarga.ts`: envoltorio de `React.lazy` que, si falla la carga dinámica, recarga la página una sola vez (marca en `sessionStorage`) y, si ya se recargó, propaga el error al `ErrorBoundary`. Todos los `lazy()` de `src/App.tsx` pasan a usarlo; las rutas no cambian.
 
-Mismo patrón que `AdminUsers.tsx`. Ruta `/admin/auditoria` con `<ProtectedRoute adminOnly>`, enlace en `AppSidebar` en el grupo de Administración, sin fila en `dashboards`. Tabla paginada por la RPC con filtros, tarjetas en móvil. El desplegable de usuarios se rellena desde `profiles` con `limit` explícito y orden por nombre.
+## E. Panel de administración
+
+En `src/pages/AdminUsers.tsx`, por usuario: interruptor "Permitir varias sesiones a la vez", número máximo de dispositivos y lista de sus dispositivos (última conexión, renombrar, bloquear, eliminar) vía las funciones nuevas. Arriba, selector global del modo de control de acceso (observación / bloqueo) sobre `app_settings`, solo para administradores, con una advertencia visible de lo que implica el modo bloqueo. Todo cambio en estos ajustes registra `cambio_config_seguridad`. Tarjetas en móvil, sin desplazamiento lateral.
+
+Los dos campos nuevos del perfil se guardan con el mismo patrón que `ver_margen`; si la regla de seguridad que impide que un usuario se auto-escale bloqueara la escritura, se ajustaría esa comprobación en la misma migración para dejar pasar estos dos campos a los administradores.
 
 ## Fuera de alcance
 
-Dispositivos, sesión única, triggers de cambios de datos, registro de navegación, exportaciones y marca de agua.
+Disparadores de cambios de datos, registro de navegación, exportaciones, marca de agua y limitación por IP. No se toca `auditoria_eventos` ni su policy, ni se crean vistas materializadas.
