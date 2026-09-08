@@ -67,6 +67,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [delegacion, setDelegacion] = useState<string | null>(null);
   const [verMargen, setVerMargen] = useState(false);
   const [dashboards, setDashboards] = useState<DashboardItem[]>([]);
+  const [pideCodigoAlta, setPideCodigoAlta] = useState(false);
+  const [codigoError, setCodigoError] = useState<string | null>(null);
+  const intentosCodigo = useRef(0);
+  const controlHechoPara = useRef<string | null>(null);
+  const idEquipo = typeof window !== "undefined" ? getDispositivoId() : "";
+
 
   const fetchUserData = async (userId: string) => {
     try {
