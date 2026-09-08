@@ -244,13 +244,133 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setDashboards([]);
       setVerMargen(false);
       setIsLoading(false);
+      setPideCodigoAlta(false);
+      setCodigoError(null);
+      intentosCodigo.current = 0;
+      controlHechoPara.current = null;
     }
   };
+
+  // ---- Control de equipos y sesiones ----
+  const evaluarControl = useCallback(
+    async (codigo?: string) => {
+      try {
+        const { data, error } = await (supabase.rpc as any)("registrar_sesion", {
+          _dispositivo_id: getDispositivoId(),
+          _sesion_id: getSesionId(),
+          _user_agent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 500) : null,
+          _codigo: codigo ?? null,
+        });
+        if (error) return true; // ante error, dejar pasar
+
+        const res = (data ?? {}) as { permitido?: boolean; motivo?: string | null };
+        const motivo = res.motivo ?? null;
+        const permitido = res.permitido !== false;
+
+        if (permitido) {
+          setPideCodigoAlta(false);
+          setCodigoError(null);
+          intentosCodigo.current = 0;
+          if (motivo === "dispositivo_nuevo") {
+            registrarEvento("dispositivo_alta", {
+              detalle: { dispositivo_id: getDispositivoId(), con_codigo: !!codigo },
+            });
+            if (codigo) {
+              registrarEvento("codigo_usado", { detalle: { dispositivo_id: getDispositivoId() } });
+            }
+          }
+          return true;
+        }
+
+        if (motivo === "codigo_requerido" || motivo === "codigo_invalido") {
+          if (motivo === "codigo_invalido") {
+            intentosCodigo.current += 1;
+            registrarEvento("codigo_invalido", { resultado: "denegado", detalle: { dispositivo_id: getDispositivoId() } });
+          }
+          if (intentosCodigo.current >= 3) {
+            toast({
+              title: "Código no válido",
+              description: "Has agotado los intentos. Pide un código nuevo al administrador.",
+              variant: "destructive",
+            });
+            await signOut();
+            return false;
+          }
+          setPideCodigoAlta(true);
+          setCodigoError(motivo === "codigo_invalido" ? "El código no es válido o ha caducado." : null);
+          return false;
+        }
+
+        registrarEvento("dispositivo_denegado", {
+          resultado: "denegado",
+          detalle: { motivo, dispositivo_id: getDispositivoId() },
+        });
+        toast({
+          title: "Equipo no autorizado",
+          description: `Este equipo no está autorizado para entrar. Contacte con el administrador e indíquele el identificador de equipo ${idEquipoCorto(getDispositivoId())}.`,
+          variant: "destructive",
+        });
+        await signOut();
+        return false;
+      } catch {
+        return true; // ante error de red, dejar pasar
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
+  const enviarCodigoAlta = async (codigo: string) => {
+    setCodigoError(null);
+    await evaluarControl(codigo.trim().toUpperCase());
+  };
+
+  useEffect(() => {
+    if (!user || !isApproved) return;
+    if (controlHechoPara.current === user.id) return;
+    controlHechoPara.current = user.id;
+    void evaluarControl();
+  }, [user, isApproved, evaluarControl]);
+
+  useEffect(() => {
+    if (!user || !isApproved || pideCodigoAlta) return;
+
+    let cancelado = false;
+    const comprobar = async () => {
+      try {
+        const { data, error } = await (supabase.rpc as any)("verificar_sesion", { _sesion_id: getSesionId() });
+        if (error || cancelado) return;
+        const vigente = ((data ?? {}) as { vigente?: boolean }).vigente !== false;
+        if (!vigente) {
+          registrarEvento("sesion_expulsada", { resultado: "denegado", detalle: { dispositivo_id: getDispositivoId() } });
+          toast({
+            title: "Sesión cerrada",
+            description: "Se ha iniciado sesión en otro equipo, por lo que esta sesión se ha cerrado.",
+            variant: "destructive",
+          });
+          await signOut();
+        }
+      } catch {
+        // ante error de red, no hacemos nada
+      }
+    };
+
+    const intervalo = setInterval(comprobar, 60000);
+    const alEnfocar = () => void comprobar();
+    window.addEventListener("focus", alEnfocar);
+
+    return () => {
+      cancelado = true;
+      clearInterval(intervalo);
+      window.removeEventListener("focus", alEnfocar);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isApproved, pideCodigoAlta]);
 
   const hasDashboard = (key: string) => role === "admin" || dashboards.some((d) => d.key === key);
 
   return (
-    <AuthContext.Provider value={{ session, user, role, isApproved, isLoading, authError, employeeCode, delegacion, verMargen, dashboards, hasDashboard, signOut }}>
+    <AuthContext.Provider value={{ session, user, role, isApproved, isLoading, authError, employeeCode, delegacion, verMargen, dashboards, hasDashboard, signOut, pideCodigoAlta, codigoError, enviarCodigoAlta, idEquipo }}>
       {children}
     </AuthContext.Provider>
   );
