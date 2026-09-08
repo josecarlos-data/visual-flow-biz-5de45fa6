@@ -15,16 +15,16 @@ Tablas nuevas `public.dispositivos` y `public.sesiones_activas` con los campos, 
 
 Columnas nuevas en `public.profiles`: `sesiones_multiples boolean NOT NULL DEFAULT false` y `dispositivos_max int NOT NULL DEFAULT 2`.
 
+En la misma migración, `CREATE OR REPLACE` de `public.prevent_profile_self_escalation` conservando íntegras las siete comprobaciones actuales (is_approved, ver_margen, employee_code, delegacion, zone_id, user_id, email) y añadiendo dos más: cualquier cambio en `sesiones_multiples` o en `dispositivos_max` lanza excepción. No se elimina ni se relaja ninguna comprobación existente y el trigger no se recrea, solo la función. La escritura desde el panel funciona sin más: la policy "Admins can update all profiles" permite a un administrador escribir cualquier columna, y el trigger no comprueba nada cuando quien escribe es administrador.
+
 Filas en `app_settings`: `control_acceso_modo = 'observacion'` y `control_dispositivos_activo = 'true'`.
 
 Cuatro funciones `SECURITY DEFINER SET search_path = public`, con `GRANT EXECUTE ... TO authenticated` explícito tras cada `CREATE` y nada a `anon`:
 
 - `registrar_sesion(_dispositivo_id, _sesion_id, _user_agent)` → jsonb `{permitido, motivo, modo}`, con la lógica y el orden descritos (alta automática por debajo del máximo, `dispositivo_no_autorizado` al superarlo, `dispositivo_bloqueado`, upsert de sesión solo si `sesiones_multiples` es falso, admin nunca denegado, en observación siempre permitido con motivo relleno).
-- `verificar_sesion(_sesion_id)` → jsonb `{vigente}`, `STABLE`, actualiza `ultima_actividad` cuando es vigente.
+- `verificar_sesion(_sesion_id)` → jsonb `{vigente}`, `VOLATILE`; para no escribir en cada llamada, actualiza `ultima_actividad` solo si han pasado más de 5 minutos desde la última.
 - `dispositivos_usuario(_user_id)` → tabla para el panel, 0 filas si el llamante no es admin.
 - `admin_gestionar_dispositivo(_id, _accion, _nombre)` → bloquear / desbloquear / renombrar / eliminar, con verificación de admin al entrar.
-
-Nota técnica: `verificar_sesion` se declara `STABLE` según lo pedido, así que la actualización de `ultima_actividad` se hace desde una función auxiliar `VOLATILE` interna; si el motor lo rechaza, la alternativa es dejarla `VOLATILE` (lo indicaría antes de cambiarlo).
 
 ## B. Auditoría
 
@@ -43,7 +43,7 @@ En `supabase/functions/registrar-evento/index.ts`, añadir a la lista blanca: `d
 
 En `src/pages/AdminUsers.tsx`, por usuario: interruptor "Permitir varias sesiones a la vez", número máximo de dispositivos y lista de sus dispositivos (última conexión, renombrar, bloquear, eliminar) vía las funciones nuevas. Arriba, selector global del modo de control de acceso (observación / bloqueo) sobre `app_settings`, solo para administradores, con una advertencia visible de lo que implica el modo bloqueo. Todo cambio en estos ajustes registra `cambio_config_seguridad`. Tarjetas en móvil, sin desplazamiento lateral.
 
-Los dos campos nuevos del perfil se guardan con el mismo patrón que `ver_margen`; si la regla de seguridad que impide que un usuario se auto-escale bloqueara la escritura, se ajustaría esa comprobación en la misma migración para dejar pasar estos dos campos a los administradores.
+Los dos campos nuevos del perfil se guardan con el mismo patrón que `ver_margen`. Queda prohibido relajar el trigger anti-escalado para dejar pasar estos campos: si al probarlo algo falla, se detiene y se explica en vez de ajustar la policy.
 
 ## Fuera de alcance
 
