@@ -1,8 +1,10 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from "react";
+import { useState, useEffect, useRef, useCallback, createContext, useContext, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { registrarEvento } from "@/lib/auditoria";
+import { getDispositivoId, getSesionId, idEquipoCorto, limpiarSesionId } from "@/lib/dispositivo";
+import { toast } from "@/hooks/use-toast";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -28,6 +30,11 @@ interface AuthContextType {
   dashboards: DashboardItem[];
   hasDashboard: (key: string) => boolean;
   signOut: () => Promise<void>;
+  /** Cuando es true, hay que pedir el código de alta antes de mostrar nada. */
+  pideCodigoAlta: boolean;
+  codigoError: string | null;
+  enviarCodigoAlta: (codigo: string) => Promise<void>;
+  idEquipo: string;
 }
 
 const AuthContext = createContext<AuthContextType>({
