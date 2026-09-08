@@ -42,11 +42,12 @@ export default function AdminUsers() {
   const [loading, setLoading] = useState(true);
   const [editingField, setEditingField] = useState<{ userId: string; field: "full_name" } | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [dispositivosDe, setDispositivosDe] = useState<UserRow | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
     const [profilesRes, vendedoresRes, delegacionesRes, dashboardsRes] = await Promise.all([
-      supabase.from("profiles").select("user_id, full_name, email, employee_code, is_approved, delegacion, ver_margen"),
+      supabase.from("profiles").select("user_id, full_name, email, employee_code, is_approved, delegacion, ver_margen, sesiones_max, dispositivos_max"),
       supabase.rpc("get_distinct_vendedores"),
       supabase.rpc("get_distinct_delegaciones"),
       supabase
@@ -94,6 +95,8 @@ export default function AdminUsers() {
         delegacion: (p as any).delegacion ?? null,
         role: rolesMap.get(p.user_id) ?? null,
         dashboardKeys: accessMap.get(p.user_id) ?? [],
+        sesiones_max: (p as any).sesiones_max ?? 1,
+        dispositivos_max: (p as any).dispositivos_max ?? 2,
       }))
     );
     setLoading(false);
