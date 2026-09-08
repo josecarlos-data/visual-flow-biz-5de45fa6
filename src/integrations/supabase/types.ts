@@ -2186,6 +2186,7 @@ export type Database = {
         Args: { _cod: number; _user_id: string }
         Returns: boolean
       }
+      cerrar_sesion: { Args: { _sesion_id: string }; Returns: undefined }
       cliente_documento_lineas: {
         Args: { _cod: number; _id_documento: string }
         Returns: {
