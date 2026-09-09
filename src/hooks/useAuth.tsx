@@ -57,6 +57,7 @@ const AuthContext = createContext<AuthContextType>({
   codigoError: null,
   enviarCodigoAlta: async () => {},
   idEquipo: "",
+  controlListo: false,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
