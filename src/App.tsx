@@ -142,9 +142,12 @@ function PendingRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-/** Mientras haga falta el código de alta, no se renderiza ninguna sección del CRM. */
+/** Hasta que se sepa si el equipo está autorizado, no se renderiza ninguna sección del CRM. */
 function ControlAcceso({ children }: { children: React.ReactNode }) {
-  const { pideCodigoAlta } = useAuth();
+  const { pideCodigoAlta, controlListo } = useAuth();
+  if (!controlListo) {
+    return <LoadingScreen />;
+  }
   if (pideCodigoAlta) {
     return (
       <Suspense fallback={<LoadingScreen />}>
