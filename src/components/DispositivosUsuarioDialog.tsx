@@ -102,7 +102,7 @@ export default function DispositivosUsuarioDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[85vh] w-[calc(100vw-2rem)] max-w-2xl overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle>Equipos y sesiones de {nombreUsuario}</DialogTitle>
           <DialogDescription>Controla desde cuántos equipos y con cuántas sesiones puede entrar.</DialogDescription>
@@ -122,11 +122,11 @@ export default function DispositivosUsuarioDialog({
 
         <div className="rounded-md border p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-medium">Código de alta de equipo</p>
               <p className="text-xs text-muted-foreground">Válido 24 horas. Sirve para varios equipos de este usuario.</p>
             </div>
-            <Button variant="outline" size="sm" className="gap-2" onClick={generarCodigo}>
+            <Button variant="outline" size="sm" className="gap-2 shrink-0" onClick={generarCodigo}>
               <KeyRound className="h-4 w-4" /> Generar código
             </Button>
           </div>
@@ -147,51 +147,58 @@ export default function DispositivosUsuarioDialog({
           )}
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 min-w-0">
           <p className="text-sm font-medium">Equipos ({dispositivos.length})</p>
-          {cargando && <p className="text-sm text-muted-foreground">Cargando...</p>}
-          {!cargando && dispositivos.length === 0 && (
-            <p className="text-sm text-muted-foreground">Todavía no ha entrado desde ningún equipo.</p>
-          )}
-          {dispositivos.map((d) => (
-            <div key={d.id} className="rounded-md border p-3 text-sm">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium">{d.nombre || "Equipo sin nombre"}</span>
-                <Badge variant="outline" className="font-mono text-[11px]">
-                  {d.dispositivo_id.replace(/-/g, "").slice(0, 8).toUpperCase()}
-                </Badge>
-                {d.bloqueado && <Badge variant="destructive">Bloqueado</Badge>}
-                {d.sesiones_abiertas > 0 && <Badge variant="secondary">{d.sesiones_abiertas} sesión(es)</Badge>}
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">Última conexión: {fecha(d.ultima_vez)}</p>
-              <p className="truncate text-xs text-muted-foreground">{d.user_agent || "—"}</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1"
-                  onClick={() => {
-                    const nombre = window.prompt("Nombre del equipo", d.nombre ?? "");
-                    if (nombre !== null) void accion(d.id, "renombrar", nombre);
-                  }}
+          <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1">
+            {cargando && <p className="text-sm text-muted-foreground">Cargando...</p>}
+            {!cargando && dispositivos.length === 0 && (
+              <p className="text-sm text-muted-foreground">Todavía no ha entrado desde ningún equipo.</p>
+            )}
+            {dispositivos.map((d) => (
+              <div key={d.id} className="min-w-0 rounded-md border p-3 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{d.nombre || "Equipo sin nombre"}</span>
+                  <Badge variant="outline" className="font-mono text-[11px]">
+                    {d.dispositivo_id.replace(/-/g, "").slice(0, 8).toUpperCase()}
+                  </Badge>
+                  {d.bloqueado && <Badge variant="destructive">Bloqueado</Badge>}
+                  {d.sesiones_abiertas > 0 && <Badge variant="secondary">{d.sesiones_abiertas} sesión(es)</Badge>}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">Última conexión: {fecha(d.ultima_vez)}</p>
+                <p
+                  className="truncate text-xs text-muted-foreground"
+                  title={d.user_agent || undefined}
                 >
-                  <Pencil className="h-3.5 w-3.5" /> Renombrar
-                </Button>
-                {d.bloqueado ? (
-                  <Button size="sm" variant="outline" className="gap-1" onClick={() => accion(d.id, "desbloquear")}>
-                    <Unlock className="h-3.5 w-3.5" /> Desbloquear
+                  {d.user_agent || "—"}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1"
+                    onClick={() => {
+                      const nombre = window.prompt("Nombre del equipo", d.nombre ?? "");
+                      if (nombre !== null) void accion(d.id, "renombrar", nombre);
+                    }}
+                  >
+                    <Pencil className="h-3.5 w-3.5" /> Renombrar
                   </Button>
-                ) : (
-                  <Button size="sm" variant="outline" className="gap-1" onClick={() => accion(d.id, "bloquear")}>
-                    <Ban className="h-3.5 w-3.5" /> Bloquear
+                  {d.bloqueado ? (
+                    <Button size="sm" variant="outline" className="gap-1" onClick={() => accion(d.id, "desbloquear")}>
+                      <Unlock className="h-3.5 w-3.5" /> Desbloquear
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="outline" className="gap-1" onClick={() => accion(d.id, "bloquear")}>
+                      <Ban className="h-3.5 w-3.5" /> Bloquear
+                    </Button>
+                  )}
+                  <Button size="sm" variant="destructive" className="gap-1" onClick={() => accion(d.id, "eliminar")}>
+                    <Trash2 className="h-3.5 w-3.5" /> Eliminar
                   </Button>
-                )}
-                <Button size="sm" variant="destructive" className="gap-1" onClick={() => accion(d.id, "eliminar")}>
-                  <Trash2 className="h-3.5 w-3.5" /> Eliminar
-                </Button>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
