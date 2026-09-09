@@ -36,6 +36,8 @@ interface AuthContextType {
   codigoError: string | null;
   enviarCodigoAlta: (codigo: string) => Promise<void>;
   idEquipo: string;
+  /** Indica que la comprobación de control de equipo ya ha terminado. */
+  controlListo: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
