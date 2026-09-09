@@ -322,6 +322,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false;
       } catch {
         return true; // ante error de red, dejar pasar
+      } finally {
+        setControlListo(true);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
