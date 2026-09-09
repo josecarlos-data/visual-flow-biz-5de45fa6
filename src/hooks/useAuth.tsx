@@ -370,6 +370,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setControlListo(true);
       return;
     }
+    if (controlHechoPara.current === user.id) return;
     setControlListo(false);
   }, [user, isApproved]);
 
