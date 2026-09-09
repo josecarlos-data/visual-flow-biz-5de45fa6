@@ -342,40 +342,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void evaluarControl();
   }, [user, isApproved, evaluarControl]);
 
+  const comprobarSesion = useCallback(async () => {
+    if (comprobandoSesion.current) return;
+    comprobandoSesion.current = true;
+    try {
+      const { data, error } = await (supabase.rpc as any)("verificar_sesion", { _sesion_id: getSesionId() });
+      if (error) return;
+      const vigente = ((data ?? {}) as { vigente?: boolean }).vigente !== false;
+      if (!vigente) {
+        registrarEvento("sesion_expulsada", { resultado: "denegado", detalle: { dispositivo_id: getDispositivoId() } });
+        toast({
+          title: "Sesión cerrada",
+          description: "Se ha iniciado sesión en otro equipo, por lo que esta sesión se ha cerrado.",
+          variant: "destructive",
+        });
+        await signOut();
+      }
+    } catch {
+      // ante error de red, no hacemos nada
+    } finally {
+      comprobandoSesion.current = false;
+    }
+  }, [signOut]);
+
+  useEffect(() => {
+    if (!user || !isApproved) {
+      setControlListo(true);
+      return;
+    }
+    setControlListo(false);
+  }, [user, isApproved]);
+
   useEffect(() => {
     if (!user || !isApproved || pideCodigoAlta) return;
 
-    let cancelado = false;
-    const comprobar = async () => {
-      try {
-        const { data, error } = await (supabase.rpc as any)("verificar_sesion", { _sesion_id: getSesionId() });
-        if (error || cancelado) return;
-        const vigente = ((data ?? {}) as { vigente?: boolean }).vigente !== false;
-        if (!vigente) {
-          registrarEvento("sesion_expulsada", { resultado: "denegado", detalle: { dispositivo_id: getDispositivoId() } });
-          toast({
-            title: "Sesión cerrada",
-            description: "Se ha iniciado sesión en otro equipo, por lo que esta sesión se ha cerrado.",
-            variant: "destructive",
-          });
-          await signOut();
-        }
-      } catch {
-        // ante error de red, no hacemos nada
-      }
+    const intervalo = setInterval(comprobarSesion, 20000);
+    const alEnfocar = () => void comprobarSesion();
+    const alVisibilidad = () => {
+      if (document.visibilityState === "visible") void comprobarSesion();
     };
-
-    const intervalo = setInterval(comprobar, 60000);
-    const alEnfocar = () => void comprobar();
     window.addEventListener("focus", alEnfocar);
+    document.addEventListener("visibilitychange", alVisibilidad);
 
     return () => {
-      cancelado = true;
       clearInterval(intervalo);
       window.removeEventListener("focus", alEnfocar);
+      document.removeEventListener("visibilitychange", alVisibilidad);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isApproved, pideCodigoAlta]);
+  }, [user, isApproved, pideCodigoAlta, comprobarSesion]);
+
+  useEffect(() => {
+    if (!user || !isApproved || pideCodigoAlta) return;
+    void comprobarSesion();
+  }, [location.pathname, user, isApproved, pideCodigoAlta, comprobarSesion]);
 
   const hasDashboard = (key: string) => role === "admin" || dashboards.some((d) => d.key === key);
 
