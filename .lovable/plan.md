@@ -1,40 +1,34 @@
-# Tres correcciones del control de acceso (sin SQL)
+# Registro automático de cambios en datos de negocio
 
-## 1 — Eliminar el destello del CRM antes de saber si el equipo está autorizado
+Objetivo: dejar constancia en el registro de auditoría de quién crea, modifica o borra información en las cinco tablas clave, sin tocar ninguna pantalla.
 
-**`src/hooks/useAuth.tsx`**
-- Nuevo estado `controlListo`, inicializado a `false`.
-- Pasa a `true` solo cuando `evaluarControl` ha terminado, en todas sus ramas, incluida la de error de red (donde se deja pasar). Lo más limpio: en `evaluarControl` hacer `setControlListo(true)` en un `finally`, o justo antes de cada `return`.
-- También pasa a `true` cuando no hay control que evaluar: si no hay usuario o no está aprobado, no hay nada que esperar (el gate solo aplica a usuarios autenticados y aprobados). Para que la pantalla de login y la de pendiente de aprobación no se queden cargando, el efecto que dispara `evaluarControl` hará `setControlListo(true)` directamente cuando `!user || !isApproved`.
-- En `signOut`, reset a `controlListo = false` junto al resto del estado.
-- Exponer `controlListo` en el tipo del contexto, valor por defecto y Provider.
+## Qué se registra
 
-**`src/App.tsx`**
-- `ControlAcceso` lee también `controlListo`: si es `false`, renderiza `<LoadingScreen />` y nada más. Ni rutas, ni menú lateral, ni un píxel del CRM.
-- Orden de render: `controlListo === false` → carga; si no, `pideCodigoAlta` → pantalla de código; si no, la app.
+- Altas, cambios y bajas en: visitas, clientes, objetivos, situaciones de cliente y ajustes de la aplicación.
+- Se guarda: quién, cuándo, en qué tabla, sobre qué ficha y qué campos cambiaron (solo los nombres de los campos, nunca su contenido).
+- Excepción: en los ajustes de la aplicación sí se guarda el valor anterior y el nuevo, por ser configuración y no dato personal.
+- No se registran las importaciones ni los procesos automáticos: no identifican a ninguna persona y llenarían el registro.
+- Si un cambio de datos no altera ningún campo relevante, no se anota nada.
+- Si el registro fallara por cualquier motivo, la operación del usuario se guarda igualmente.
 
-## 2 — Expulsión de sesión más rápida (useAuth.tsx)
+## Detalle técnico (una sola migración)
 
-En el efecto de `verificar_sesion`:
-- Intervalo de 60000 a 20000 ms.
-- Nuevo listener `visibilitychange`: lanza la comprobación cuando `document.visibilityState === "visible"`. Se mantiene el de `focus`. Ambos se eliminan en la limpieza del efecto.
-- Comprobación al cambiar de ruta: `useLocation()` dentro de `AuthProvider` (ya está bajo `BrowserRouter` en App.tsx, así que es válido) y un efecto que llama a `comprobar` cuando cambia `location.pathname`, con las mismas guardas (`user && isApproved && !pideCodigoAlta`).
-- Marca anti-solape: `comprobando = useRef(false)`; al entrar, si ya es `true` se sale; si no, se pone a `true` y se libera en `finally`. La marca vive fuera para compartirla entre el intervalo, los listeners y el efecto de ruta — para ello `comprobar` se define con `useCallback` y ambos efectos la usan.
+Función `public.auditar_cambio() RETURNS trigger`, `SECURITY DEFINER`, `SET search_path = public`:
 
-## 3 — Desbordamiento de DispositivosUsuarioDialog
+1. `auth.uid()` nulo → retorna `NEW`/`OLD` sin escribir.
+2. `tipo`: `dato_alta` (INSERT), `dato_cambio` (UPDATE), `dato_baja` (DELETE). `resultado = 'ok'`. `entidad = TG_TABLE_NAME`.
+3. `entidad_id`: columna `key` para `app_settings`, columna `id` en el resto, convertida a texto.
+4. UPDATE: se comparan `to_jsonb(OLD)` y `to_jsonb(NEW)` excluyendo `updated_at` y `created_at`. Lista vacía → retorna `NEW` sin insertar.
+5. `detalle = {"campos": [...]}`. En `app_settings` se añaden `antes` y `despues` con la columna `value`.
+6. INSERT y DELETE: `detalle = {"campos": []}`.
+7. Inserta en `auditoria_eventos`: `user_id = auth.uid()`, `tipo`, `resultado`, `entidad`, `entidad_id`, `detalle`. `ip`, `user_agent`, `email` y `ruta` quedan a NULL.
+8. La inserción va dentro de un bloque con `EXCEPTION WHEN OTHERS THEN NULL`.
 
-**`src/components/DispositivosUsuarioDialog.tsx`**
-- `DialogContent`: ancho responsivo sin scroll horizontal — `w-[calc(100vw-2rem)] max-w-2xl` (o equivalente) para que nunca supere el viewport en móvil.
-- User-agent: `truncate` (una línea con puntos suspensivos) y `title={d.user_agent}` con el texto completo. La clase `truncate` incluye `overflow-hidden`, así que no puede ensanchar el contenedor.
-- Lista de equipos: contenedor con `max-h-… overflow-y-auto` propio, para que muchos equipos hagan scroll dentro de la lista en vez de estirar el diálogo.
-- Verificación en móvil (viewport estrecho) de que no aparece scroll horizontal en ninguna parte del diálogo.
+Triggers `AFTER INSERT OR UPDATE OR DELETE FOR EACH ROW`, con `DROP TRIGGER IF EXISTS` previo:
+`auditar_visitas`, `auditar_clientes`, `auditar_objetivos`, `auditar_situaciones_cliente`, `auditar_app_settings`.
+
+Comprobado antes de planificar: `auditoria_eventos` no tiene restricción sobre la columna `tipo` (solo sobre `resultado`, que admite `ok`), su RLS no está en modo forzado y su propietario es `postgres`, por lo que la función `SECURITY DEFINER` puede insertar pese a la política que bloquea inserciones desde la aplicación. No se modifican esa tabla, sus permisos ni sus políticas.
 
 ## Fuera de alcance
-No se toca `registrar_sesion`, ninguna RPC ni SQL. No se toca la lógica de guardado ni otros ficheros.
 
-## Verificación
-- Build y typecheck limpios.
-- Recarga con sesión activa: solo se ve el indicador de carga hasta que termina la comprobación; nunca el CRM.
-- Equipo que necesita código: pantalla de código directa, sin destello previo.
-- Sesión expulsada desde otro equipo: en ≤20 s, al volver a la pestaña o al cambiar de sección, cierra sesión.
-- Diálogo de equipos: user-agent truncado con tooltip, lista con scroll propio, sin scroll horizontal en móvil.
+Sin índices nuevos, sin triggers en `ventas_diarias` ni en tablas de importación, sin cambios en la pantalla de Auditoría, en la edge function ni en `dispositivos` / `sesiones_activas` / `codigos_alta`.
