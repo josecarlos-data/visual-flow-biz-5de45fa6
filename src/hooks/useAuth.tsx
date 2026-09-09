@@ -253,6 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
       setPideCodigoAlta(false);
       setCodigoError(null);
+      setControlListo(false);
       intentosCodigo.current = 0;
       controlHechoPara.current = null;
     }
