@@ -399,7 +399,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasDashboard = (key: string) => role === "admin" || dashboards.some((d) => d.key === key);
 
   return (
-    <AuthContext.Provider value={{ session, user, role, isApproved, isLoading, authError, employeeCode, delegacion, verMargen, dashboards, hasDashboard, signOut, pideCodigoAlta, codigoError, enviarCodigoAlta, idEquipo }}>
+    <AuthContext.Provider value={{ session, user, role, isApproved, isLoading, authError, employeeCode, delegacion, verMargen, dashboards, hasDashboard, signOut, pideCodigoAlta, codigoError, enviarCodigoAlta, idEquipo, controlListo }}>
       {children}
     </AuthContext.Provider>
   );
