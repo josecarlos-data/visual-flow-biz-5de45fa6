@@ -219,7 +219,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     try {
       await registrarEvento("logout", { resultado: "ok", email: user?.email ?? null, esperar: true });
     } catch {
@@ -257,7 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       intentosCodigo.current = 0;
       controlHechoPara.current = null;
     }
-  };
+  }, [user]);
 
   // ---- Control de equipos y sesiones ----
   const evaluarControl = useCallback(
