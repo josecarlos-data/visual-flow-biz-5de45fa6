@@ -1,0 +1,1 @@
+REVOKE ALL ON FUNCTION public.auditar_cambio() FROM PUBLIC, anon, authenticated;
