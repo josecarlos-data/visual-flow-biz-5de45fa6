@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, createContext, useContext, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
+import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { registrarEvento } from "@/lib/auditoria";
@@ -35,6 +36,8 @@ interface AuthContextType {
   codigoError: string | null;
   enviarCodigoAlta: (codigo: string) => Promise<void>;
   idEquipo: string;
+  /** Indica que la comprobación de control de equipo ya ha terminado. */
+  controlListo: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -54,6 +57,7 @@ const AuthContext = createContext<AuthContextType>({
   codigoError: null,
   enviarCodigoAlta: async () => {},
   idEquipo: "",
+  controlListo: false,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -69,9 +73,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [dashboards, setDashboards] = useState<DashboardItem[]>([]);
   const [pideCodigoAlta, setPideCodigoAlta] = useState(false);
   const [codigoError, setCodigoError] = useState<string | null>(null);
+  const [controlListo, setControlListo] = useState(false);
   const intentosCodigo = useRef(0);
   const controlHechoPara = useRef<string | null>(null);
+  const comprobandoSesion = useRef(false);
   const idEquipo = typeof window !== "undefined" ? getDispositivoId() : "";
+  const location = useLocation();
 
 
   const fetchUserData = async (userId: string) => {
@@ -212,7 +219,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     try {
       await registrarEvento("logout", { resultado: "ok", email: user?.email ?? null, esperar: true });
     } catch {
@@ -246,10 +253,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
       setPideCodigoAlta(false);
       setCodigoError(null);
+      setControlListo(false);
       intentosCodigo.current = 0;
       controlHechoPara.current = null;
     }
-  };
+  }, [user]);
 
   // ---- Control de equipos y sesiones ----
   const evaluarControl = useCallback(
@@ -314,6 +322,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false;
       } catch {
         return true; // ante error de red, dejar pasar
+      } finally {
+        setControlListo(true);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -332,45 +342,64 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void evaluarControl();
   }, [user, isApproved, evaluarControl]);
 
+  const comprobarSesion = useCallback(async () => {
+    if (comprobandoSesion.current) return;
+    comprobandoSesion.current = true;
+    try {
+      const { data, error } = await (supabase.rpc as any)("verificar_sesion", { _sesion_id: getSesionId() });
+      if (error) return;
+      const vigente = ((data ?? {}) as { vigente?: boolean }).vigente !== false;
+      if (!vigente) {
+        registrarEvento("sesion_expulsada", { resultado: "denegado", detalle: { dispositivo_id: getDispositivoId() } });
+        toast({
+          title: "Sesión cerrada",
+          description: "Se ha iniciado sesión en otro equipo, por lo que esta sesión se ha cerrado.",
+          variant: "destructive",
+        });
+        await signOut();
+      }
+    } catch {
+      // ante error de red, no hacemos nada
+    } finally {
+      comprobandoSesion.current = false;
+    }
+  }, [signOut]);
+
+  useEffect(() => {
+    if (!user || !isApproved) {
+      setControlListo(true);
+      return;
+    }
+    setControlListo(false);
+  }, [user, isApproved]);
+
   useEffect(() => {
     if (!user || !isApproved || pideCodigoAlta) return;
 
-    let cancelado = false;
-    const comprobar = async () => {
-      try {
-        const { data, error } = await (supabase.rpc as any)("verificar_sesion", { _sesion_id: getSesionId() });
-        if (error || cancelado) return;
-        const vigente = ((data ?? {}) as { vigente?: boolean }).vigente !== false;
-        if (!vigente) {
-          registrarEvento("sesion_expulsada", { resultado: "denegado", detalle: { dispositivo_id: getDispositivoId() } });
-          toast({
-            title: "Sesión cerrada",
-            description: "Se ha iniciado sesión en otro equipo, por lo que esta sesión se ha cerrado.",
-            variant: "destructive",
-          });
-          await signOut();
-        }
-      } catch {
-        // ante error de red, no hacemos nada
-      }
+    const intervalo = setInterval(comprobarSesion, 20000);
+    const alEnfocar = () => void comprobarSesion();
+    const alVisibilidad = () => {
+      if (document.visibilityState === "visible") void comprobarSesion();
     };
-
-    const intervalo = setInterval(comprobar, 60000);
-    const alEnfocar = () => void comprobar();
     window.addEventListener("focus", alEnfocar);
+    document.addEventListener("visibilitychange", alVisibilidad);
 
     return () => {
-      cancelado = true;
       clearInterval(intervalo);
       window.removeEventListener("focus", alEnfocar);
+      document.removeEventListener("visibilitychange", alVisibilidad);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isApproved, pideCodigoAlta]);
+  }, [user, isApproved, pideCodigoAlta, comprobarSesion]);
+
+  useEffect(() => {
+    if (!user || !isApproved || pideCodigoAlta) return;
+    void comprobarSesion();
+  }, [location.pathname, user, isApproved, pideCodigoAlta, comprobarSesion]);
 
   const hasDashboard = (key: string) => role === "admin" || dashboards.some((d) => d.key === key);
 
   return (
-    <AuthContext.Provider value={{ session, user, role, isApproved, isLoading, authError, employeeCode, delegacion, verMargen, dashboards, hasDashboard, signOut, pideCodigoAlta, codigoError, enviarCodigoAlta, idEquipo }}>
+    <AuthContext.Provider value={{ session, user, role, isApproved, isLoading, authError, employeeCode, delegacion, verMargen, dashboards, hasDashboard, signOut, pideCodigoAlta, codigoError, enviarCodigoAlta, idEquipo, controlListo }}>
       {children}
     </AuthContext.Provider>
   );
