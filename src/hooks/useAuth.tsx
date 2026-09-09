@@ -78,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const controlHechoPara = useRef<string | null>(null);
   const comprobandoSesion = useRef(false);
   const idEquipo = typeof window !== "undefined" ? getDispositivoId() : "";
+  const location = useLocation();
 
 
   const fetchUserData = async (userId: string) => {
