@@ -30,7 +30,17 @@ Hacer que todas las pestañas de un mismo identificador de equipo compartan una 
 - Cuando sea `true`, mantener la comprobación actual.
 - Mantener el permiso de ejecución exclusivamente para usuarios autenticados.
 
-## 2. Expulsión local en el cliente
+## 2. Identificador de sesión compartido por equipo
+
+En `src/lib/dispositivo.ts` y `src/hooks/useAuth.tsx`:
+
+- `getSesionId()` pasa de `sessionStorage` a `localStorage`, con la misma clave `crm_sesion_id`, junto al identificador de equipo. Se genera solo si no existe.
+- Así, todas las pestañas del mismo equipo comparten el mismo `sesion_id`: `registrar_sesion` actualiza una única fila y ninguna pestaña expulsa a otra.
+- El `DELETE` por `dispositivo_id` de la migración se mantiene: limpia las filas sueltas que dejaron los `sesion_id` antiguos por pestaña.
+- Al cerrar sesión manualmente se elimina la clave `crm_sesion_id` del almacenamiento local, para que el siguiente inicio genere una nueva.
+- La marca `auditoria_login_<user>` que evita registrar el evento de inicio repetido se queda en `sessionStorage`, sin cambios.
+
+## 3. Expulsión local en el cliente
 
 En `src/hooks/useAuth.tsx`:
 
