@@ -63,12 +63,13 @@ En `SeguridadAccesoCard`:
 
 - Aplicar la única migración y comprobar las definiciones y permisos finales de ambas funciones.
 - Build y comprobación de tipos limpios.
-- Abrir dos pestañas con el mismo identificador de equipo y `sesiones_max = 1`: ambas permanecen operativas y ocupan una sola fila/plaza efectiva.
+- Abrir dos pestañas normales (no la vista previa en iframe) con el mismo equipo y `sesiones_max = 1`: ambas comparten `sesion_id`, actualizan la misma fila y ninguna expulsa a la otra.
 - Abrir otro equipo con el mismo usuario: se conserva solo el equipo ganador según el límite, sin empate indeterminado.
 - Confirmar que una pestaña expulsada usa cierre local y no invalida la sesión ganadora.
+- Cerrar sesión manualmente: se elimina `crm_sesion_id` del almacenamiento local y el siguiente inicio genera uno nuevo.
 - Desactivar el control desde el panel: `verificar_sesion` siempre acepta y `registrar_sesion` no elimina sesiones.
 - Reactivarlo: vuelve a aplicarse el límite configurado.
 
 ## Alcance
 
-Una migración para los cambios de base de datos y cambios únicamente en `src/hooks/useAuth.tsx` y `src/components/SeguridadAccesoCard.tsx`. Sin alterar la lógica de control de equipos, códigos de alta, auditoría ni el cierre manual de sesión.
+Una migración para los cambios de base de datos y cambios únicamente en `src/hooks/useAuth.tsx`, `src/lib/dispositivo.ts` y `src/components/SeguridadAccesoCard.tsx`. Sin alterar la lógica de control de equipos, códigos de alta, auditoría ni el cierre manual de sesión.
