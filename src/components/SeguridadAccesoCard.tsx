@@ -7,11 +7,12 @@ import { ShieldAlert } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { registrarEvento } from "@/lib/auditoria";
 
-const CLAVES = ["control_acceso_modo", "alta_dispositivo_modo"] as const;
+const CLAVES = ["control_acceso_modo", "alta_dispositivo_modo", "control_sesiones_activo"] as const;
 
 export default function SeguridadAccesoCard() {
   const [modo, setModo] = useState("observacion");
   const [altaModo, setAltaModo] = useState("auto");
+  const [sesionesActivo, setSesionesActivo] = useState("true");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,6 +25,7 @@ export default function SeguridadAccesoCard() {
       filas.forEach((f) => {
         if (f.key === "control_acceso_modo") setModo(f.value);
         if (f.key === "alta_dispositivo_modo") setAltaModo(f.value);
+        if (f.key === "control_sesiones_activo") setSesionesActivo(f.value);
       });
       setLoading(false);
     })();
