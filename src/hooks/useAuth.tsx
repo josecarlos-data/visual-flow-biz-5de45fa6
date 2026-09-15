@@ -399,7 +399,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, isApproved]);
 
   useEffect(() => {
-    if (!user || !isApproved || pideCodigoAlta) return;
+    if (!user || !isApproved || pideCodigoAlta || !controlListo) return;
 
     const intervalo = setInterval(comprobarSesion, 20000);
     const alEnfocar = () => void comprobarSesion();
@@ -414,7 +414,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("focus", alEnfocar);
       document.removeEventListener("visibilitychange", alVisibilidad);
     };
-  }, [user, isApproved, pideCodigoAlta, comprobarSesion]);
+  }, [user, isApproved, pideCodigoAlta, controlListo, comprobarSesion]);
 
   useEffect(() => {
     if (!user || !isApproved || pideCodigoAlta) return;
