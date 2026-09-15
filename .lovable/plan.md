@@ -1,34 +1,64 @@
-# Registro automático de cambios en datos de negocio
+# Corregir expulsiones entre pestañas del mismo equipo
 
-Objetivo: dejar constancia en el registro de auditoría de quién crea, modifica o borra información en las cinco tablas clave, sin tocar ninguna pantalla.
+## Objetivo
 
-## Qué se registra
+Hacer que todas las pestañas de un mismo identificador de equipo compartan una única plaza de sesión, evitar que una expulsión cierre los demás contextos del usuario y añadir un interruptor general para desactivar temporalmente el control de sesiones.
 
-- Altas, cambios y bajas en: visitas, clientes, objetivos, situaciones de cliente y ajustes de la aplicación.
-- Se guarda: quién, cuándo, en qué tabla, sobre qué ficha y qué campos cambiaron (solo los nombres de los campos, nunca su contenido).
-- Excepción: en los ajustes de la aplicación sí se guarda el valor anterior y el nuevo, por ser configuración y no dato personal.
-- No se registran las importaciones ni los procesos automáticos: no identifican a ninguna persona y llenarían el registro.
-- Si un cambio de datos no altera ningún campo relevante, no se anota nada.
-- Si el registro fallara por cualquier motivo, la operación del usuario se guarda igualmente.
+## 1. Una única migración
 
-## Detalle técnico (una sola migración)
+### Ajuste global
 
-Función `public.auditar_cambio() RETURNS trigger`, `SECURITY DEFINER`, `SET search_path = public`:
+- Añadir a `app_settings` la clave `control_sesiones_activo` con valor inicial `true` y una descripción clara.
+- Usar una inserción idempotente para no sobrescribir una configuración existente.
 
-1. `auth.uid()` nulo → retorna `NEW`/`OLD` sin escribir.
-2. `tipo`: `dato_alta` (INSERT), `dato_cambio` (UPDATE), `dato_baja` (DELETE). `resultado = 'ok'`. `entidad = TG_TABLE_NAME`.
-3. `entidad_id`: columna `key` para `app_settings`, columna `id` en el resto, convertida a texto.
-4. UPDATE: se comparan `to_jsonb(OLD)` y `to_jsonb(NEW)` excluyendo `updated_at` y `created_at`. Lista vacía → retorna `NEW` sin insertar.
-5. `detalle = {"campos": [...]}`. En `app_settings` se añaden `antes` y `despues` con la columna `value`.
-6. INSERT y DELETE: `detalle = {"campos": []}`.
-7. Inserta en `auditoria_eventos`: `user_id = auth.uid()`, `tipo`, `resultado`, `entidad`, `entidad_id`, `detalle`. `ip`, `user_agent`, `email` y `ruta` quedan a NULL.
-8. La inserción va dentro de un bloque con `EXCEPTION WHEN OTHERS THEN NULL`.
+### `public.registrar_sesion`
 
-Triggers `AFTER INSERT OR UPDATE OR DELETE FOR EACH ROW`, con `DROP TRIGGER IF EXISTS` previo:
-`auditar_visitas`, `auditar_clientes`, `auditar_objetivos`, `auditar_situaciones_cliente`, `auditar_app_settings`.
+- Eliminar primero la función usando su firma exacta `public.registrar_sesion(text, text, text, text)` y recrearla conservando toda la lógica actual de autorización de equipos, códigos de alta, límites y respuestas.
+- Leer `control_sesiones_activo`, con `true` como valor seguro por defecto.
+- Cuando el acceso del equipo esté permitido y el control de sesiones esté activo:
+  1. Limpiar sesiones caducadas como hasta ahora.
+  2. Antes de insertar, borrar las sesiones anteriores del mismo usuario e identificador de equipo cuyo `sesion_id` sea distinto al actual.
+  3. Insertar o actualizar la sesión actual.
+  4. Aplicar `sesiones_max` ordenando por `ultima_actividad DESC, sesion_id DESC`, para que los empates sean deterministas.
+- Cuando `control_sesiones_activo = 'false'`, no borrar sesiones por caducidad, equipo ni límite; se podrá mantener/registrar la sesión actual sin expulsar ninguna otra.
+- Restaurar `GRANT EXECUTE ... TO authenticated` tras recrear la función y mantenerla sin acceso público o anónimo.
 
-Comprobado antes de planificar: `auditoria_eventos` no tiene restricción sobre la columna `tipo` (solo sobre `resultado`, que admite `ok`), su RLS no está en modo forzado y su propietario es `postgres`, por lo que la función `SECURITY DEFINER` puede insertar pese a la política que bloquea inserciones desde la aplicación. No se modifican esa tabla, sus permisos ni sus políticas.
+### `public.verificar_sesion`
 
-## Fuera de alcance
+- Recrear la función dentro de la misma migración, conservando su firma, seguridad, volatilidad y actualización espaciada de actividad.
+- Leer `control_sesiones_activo`; cuando sea `false`, devolver inmediatamente `{"vigente": true}` sin consultar, borrar ni actualizar sesiones.
+- Cuando sea `true`, mantener la comprobación actual.
+- Mantener el permiso de ejecución exclusivamente para usuarios autenticados.
 
-Sin índices nuevos, sin triggers en `ventas_diarias` ni en tablas de importación, sin cambios en la pantalla de Auditoría, en la edge function ni en `dispositivos` / `sesiones_activas` / `codigos_alta`.
+## 2. Expulsión local en el cliente
+
+En `src/hooks/useAuth.tsx`:
+
+- En la rama automática que detecta una sesión no vigente, sustituir la llamada al cierre manual completo por `supabase.auth.signOut({ scope: "local" })`.
+- Después, limpiar el estado local de autenticación y control necesario para que esa pestaña vuelva al acceso sin afectar el token remoto de la sesión ganadora.
+- Conservar sin cambios el botón manual de cerrar sesión y su flujo actual.
+- Mantener la auditoría de `sesion_expulsada` y el aviso existente.
+
+## 3. Interruptor en el panel de seguridad
+
+En `SeguridadAccesoCard`:
+
+- Cargar también `control_sesiones_activo` junto a los dos ajustes existentes.
+- Añadir un tercer selector con opciones `Activo` y `Desactivado`.
+- Guardarlo mediante el mismo flujo actual y registrar el cambio en Auditoría.
+- Mostrar una advertencia visible cuando esté desactivado, indicando que temporalmente no se limita el acceso simultáneo desde distintos equipos.
+- Ajustar la rejilla para que los tres controles se distribuyan correctamente en tamaños amplios y se apilen en móvil.
+
+## Verificación
+
+- Aplicar la única migración y comprobar las definiciones y permisos finales de ambas funciones.
+- Build y comprobación de tipos limpios.
+- Abrir dos pestañas con el mismo identificador de equipo y `sesiones_max = 1`: ambas permanecen operativas y ocupan una sola fila/plaza efectiva.
+- Abrir otro equipo con el mismo usuario: se conserva solo el equipo ganador según el límite, sin empate indeterminado.
+- Confirmar que una pestaña expulsada usa cierre local y no invalida la sesión ganadora.
+- Desactivar el control desde el panel: `verificar_sesion` siempre acepta y `registrar_sesion` no elimina sesiones.
+- Reactivarlo: vuelve a aplicarse el límite configurado.
+
+## Alcance
+
+Una migración para los cambios de base de datos y cambios únicamente en `src/hooks/useAuth.tsx` y `src/components/SeguridadAccesoCard.tsx`. Sin alterar la lógica de control de equipos, códigos de alta, auditoría ni el cierre manual de sesión.
