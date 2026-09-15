@@ -4,3 +4,4 @@
 - [x] Cliente: crm_sesion_id en localStorage, expulsión con cierre local, segunda pestaña termina en login con aviso
 - [x] Panel: selector control_sesiones_activo con advertencia
 - [x] Build y typecheck limpios; pendiente solo la prueba manual con dos pestañas normales del mismo equipo
+- [x] Corrección carrera al iniciar sesión: verificar_sesion defiende fila ausente, useAuth espera a controlListo y salta el primer pathname

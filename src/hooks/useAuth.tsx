@@ -77,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const intentosCodigo = useRef(0);
   const controlHechoPara = useRef<string | null>(null);
   const comprobandoSesion = useRef(false);
+  const ultimoPathnameComprobado = useRef<string | null>(null);
   const idEquipo = typeof window !== "undefined" ? getDispositivoId() : "";
   const location = useLocation();
 
@@ -232,6 +233,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setControlListo(false);
     intentosCodigo.current = 0;
     controlHechoPara.current = null;
+    ultimoPathnameComprobado.current = null;
   }, []);
 
   const signOut = useCallback(async () => {
@@ -347,6 +349,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, isApproved, evaluarControl]);
 
   const comprobarSesion = useCallback(async () => {
+    if (!controlListo) return;
     if (comprobandoSesion.current) return;
     comprobandoSesion.current = true;
     try {
@@ -384,7 +387,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       comprobandoSesion.current = false;
     }
-  }, [signOut, limpiarEstadoLocal, user]);
+  }, [controlListo, limpiarEstadoLocal, user]);
 
   useEffect(() => {
     if (!user || !isApproved) {
@@ -396,7 +399,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, isApproved]);
 
   useEffect(() => {
-    if (!user || !isApproved || pideCodigoAlta) return;
+    if (!user || !isApproved || pideCodigoAlta || !controlListo) return;
 
     const intervalo = setInterval(comprobarSesion, 20000);
     const alEnfocar = () => void comprobarSesion();
@@ -411,12 +414,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("focus", alEnfocar);
       document.removeEventListener("visibilitychange", alVisibilidad);
     };
-  }, [user, isApproved, pideCodigoAlta, comprobarSesion]);
+  }, [user, isApproved, pideCodigoAlta, controlListo, comprobarSesion]);
 
   useEffect(() => {
-    if (!user || !isApproved || pideCodigoAlta) return;
+    if (!user || !isApproved || pideCodigoAlta || !controlListo) return;
+    if (ultimoPathnameComprobado.current === null) {
+      ultimoPathnameComprobado.current = location.pathname;
+      return;
+    }
+    if (ultimoPathnameComprobado.current === location.pathname) return;
+    ultimoPathnameComprobado.current = location.pathname;
     void comprobarSesion();
-  }, [location.pathname, user, isApproved, pideCodigoAlta, comprobarSesion]);
+  }, [location.pathname, user, isApproved, pideCodigoAlta, controlListo, comprobarSesion]);
 
   const hasDashboard = (key: string) => role === "admin" || dashboards.some((d) => d.key === key);
 

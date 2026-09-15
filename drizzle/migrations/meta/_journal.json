@@ -8,6 +8,13 @@
       "when": 1789458914946,
       "tag": "0000_sesiones_por_equipo_e_interruptor",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789469272199,
+      "tag": "0001_verificar_sesion_defensa_carrera",
+      "breakpoints": true
     }
   ]
 }
