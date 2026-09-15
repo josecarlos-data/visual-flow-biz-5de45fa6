@@ -349,6 +349,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, isApproved, evaluarControl]);
 
   const comprobarSesion = useCallback(async () => {
+    if (!controlListo) return;
     if (comprobandoSesion.current) return;
     comprobandoSesion.current = true;
     try {
@@ -386,7 +387,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       comprobandoSesion.current = false;
     }
-  }, [signOut, limpiarEstadoLocal, user]);
+  }, [controlListo, limpiarEstadoLocal, user]);
 
   useEffect(() => {
     if (!user || !isApproved) {
