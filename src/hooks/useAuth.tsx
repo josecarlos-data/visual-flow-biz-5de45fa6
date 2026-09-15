@@ -77,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const intentosCodigo = useRef(0);
   const controlHechoPara = useRef<string | null>(null);
   const comprobandoSesion = useRef(false);
+  const ultimoPathnameComprobado = useRef<string | null>(null);
   const idEquipo = typeof window !== "undefined" ? getDispositivoId() : "";
   const location = useLocation();
 
