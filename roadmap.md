@@ -1,4 +1,6 @@
-# Roadmap
+# Tareas
 
-## En curso
-- [x] NuevaVisita.tsx: zona A congelada (partición fija al nacer el bloque) + bloques manuales sin colapsable + badge "IA" solo para extracción por voz. Plan aprobado, cambios aplicados, indentación restaurada y referencias verificadas. Build anterior OK.
+- [ ] Migración: sesiones por equipo en registrar_sesion, interruptor control_sesiones_activo en ambas funciones
+- [ ] Cliente: crm_sesion_id en localStorage, expulsión con cierre local, segunda pestaña termina en login con aviso
+- [ ] Panel: selector control_sesiones_activo con advertencia
+- [ ] Verificar build/typecheck y comportamiento con dos pestañas
