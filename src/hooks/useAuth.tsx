@@ -233,6 +233,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setControlListo(false);
     intentosCodigo.current = 0;
     controlHechoPara.current = null;
+    ultimoPathnameComprobado.current = null;
   }, []);
 
   const signOut = useCallback(async () => {
