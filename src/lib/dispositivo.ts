@@ -28,13 +28,16 @@ export function idEquipoCorto(id: string): string {
   return id.replace(/-/g, "").slice(0, 8).toUpperCase();
 }
 
-/** Identificador de la sesión de navegador actual. */
+/**
+ * Identificador de la sesión del equipo. Vive en localStorage para que todas
+ * las pestañas del mismo equipo compartan sesión y no se expulsen entre sí.
+ */
 export function getSesionId(): string {
   try {
-    const existente = sessionStorage.getItem(CLAVE_SESION);
+    const existente = localStorage.getItem(CLAVE_SESION);
     if (existente) return existente;
     const nuevo = uuid();
-    sessionStorage.setItem(CLAVE_SESION, nuevo);
+    localStorage.setItem(CLAVE_SESION, nuevo);
     return nuevo;
   } catch {
     return uuid();
@@ -43,7 +46,7 @@ export function getSesionId(): string {
 
 export function limpiarSesionId() {
   try {
-    sessionStorage.removeItem(CLAVE_SESION);
+    localStorage.removeItem(CLAVE_SESION);
   } catch {
     // ignorado
   }

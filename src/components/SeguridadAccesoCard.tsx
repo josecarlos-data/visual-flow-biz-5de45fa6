@@ -7,11 +7,12 @@ import { ShieldAlert } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { registrarEvento } from "@/lib/auditoria";
 
-const CLAVES = ["control_acceso_modo", "alta_dispositivo_modo"] as const;
+const CLAVES = ["control_acceso_modo", "alta_dispositivo_modo", "control_sesiones_activo"] as const;
 
 export default function SeguridadAccesoCard() {
   const [modo, setModo] = useState("observacion");
   const [altaModo, setAltaModo] = useState("auto");
+  const [sesionesActivo, setSesionesActivo] = useState("true");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,6 +25,7 @@ export default function SeguridadAccesoCard() {
       filas.forEach((f) => {
         if (f.key === "control_acceso_modo") setModo(f.value);
         if (f.key === "alta_dispositivo_modo") setAltaModo(f.value);
+        if (f.key === "control_sesiones_activo") setSesionesActivo(f.value);
       });
       setLoading(false);
     })();
@@ -49,7 +51,7 @@ export default function SeguridadAccesoCard() {
           <ShieldAlert className="h-4 w-4" /> Control de acceso por equipo
         </CardTitle>
       </CardHeader>
-      <CardContent className="grid gap-4 sm:grid-cols-2">
+      <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div className="space-y-1.5">
           <Label>Modo de control de acceso</Label>
           <Select
@@ -92,9 +94,36 @@ export default function SeguridadAccesoCard() {
             Solo impide la entrada si el modo de control está en bloqueo.
           </p>
         </div>
+        <div className="space-y-1.5">
+          <Label>Sesiones simultáneas</Label>
+          <Select
+            value={sesionesActivo}
+            disabled={loading}
+            onValueChange={async (v) => {
+              const ok = await guardar("control_sesiones_activo", v);
+              if (ok) setSesionesActivo(v);
+            }}
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="true">Activo (limita por usuario)</SelectItem>
+              <SelectItem value="false">Desactivado</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Limita desde cuántos equipos distintos puede entrar cada usuario a la vez. Desactívalo solo de forma
+            temporal si alguien se ha quedado fuera.
+          </p>
+        </div>
         {modo === "bloqueo" && (
-          <p className="sm:col-span-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+          <p className="sm:col-span-2 lg:col-span-3 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
             Atención: el modo bloqueo está activo. Un comercial con un equipo nuevo o bloqueado no podrá acceder.
+          </p>
+        )}
+        {sesionesActivo !== "true" && (
+          <p className="sm:col-span-2 lg:col-span-3 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+            Atención: el límite de sesiones simultáneas está desactivado. Cualquier usuario podrá entrar desde tantos
+            equipos como tenga autorizados, sin expulsar las sesiones anteriores.
           </p>
         )}
       </CardContent>

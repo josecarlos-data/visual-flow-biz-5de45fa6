@@ -219,6 +219,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const limpiarEstadoLocal = useCallback(() => {
+    setSession(null);
+    setUser(null);
+    setRole(null);
+    setIsApproved(false);
+    setDashboards([]);
+    setVerMargen(false);
+    setIsLoading(false);
+    setPideCodigoAlta(false);
+    setCodigoError(null);
+    setControlListo(false);
+    intentosCodigo.current = 0;
+    controlHechoPara.current = null;
+  }, []);
+
   const signOut = useCallback(async () => {
     try {
       await registrarEvento("logout", { resultado: "ok", email: user?.email ?? null, esperar: true });
@@ -244,20 +259,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error("Error during sign out:", err);
     } finally {
-      setSession(null);
-      setUser(null);
-      setRole(null);
-      setIsApproved(false);
-      setDashboards([]);
-      setVerMargen(false);
-      setIsLoading(false);
-      setPideCodigoAlta(false);
-      setCodigoError(null);
-      setControlListo(false);
-      intentosCodigo.current = 0;
-      controlHechoPara.current = null;
+      limpiarEstadoLocal();
     }
-  }, [user]);
+  }, [user, limpiarEstadoLocal]);
 
   // ---- Control de equipos y sesiones ----
   const evaluarControl = useCallback(
@@ -356,14 +360,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           description: "Se ha iniciado sesión en otro equipo, por lo que esta sesión se ha cerrado.",
           variant: "destructive",
         });
-        await signOut();
+        // Cierre LOCAL: un signOut global revocaría el token también en la
+        // sesión que acaba de ganar y tumbaría al usuario en todos lados.
+        try {
+          sessionStorage.removeItem(`auditoria_login_${user?.id ?? ""}`);
+          limpiarSesionId();
+        } catch {
+          // ignorado
+        }
+        try {
+          await Promise.race([
+            supabase.auth.signOut({ scope: "local" }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Sign out timeout")), 4000)),
+          ]);
+        } catch (err) {
+          console.error("Error during local sign out:", err);
+        } finally {
+          limpiarEstadoLocal();
+        }
       }
     } catch {
       // ante error de red, no hacemos nada
     } finally {
       comprobandoSesion.current = false;
     }
-  }, [signOut]);
+  }, [signOut, limpiarEstadoLocal, user]);
 
   useEffect(() => {
     if (!user || !isApproved) {
