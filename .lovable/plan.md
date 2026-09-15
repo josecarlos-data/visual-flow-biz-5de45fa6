@@ -30,7 +30,17 @@ Hacer que todas las pestañas de un mismo identificador de equipo compartan una 
 - Cuando sea `true`, mantener la comprobación actual.
 - Mantener el permiso de ejecución exclusivamente para usuarios autenticados.
 
-## 2. Expulsión local en el cliente
+## 2. Identificador de sesión compartido por equipo
+
+En `src/lib/dispositivo.ts` y `src/hooks/useAuth.tsx`:
+
+- `getSesionId()` pasa de `sessionStorage` a `localStorage`, con la misma clave `crm_sesion_id`, junto al identificador de equipo. Se genera solo si no existe.
+- Así, todas las pestañas del mismo equipo comparten el mismo `sesion_id`: `registrar_sesion` actualiza una única fila y ninguna pestaña expulsa a otra.
+- El `DELETE` por `dispositivo_id` de la migración se mantiene: limpia las filas sueltas que dejaron los `sesion_id` antiguos por pestaña.
+- Al cerrar sesión manualmente se elimina la clave `crm_sesion_id` del almacenamiento local, para que el siguiente inicio genere una nueva.
+- La marca `auditoria_login_<user>` que evita registrar el evento de inicio repetido se queda en `sessionStorage`, sin cambios.
+
+## 3. Expulsión local en el cliente
 
 En `src/hooks/useAuth.tsx`:
 
@@ -39,7 +49,7 @@ En `src/hooks/useAuth.tsx`:
 - Conservar sin cambios el botón manual de cerrar sesión y su flujo actual.
 - Mantener la auditoría de `sesion_expulsada` y el aviso existente.
 
-## 3. Interruptor en el panel de seguridad
+## 4. Interruptor en el panel de seguridad
 
 En `SeguridadAccesoCard`:
 
@@ -53,12 +63,13 @@ En `SeguridadAccesoCard`:
 
 - Aplicar la única migración y comprobar las definiciones y permisos finales de ambas funciones.
 - Build y comprobación de tipos limpios.
-- Abrir dos pestañas con el mismo identificador de equipo y `sesiones_max = 1`: ambas permanecen operativas y ocupan una sola fila/plaza efectiva.
+- Abrir dos pestañas normales (no la vista previa en iframe) con el mismo equipo y `sesiones_max = 1`: ambas comparten `sesion_id`, actualizan la misma fila y ninguna expulsa a la otra.
 - Abrir otro equipo con el mismo usuario: se conserva solo el equipo ganador según el límite, sin empate indeterminado.
 - Confirmar que una pestaña expulsada usa cierre local y no invalida la sesión ganadora.
+- Cerrar sesión manualmente: se elimina `crm_sesion_id` del almacenamiento local y el siguiente inicio genera uno nuevo.
 - Desactivar el control desde el panel: `verificar_sesion` siempre acepta y `registrar_sesion` no elimina sesiones.
 - Reactivarlo: vuelve a aplicarse el límite configurado.
 
 ## Alcance
 
-Una migración para los cambios de base de datos y cambios únicamente en `src/hooks/useAuth.tsx` y `src/components/SeguridadAccesoCard.tsx`. Sin alterar la lógica de control de equipos, códigos de alta, auditoría ni el cierre manual de sesión.
+Una migración para los cambios de base de datos y cambios únicamente en `src/hooks/useAuth.tsx`, `src/lib/dispositivo.ts` y `src/components/SeguridadAccesoCard.tsx`. Sin alterar la lógica de control de equipos, códigos de alta, auditoría ni el cierre manual de sesión.
