@@ -49,7 +49,7 @@ En `src/hooks/useAuth.tsx`:
 - Conservar sin cambios el botón manual de cerrar sesión y su flujo actual.
 - Mantener la auditoría de `sesion_expulsada` y el aviso existente.
 
-## 3. Interruptor en el panel de seguridad
+## 4. Interruptor en el panel de seguridad
 
 En `SeguridadAccesoCard`:
 
