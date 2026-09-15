@@ -417,9 +417,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, isApproved, pideCodigoAlta, controlListo, comprobarSesion]);
 
   useEffect(() => {
-    if (!user || !isApproved || pideCodigoAlta) return;
+    if (!user || !isApproved || pideCodigoAlta || !controlListo) return;
+    if (ultimoPathnameComprobado.current === null) {
+      ultimoPathnameComprobado.current = location.pathname;
+      return;
+    }
+    if (ultimoPathnameComprobado.current === location.pathname) return;
+    ultimoPathnameComprobado.current = location.pathname;
     void comprobarSesion();
-  }, [location.pathname, user, isApproved, pideCodigoAlta, comprobarSesion]);
+  }, [location.pathname, user, isApproved, pideCodigoAlta, controlListo, comprobarSesion]);
 
   const hasDashboard = (key: string) => role === "admin" || dashboards.some((d) => d.key === key);
 
