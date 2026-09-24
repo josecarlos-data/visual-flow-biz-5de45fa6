@@ -284,13 +284,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const veredicto: Veredicto = v === VENCIDO ? { estado: "activo", codigoError: null } : v;
     setCodigoError(veredicto.codigoError);
     fijar(veredicto.estado);
-    if (veredicto.estado === "denegado") await signOut();
+    if (veredicto.estado === "denegado") await cerrarSesionDenegada();
   };
 
   const limpiarEstadoLocal = () => {
     fijarSesion(null);
     ultimoPathnameComprobado.current = null;
     void resolverAcceso(null);
+  };
+
+  /** Cierre local tras denegación de acceso: sin evento 'logout' ni cerrar_sesion, y sin revocar la sesión en otros equipos. */
+  const cerrarSesionDenegada = async () => {
+    const uid = sessionRef.current?.user?.id ?? "";
+    try {
+      sessionStorage.removeItem(`auditoria_login_${uid}`);
+    } catch {
+      // ignorado
+    }
+    try {
+      await Promise.race([
+        supabase.auth.signOut({ scope: "local" }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Sign out timeout")), 4000)),
+      ]);
+    } catch (err) {
+      console.error("Error during local sign out:", err);
+    } finally {
+      limpiarEstadoLocal();
+    }
   };
 
   const signOut = async () => {
