@@ -6,4 +6,4 @@
 - [x] Build y typecheck limpios; pendiente solo la prueba manual con dos pestañas normales del mismo equipo
 - [x] Corrección carrera al iniciar sesión: verificar_sesion defiende fila ausente, useAuth espera a controlListo y salta el primer pathname
 
-- [ ] Rehacer useAuth con máquina de estados única (resolverAcceso, generación, límites de 8 s por paso, vigilante solo en activo)
+- [x] Rehacer useAuth con máquina de estados única (resolverAcceso, generación, límites de 8 s por paso, vigilante solo en activo)
