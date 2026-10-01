@@ -7,3 +7,4 @@
 - [x] Corrección carrera al iniciar sesión: verificar_sesion defiende fila ausente, useAuth espera a controlListo y salta el primer pathname
 
 - [x] Rehacer useAuth con máquina de estados única (resolverAcceso, generación, límites de 8 s por paso, vigilante solo en activo)
+- [x] Contraseñas: política 12, cambio voluntario/forzado/recuperación vía función cambiar-password (vía de usuario), panel restablecer/forzar

@@ -61,8 +61,6 @@ export default function Auth() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={6}
-                placeholder="Mínimo 6 caracteres"
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>

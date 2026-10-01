@@ -1,0 +1,1 @@
+- Password changes go through the cambiar-password edge function acting as the user (updateUser), never the admin API, so server password checks (HIBP) apply and only that function clears profiles.debe_cambiar_password.

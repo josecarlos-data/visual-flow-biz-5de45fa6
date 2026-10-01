@@ -15,7 +15,10 @@ export type EstadoAcceso =
   | "pendiente_aprobacion"
   | "pide_codigo"
   | "denegado"
+  | "pide_password"
   | "activo";
+
+export type ModoPassword = "forzado" | "recuperacion";
 
 export interface DashboardItem {
   key: string;
@@ -47,6 +50,11 @@ interface AuthContextType {
   /** Indica que la comprobación de control de equipo ya ha terminado. */
   controlListo: boolean;
   estadoAcceso: EstadoAcceso;
+  pidePassword: boolean;
+  /** Motivo por el que se pide la contraseña en la pantalla bloqueante. */
+  modoPassword: ModoPassword | null;
+  /** Llamar tras guardar la contraseña con éxito: relanza la cadena. */
+  passwordGuardada: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -68,6 +76,9 @@ const AuthContext = createContext<AuthContextType>({
   idEquipo: "",
   controlListo: false,
   estadoAcceso: "cargando",
+  pidePassword: false,
+  modoPassword: null,
+  passwordGuardada: async () => {},
 });
 
 const LIMITE_PASO_MS = 8000;
@@ -85,16 +96,17 @@ interface DatosUsuario {
   delegacion: string | null;
   verMargen: boolean;
   dashboards: DashboardItem[];
+  debeCambiarPassword: boolean;
 }
 
 /** Carga perfil, rol y dashboards. No escribe estado. */
 async function cargarDatosUsuario(userId: string): Promise<DatosUsuario> {
   const vacio: DatosUsuario = {
-    error: null, isApproved: false, role: null, employeeCode: null, delegacion: null, verMargen: false, dashboards: [],
+    error: null, isApproved: false, role: null, employeeCode: null, delegacion: null, verMargen: false, dashboards: [], debeCambiarPassword: false,
   };
   try {
     const [profileRes, roleRes] = await Promise.all([
-      supabase.from("profiles").select("is_approved, employee_code, delegacion, ver_margen").eq("user_id", userId).maybeSingle(),
+      supabase.from("profiles").select("is_approved, employee_code, delegacion, ver_margen, debe_cambiar_password").eq("user_id", userId).maybeSingle(),
       supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
     ]);
     const role = roleRes.error ? null : ((roleRes.data?.role as AppRole) ?? null);
@@ -129,6 +141,7 @@ async function cargarDatosUsuario(userId: string): Promise<DatosUsuario> {
       delegacion: profileRes.data?.delegacion ?? null,
       verMargen: ((profileRes.data as any)?.ver_margen ?? false) || role === "admin",
       dashboards,
+      debeCambiarPassword: (profileRes.data as any)?.debe_cambiar_password === true,
     };
   } catch (err) {
     console.error("[Auth] Error fetching user data:", err);
@@ -149,6 +162,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [dashboards, setDashboards] = useState<DashboardItem[]>([]);
   const [codigoError, setCodigoError] = useState<string | null>(null);
   const [estadoAcceso, setEstadoAcceso] = useState<EstadoAcceso>("cargando");
+  const [modoPassword, setModoPassword] = useState<ModoPassword | null>(null);
+  const debeCambiarRef = useRef(false);
+  const recuperacionRef = useRef(false);
 
   const generacion = useRef(0);
   const estadoRef = useRef<EstadoAcceso>("cargando");
@@ -239,6 +255,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!s?.user) {
       datosCargadosPara.current = null;
       intentosCodigo.current = 0;
+      debeCambiarRef.current = false;
+      recuperacionRef.current = false;
+      setModoPassword(null);
       setRole(null);
       setAuthError(null);
       setEmployeeCode(null);
@@ -272,6 +291,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setDelegacion(r.delegacion);
       setVerMargen(r.verMargen);
       setDashboards(r.dashboards);
+      debeCambiarRef.current = r.debeCambiarPassword;
       if (r.error || !r.isApproved) {
         fijar("pendiente_aprobacion");
         return;
@@ -283,6 +303,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!vigente()) return;
     const veredicto: Veredicto = v === VENCIDO ? { estado: "activo", codigoError: null } : v;
     setCodigoError(veredicto.codigoError);
+    if (veredicto.estado === "activo" && (recuperacionRef.current || debeCambiarRef.current)) {
+      setModoPassword(recuperacionRef.current ? "recuperacion" : "forzado");
+      fijar("pide_password");
+      return;
+    }
+    setModoPassword(null);
     fijar(veredicto.estado);
     if (veredicto.estado === "denegado") await cerrarSesionDenegada();
   };
@@ -350,6 +376,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOutEstable = useCallback(() => fnRef.current.signOut(), []);
 
+  const passwordGuardada = useCallback(async () => {
+    recuperacionRef.current = false;
+    await fnRef.current.resolverAcceso(sessionRef.current);
+  }, []);
+
   const enviarCodigoAlta = useCallback(async (codigo: string) => {
     setCodigoError(null);
     await fnRef.current.resolverAcceso(sessionRef.current, codigo.trim().toUpperCase());
@@ -389,7 +420,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (estadoRef.current === "activo" && anteriorId === s.user.id) return;
       }
 
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+      if (event === "PASSWORD_RECOVERY" && s?.user) {
+        recuperacionRef.current = true;
+      }
+
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "PASSWORD_RECOVERY") {
         // Diferido: llamar a Supabase dentro del callback provoca bloqueo.
         setTimeout(() => {
           if (mounted) void fnRef.current.resolverAcceso(s);
@@ -481,14 +516,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isLoading = estadoAcceso === "cargando";
   const controlListo = estadoAcceso !== "cargando";
   const pideCodigoAlta = estadoAcceso === "pide_codigo";
-  const isApproved = estadoAcceso === "pide_codigo" || estadoAcceso === "denegado" || estadoAcceso === "activo";
+  const isApproved = estadoAcceso === "pide_codigo" || estadoAcceso === "denegado" || estadoAcceso === "pide_password" || estadoAcceso === "activo";
+  const pidePassword = estadoAcceso === "pide_password";
 
   return (
     <AuthContext.Provider
       value={{
         session, user, role, isApproved, isLoading, authError, employeeCode, delegacion, verMargen, dashboards,
         hasDashboard, signOut: signOutEstable, pideCodigoAlta, codigoError, enviarCodigoAlta, idEquipo, controlListo,
-        estadoAcceso,
+        estadoAcceso, pidePassword, modoPassword, passwordGuardada,
       }}
     >
       {children}
