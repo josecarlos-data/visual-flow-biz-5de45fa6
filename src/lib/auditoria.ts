@@ -14,7 +14,10 @@ export type TipoEvento =
   | "cambio_config_seguridad"
   | "codigo_generado"
   | "codigo_usado"
-  | "codigo_invalido";
+  | "codigo_invalido"
+  | "password_cambiada"
+  | "password_restablecer_enviado"
+  | "password_cambio_forzado";
 
 export type ResultadoEvento = "ok" | "denegado" | "fallo";
 

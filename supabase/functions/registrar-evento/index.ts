@@ -16,6 +16,9 @@ const TIPOS_PERMITIDOS = [
   "codigo_generado",
   "codigo_usado",
   "codigo_invalido",
+  "password_cambiada",
+  "password_restablecer_enviado",
+  "password_cambio_forzado",
 ] as const;
 
 const RESULTADOS = ["ok", "denegado", "fallo"];
