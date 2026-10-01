@@ -915,6 +915,7 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          debe_cambiar_password: boolean
           delegacion: string | null
           dispositivos_max: number
           email: string | null
@@ -922,6 +923,7 @@ export type Database = {
           full_name: string | null
           id: string
           is_approved: boolean
+          password_cambiada_en: string | null
           sesiones_max: number
           updated_at: string
           user_id: string
@@ -930,6 +932,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          debe_cambiar_password?: boolean
           delegacion?: string | null
           dispositivos_max?: number
           email?: string | null
@@ -937,6 +940,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_approved?: boolean
+          password_cambiada_en?: string | null
           sesiones_max?: number
           updated_at?: string
           user_id: string
@@ -945,6 +949,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          debe_cambiar_password?: boolean
           delegacion?: string | null
           dispositivos_max?: number
           email?: string | null
@@ -952,6 +957,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_approved?: boolean
+          password_cambiada_en?: string | null
           sesiones_max?: number
           updated_at?: string
           user_id?: string
