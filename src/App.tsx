@@ -35,6 +35,8 @@ const Objetivos = lazy(() => import("./pages/Objetivos"));
 const Documentos = lazy(() => import("./pages/Documentos"));
 const ActividadInterna = lazy(() => import("./pages/ActividadInterna"));
 const CodigoAlta = lazy(() => import("./pages/CodigoAlta"));
+const EstablecerPassword = lazy(() => import("./components/EstablecerPassword"));
+const CambiarPassword = lazy(() => import("./pages/CambiarPassword"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -144,7 +146,7 @@ function PendingRoute({ children }: { children: React.ReactNode }) {
 
 /** Hasta que se sepa si el equipo está autorizado, no se renderiza ninguna sección del CRM. */
 function ControlAcceso({ children }: { children: React.ReactNode }) {
-  const { pideCodigoAlta, controlListo } = useAuth();
+  const { pideCodigoAlta, controlListo, pidePassword, modoPassword } = useAuth();
   if (!controlListo) {
     return <LoadingScreen />;
   }
@@ -152,6 +154,13 @@ function ControlAcceso({ children }: { children: React.ReactNode }) {
     return (
       <Suspense fallback={<LoadingScreen />}>
         <CodigoAlta />
+      </Suspense>
+    );
+  }
+  if (pidePassword) {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <EstablecerPassword modo={modoPassword ?? "forzado"} />
       </Suspense>
     );
   }
@@ -195,6 +204,7 @@ const App = () => (
                 <Route path="/documentos" element={<ProtectedRoute dashboardKey="documentos"><Documentos /></ProtectedRoute>} />
                 <Route path="/actividad-interna" element={<ProtectedRoute dashboardKey="actividad_interna"><ActividadInterna /></ProtectedRoute>} />
 
+                <Route path="/cuenta/contrasena" element={<ProtectedRoute><CambiarPassword /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

@@ -1,5 +1,5 @@
 import * as Icons from "lucide-react";
-import { Users, Database, BarChart3, LogOut, Settings } from "lucide-react";
+import { Users, Database, BarChart3, LogOut, Settings, KeyRound } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import logoRimosaIcon from "@/assets/logo_rimosa_icon.png";
@@ -98,6 +98,12 @@ export function AppSidebar() {
         <div className="mb-2 truncate text-sm text-muted-foreground">
           {user?.email}
         </div>
+        <Button asChild variant="ghost" size="sm" className="w-full justify-start">
+          <NavLink to="/cuenta/contrasena">
+            <KeyRound className="mr-2 h-4 w-4" />
+            Cambiar contraseña
+          </NavLink>
+        </Button>
         <Button variant="ghost" size="sm" className="w-full justify-start" onClick={signOut}>
           <LogOut className="mr-2 h-4 w-4" />
           Cerrar sesión
