@@ -451,8 +451,8 @@ export default function AdminUsers() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {accionPw?.tipo === "restablecer"
-                ? `Se enviará un correo a ${accionPw?.u.email ?? ""} para elegir una contraseña nueva, y tendrá que cambiarla en su próximo acceso.`
-                : `${accionPw?.u.full_name || accionPw?.u.email || "El usuario"} tendrá que cambiar su contraseña en su próximo acceso. No se envía ningún correo.`}
+                ? `Envía un enlace al correo ${accionPw?.u.email ?? ""}. La contraseña actual sigue funcionando hasta que el usuario ponga una nueva.`
+                : "El usuario conoce su contraseña pero debe cambiarla al entrar. No se envía ningún correo."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

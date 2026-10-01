@@ -22,14 +22,15 @@ function metodosAuth(token: string): string[] {
   }
 }
 
-function traducir(err: any): string {
-  const code = String(err?.code ?? "");
-  const msg = String(err?.message ?? "").toLowerCase();
-  const reasons: string[] = err?.reasons ?? err?.weak_password?.reasons ?? [];
+function traducir(status: number, body: any): string {
+  const code = String(body?.code ?? body?.error_code ?? "");
+  const msg = String(body?.msg ?? body?.message ?? "").toLowerCase();
+  const reasons: string[] = body?.weak_password?.reasons ?? [];
   if (reasons.includes("pwned") || msg.includes("pwned") || msg.includes("leaked") || msg.includes("breach")) return "filtrada";
-  if (code === "same_password" || msg.includes("different from the old") || msg.includes("same")) return "igual";
-  if (code === "weak_password" || msg.includes("weak") || msg.includes("at least")) return "debil";
-  if (code === "session_not_found" || code === "bad_jwt" || err?.status === 401 || msg.includes("session") || msg.includes("jwt")) return "sesion";
+  if (code === "same_password") return "igual";
+  if (code === "weak_password") return "debil";
+  if (status === 401 || code === "session_not_found" || code === "bad_jwt") return "sesion";
+  console.error("[cambiar-password] error inesperado", status, code || "(sin código)");
   return "error";
 }
 
@@ -66,7 +67,8 @@ Deno.serve(async (req) => {
   } else if (modo === "recuperacion") {
     const m = metodosAuth(token);
     if (!m.includes("recovery") && !m.includes("otp")) return fallo("modo_invalido", 403);
-  } else {
+  }
+  if (modo === "voluntario" || modo === "forzado") {
     if (!actual || !user.email) return fallo("actual_incorrecta");
     const verif = createClient(URL, ANON, { auth: { persistSession: false, autoRefreshToken: false } });
     const { error: sErr } = await verif.auth.signInWithPassword({ email: user.email, password: actual });
@@ -74,10 +76,15 @@ Deno.serve(async (req) => {
   }
 
   // Cambio por la vía de usuario: aplica las comprobaciones del servidor (incluida HIBP).
-  const { error: upErr } = await comoUsuario.auth.updateUser({ password });
-  if (upErr) {
-    console.error("[cambiar-password] updateUser", upErr.status, (upErr as any).code);
-    return fallo(traducir(upErr));
+  const upRes = await fetch(`${URL}/auth/v1/user`, {
+    method: "PUT",
+    headers: { apikey: ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+  if (!upRes.ok) {
+    let cuerpo: any = null;
+    try { cuerpo = await upRes.json(); } catch { /* sin cuerpo */ }
+    return fallo(traducir(upRes.status, cuerpo));
   }
 
   const { error: pErr } = await admin
