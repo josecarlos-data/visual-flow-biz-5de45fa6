@@ -38,7 +38,8 @@ export default function FormularioPassword({ modo, onExito }: { modo: ModoCambio
 
   const largo = nueva.length >= MIN;
   const coinciden = nueva.length > 0 && nueva === repetir;
-  const valido = largo && coinciden && (modo !== "voluntario" || actual.length > 0);
+  const pideActual = modo !== "recuperacion";
+  const valido = largo && coinciden && (!pideActual || actual.length > 0);
 
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +48,7 @@ export default function FormularioPassword({ modo, onExito }: { modo: ModoCambio
     setError(null);
     try {
       const { data, error: err } = await supabase.functions.invoke("cambiar-password", {
-        body: { modo, password: nueva, actual: modo === "voluntario" ? actual : undefined },
+        body: { modo, password: nueva, actual: pideActual ? actual : undefined },
       });
       if (err || !data?.ok) {
         setError(MENSAJES[await codigoDeError(err, data)] ?? MENSAJES.error);
@@ -66,7 +67,7 @@ export default function FormularioPassword({ modo, onExito }: { modo: ModoCambio
 
   return (
     <form onSubmit={enviar} className="space-y-4">
-      {modo === "voluntario" && (
+      {pideActual && (
         <div className="space-y-2">
           <Label htmlFor="pw-actual">Contraseña actual</Label>
           <Input id="pw-actual" type="password" autoComplete="current-password" value={actual} onChange={(e) => setActual(e.target.value)} />
