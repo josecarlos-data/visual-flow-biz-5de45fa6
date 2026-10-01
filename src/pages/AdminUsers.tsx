@@ -12,6 +12,12 @@ import type { Database } from "@/integrations/supabase/types";
 import { registrarEvento } from "@/lib/auditoria";
 import SeguridadAccesoCard from "@/components/SeguridadAccesoCard";
 import DispositivosUsuarioDialog from "@/components/DispositivosUsuarioDialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+const URL_PRODUCCION = "https://crmrimosa.josecarlossobrino.com";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -32,6 +38,8 @@ interface UserRow {
   dashboardKeys: string[];
   sesiones_max: number;
   dispositivos_max: number;
+  debe_cambiar_password: boolean;
+  password_cambiada_en: string | null;
 }
 
 export default function AdminUsers() {
@@ -43,11 +51,12 @@ export default function AdminUsers() {
   const [editingField, setEditingField] = useState<{ userId: string; field: "full_name" } | null>(null);
   const [editValue, setEditValue] = useState("");
   const [dispositivosDe, setDispositivosDe] = useState<UserRow | null>(null);
+  const [accionPw, setAccionPw] = useState<{ u: UserRow; tipo: "restablecer" | "forzar" } | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
     const [profilesRes, vendedoresRes, delegacionesRes, dashboardsRes] = await Promise.all([
-      supabase.from("profiles").select("user_id, full_name, email, employee_code, is_approved, delegacion, ver_margen, sesiones_max, dispositivos_max"),
+      supabase.from("profiles").select("user_id, full_name, email, employee_code, is_approved, delegacion, ver_margen, sesiones_max, dispositivos_max, debe_cambiar_password, password_cambiada_en"),
       supabase.rpc("get_distinct_vendedores"),
       supabase.rpc("get_distinct_delegaciones"),
       supabase
@@ -97,12 +106,41 @@ export default function AdminUsers() {
         dashboardKeys: accessMap.get(p.user_id) ?? [],
         sesiones_max: (p as any).sesiones_max ?? 1,
         dispositivos_max: (p as any).dispositivos_max ?? 2,
+        debe_cambiar_password: (p as any).debe_cambiar_password ?? false,
+        password_cambiada_en: (p as any).password_cambiada_en ?? null,
       }))
     );
     setLoading(false);
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  const ejecutarAccionPw = async () => {
+    if (!accionPw) return;
+    const { u, tipo } = accionPw;
+    setAccionPw(null);
+    if (tipo === "restablecer") {
+      if (!u.email) {
+        toast({ title: "Este usuario no tiene correo", variant: "destructive" });
+        return;
+      }
+      const { error } = await supabase.auth.resetPasswordForEmail(u.email, { redirectTo: URL_PRODUCCION });
+      if (error) {
+        toast({ title: "No se ha podido enviar el correo", description: "Inténtalo de nuevo en unos minutos.", variant: "destructive" });
+        return;
+      }
+    }
+    const { error } = await supabase.from("profiles").update({ debe_cambiar_password: true } as any).eq("user_id", u.user_id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    registrarEvento(tipo === "restablecer" ? "password_restablecer_enviado" : "password_cambio_forzado", {
+      entidad: "usuario", entidad_id: u.user_id, detalle: { email: u.email },
+    });
+    toast({ title: tipo === "restablecer" ? "Correo de restablecimiento enviado" : "Cambio de contraseña forzado" });
+    fetchData();
+  };
 
   const approveUser = async (userId: string) => {
     const { error } = await supabase.from("profiles").update({ is_approved: true }).eq("user_id", userId);
@@ -382,6 +420,20 @@ export default function AdminUsers() {
                         <MonitorSmartphone className="h-4 w-4" />
                         {u.dispositivos_max} · {u.sesiones_max === 0 ? "∞" : u.sesiones_max}
                       </Button>
+                      {u.is_approved && (
+                        <div className="mt-2 flex flex-col gap-1">
+                          {u.debe_cambiar_password && <Badge variant="destructive" className="w-fit">Cambio pendiente</Badge>}
+                          <span className="text-xs text-muted-foreground">
+                            Contraseña: {u.password_cambiada_en ? new Date(u.password_cambiada_en).toLocaleDateString("es-ES") : "sin registro"}
+                          </span>
+                          <Button size="sm" variant="ghost" className="h-7 justify-start px-2 text-xs" onClick={() => setAccionPw({ u, tipo: "restablecer" })}>
+                            Restablecer contraseña
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-7 justify-start px-2 text-xs" onClick={() => setAccionPw({ u, tipo: "forzar" })}>
+                            Forzar cambio de contraseña
+                          </Button>
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -390,6 +442,25 @@ export default function AdminUsers() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!accionPw} onOpenChange={(v) => !v && setAccionPw(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {accionPw?.tipo === "restablecer" ? "Restablecer contraseña" : "Forzar cambio de contraseña"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {accionPw?.tipo === "restablecer"
+                ? `Se enviará un correo a ${accionPw?.u.email ?? ""} para elegir una contraseña nueva, y tendrá que cambiarla en su próximo acceso.`
+                : `${accionPw?.u.full_name || accionPw?.u.email || "El usuario"} tendrá que cambiar su contraseña en su próximo acceso. No se envía ningún correo.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={ejecutarAccionPw}>Confirmar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {dispositivosDe && (
         <DispositivosUsuarioDialog
