@@ -91,7 +91,10 @@ Deno.serve(async (req) => {
     .from("profiles")
     .update({ debe_cambiar_password: false, password_cambiada_en: new Date().toISOString() })
     .eq("user_id", user.id);
-  if (pErr) console.error("[cambiar-password] profiles", pErr.message);
+  if (pErr) {
+    console.error("[cambiar-password] profiles", pErr.message);
+    return fallo("error", 500);
+  }
 
   await admin.from("auditoria_eventos").insert({
     user_id: user.id,
