@@ -11,7 +11,7 @@ export default function CambiarPassword() {
           <CardDescription>Mínimo 12 caracteres.</CardDescription>
         </CardHeader>
         <CardContent>
-          <FormularioPassword modo="voluntario" onExito={() => toast({ title: "Contraseña cambiada" })} />
+          <FormularioPassword modo="voluntario" onExito={() => { toast({ title: "Contraseña cambiada" }); }} />
         </CardContent>
       </Card>
     </div>
