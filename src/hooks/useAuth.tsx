@@ -16,7 +16,14 @@ export type EstadoAcceso =
   | "pide_codigo"
   | "denegado"
   | "pide_password"
+  | "bloqueado"
   | "activo";
+
+export interface InfoBloqueo {
+  estado: string;
+  motivo: string | null;
+  hasta: string | null;
+}
 
 export type ModoPassword = "forzado" | "recuperacion";
 
@@ -55,6 +62,8 @@ interface AuthContextType {
   modoPassword: ModoPassword | null;
   /** Llamar tras guardar la contraseña con éxito: relanza la cadena. */
   passwordGuardada: () => Promise<void>;
+  /** Datos del bloqueo cuando estadoAcceso es 'bloqueado'. */
+  bloqueo: InfoBloqueo | null;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -79,6 +88,7 @@ const AuthContext = createContext<AuthContextType>({
   pidePassword: false,
   modoPassword: null,
   passwordGuardada: async () => {},
+  bloqueo: null,
 });
 
 const LIMITE_PASO_MS = 8000;
@@ -97,16 +107,24 @@ interface DatosUsuario {
   verMargen: boolean;
   dashboards: DashboardItem[];
   debeCambiarPassword: boolean;
+  bloqueo: InfoBloqueo | null;
+}
+
+/** Mismo criterio que public.is_approved: activo o suspensión temporal ya vencida. */
+function estaOperativo(estado: string | null | undefined, hasta: string | null | undefined): boolean {
+  if (!estado || estado === "activo") return true;
+  if (estado === "suspendido_temporal") return !!hasta && new Date(hasta).getTime() <= Date.now();
+  return false;
 }
 
 /** Carga perfil, rol y dashboards. No escribe estado. */
 async function cargarDatosUsuario(userId: string): Promise<DatosUsuario> {
   const vacio: DatosUsuario = {
-    error: null, isApproved: false, role: null, employeeCode: null, delegacion: null, verMargen: false, dashboards: [], debeCambiarPassword: false,
+    error: null, isApproved: false, role: null, employeeCode: null, delegacion: null, verMargen: false, dashboards: [], debeCambiarPassword: false, bloqueo: null,
   };
   try {
     const [profileRes, roleRes] = await Promise.all([
-      supabase.from("profiles").select("is_approved, employee_code, delegacion, ver_margen, debe_cambiar_password").eq("user_id", userId).maybeSingle(),
+      supabase.from("profiles").select("is_approved, employee_code, delegacion, ver_margen, debe_cambiar_password, estado, estado_motivo, bloqueado_hasta").eq("user_id", userId).maybeSingle(),
       supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
     ]);
     const role = roleRes.error ? null : ((roleRes.data?.role as AppRole) ?? null);
@@ -142,6 +160,13 @@ async function cargarDatosUsuario(userId: string): Promise<DatosUsuario> {
       verMargen: ((profileRes.data as any)?.ver_margen ?? false) || role === "admin",
       dashboards,
       debeCambiarPassword: (profileRes.data as any)?.debe_cambiar_password === true,
+      bloqueo: estaOperativo(profileRes.data?.estado, profileRes.data?.bloqueado_hasta)
+        ? null
+        : {
+            estado: profileRes.data?.estado ?? "bloqueado_admin",
+            motivo: profileRes.data?.estado_motivo ?? null,
+            hasta: profileRes.data?.bloqueado_hasta ?? null,
+          },
     };
   } catch (err) {
     console.error("[Auth] Error fetching user data:", err);
@@ -163,6 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [codigoError, setCodigoError] = useState<string | null>(null);
   const [estadoAcceso, setEstadoAcceso] = useState<EstadoAcceso>("cargando");
   const [modoPassword, setModoPassword] = useState<ModoPassword | null>(null);
+  const [bloqueo, setBloqueo] = useState<InfoBloqueo | null>(null);
   const debeCambiarRef = useRef(false);
   const recuperacionRef = useRef(false);
 
@@ -258,6 +284,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       debeCambiarRef.current = false;
       recuperacionRef.current = false;
       setModoPassword(null);
+      setBloqueo(null);
       setRole(null);
       setAuthError(null);
       setEmployeeCode(null);
@@ -293,7 +320,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setDashboards(r.dashboards);
       debeCambiarRef.current = r.debeCambiarPassword;
       if (r.error || !r.isApproved) {
+        setBloqueo(null);
         fijar("pendiente_aprobacion");
+        return;
+      }
+      setBloqueo(r.bloqueo);
+      if (r.bloqueo) {
+        fijar("bloqueado");
         return;
       }
       datosCargadosPara.current = userId;
@@ -449,12 +482,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await (supabase.rpc as any)("verificar_sesion", { _sesion_id: getSesionId() });
       if (error) return;
       if (gen !== generacion.current || estadoRef.current !== "activo") return;
-      const vigente = ((data ?? {}) as { vigente?: boolean }).vigente !== false;
-      if (vigente) return;
-      registrarEvento("sesion_expulsada", { resultado: "denegado", detalle: { dispositivo_id: getDispositivoId() } });
+      const res = (data ?? {}) as { vigente?: boolean; motivo?: string };
+      if (res.vigente !== false) return;
+      const bloqueado = res.motivo === "usuario_bloqueado";
+      registrarEvento("sesion_expulsada", {
+        resultado: "denegado",
+        detalle: { dispositivo_id: getDispositivoId(), motivo: bloqueado ? "usuario_bloqueado" : "otro_equipo" },
+      });
       toast({
         title: "Sesión cerrada",
-        description: "Se ha iniciado sesión en otro equipo, por lo que esta sesión se ha cerrado.",
+        description: bloqueado
+          ? "Tu usuario ha sido bloqueado. Contacta con el administrador."
+          : "Se ha iniciado sesión en otro equipo, por lo que esta sesión se ha cerrado.",
         variant: "destructive",
       });
       // Cierre LOCAL: un signOut global revocaría el token también en la sesión ganadora.
@@ -524,7 +563,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         session, user, role, isApproved, isLoading, authError, employeeCode, delegacion, verMargen, dashboards,
         hasDashboard, signOut: signOutEstable, pideCodigoAlta, codigoError, enviarCodigoAlta, idEquipo, controlListo,
-        estadoAcceso, pidePassword, modoPassword, passwordGuardada,
+        estadoAcceso, pidePassword, modoPassword, passwordGuardada, bloqueo,
       }}
     >
       {children}

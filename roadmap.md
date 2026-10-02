@@ -8,3 +8,5 @@
 
 - [x] Rehacer useAuth con máquina de estados única (resolverAcceso, generación, límites de 8 s por paso, vigilante solo en activo)
 - [x] Contraseñas: política 12, cambio voluntario/forzado/recuperación vía función cambiar-password (vía de usuario), panel restablecer/forzar
+- [x] Estado de usuario, baja y nombre de usuario (migración 0004, is_admin/is_approved con estado, bloqueo en useAuth, panel)
+- [ ] Migración separada: proteger por estado las funciones sin comprobación (actividad_interna_*, cliente_top_productos, situaciones_activas)
