@@ -448,15 +448,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       fijarSesion(s);
 
       if (event === "SIGNED_IN" && s?.user) {
-        try {
-          const marca = `auditoria_login_${s.user.id}`;
-          if (!sessionStorage.getItem(marca)) {
-            sessionStorage.setItem(marca, "1");
-            registrarEvento("login", { resultado: "ok", email: s.user.email ?? null });
-          }
-        } catch {
-          // sessionStorage no disponible
-        }
         // Mismo usuario ya activo (p. ej. al volver a enfocar): no relanzar.
         if (estadoRef.current === "activo" && anteriorId === s.user.id) return;
       }

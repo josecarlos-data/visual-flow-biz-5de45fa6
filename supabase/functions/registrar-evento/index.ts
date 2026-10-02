@@ -60,10 +60,8 @@ Deno.serve(async (req) => {
     }
     const autenticado = userId !== null;
 
-    // Sin sesión válida solo se acepta un login fallido
-    if (!autenticado && !(tipo === "login" && resultado === "fallo")) {
-      return sinContenido();
-    }
+    // Todo evento requiere sesión válida (los fallos de login los registra iniciar-sesion)
+    if (!autenticado) return sinContenido();
 
     const cfIp = req.headers.get("cf-connecting-ip");
     const xff = req.headers.get("x-forwarded-for");

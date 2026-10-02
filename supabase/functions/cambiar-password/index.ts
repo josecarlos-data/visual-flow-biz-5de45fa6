@@ -72,7 +72,16 @@ Deno.serve(async (req) => {
     if (!actual || !user.email) return fallo("actual_incorrecta");
     const verif = createClient(URL, ANON, { auth: { persistSession: false, autoRefreshToken: false } });
     const { error: sErr } = await verif.auth.signInWithPassword({ email: user.email, password: actual });
-    if (sErr) return fallo("actual_incorrecta");
+    if (sErr) {
+      const codigo = (sErr as any)?.code ?? null;
+      if (codigo === "invalid_credentials") {
+        const { error: rErr } = await admin.rpc("registrar_fallo_acceso", { _user_id: user.id, _origen: "cambio_password" });
+        if (rErr) console.error("[cambiar-password] registrar_fallo_acceso", rErr.message);
+        return fallo("actual_incorrecta");
+      }
+      console.error("[cambiar-password] error del servicio al verificar", (sErr as any)?.status, codigo);
+      return fallo("error", 503);
+    }
   }
 
   // Cambio por la vía de usuario: aplica las comprobaciones del servidor (incluida HIBP).
