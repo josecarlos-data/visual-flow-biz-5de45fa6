@@ -7,13 +7,20 @@ import { ShieldAlert } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { registrarEvento } from "@/lib/auditoria";
 
-const CLAVES = ["control_acceso_modo", "alta_dispositivo_modo", "control_sesiones_activo", "acceso_permite_correo"] as const;
+const CLAVES = ["control_acceso_modo", "alta_dispositivo_modo", "control_sesiones_activo", "acceso_permite_correo", "segundo_factor_modo"] as const;
 
-export default function SeguridadAccesoCard({ activosSinUsuario = 0 }: { activosSinUsuario?: number }) {
+export default function SeguridadAccesoCard({
+  activosSinUsuario = 0,
+  onModo2fa,
+}: {
+  activosSinUsuario?: number;
+  onModo2fa?: (modo: string) => void;
+}) {
   const [modo, setModo] = useState("observacion");
   const [altaModo, setAltaModo] = useState("auto");
   const [sesionesActivo, setSesionesActivo] = useState("true");
   const [permiteCorreo, setPermiteCorreo] = useState("true");
+  const [modo2fa, setModo2fa] = useState("desactivado");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,9 +35,11 @@ export default function SeguridadAccesoCard({ activosSinUsuario = 0 }: { activos
         if (f.key === "alta_dispositivo_modo") setAltaModo(f.value);
         if (f.key === "control_sesiones_activo") setSesionesActivo(f.value);
         if (f.key === "acceso_permite_correo") setPermiteCorreo(f.value);
+        if (f.key === "segundo_factor_modo") { setModo2fa(f.value); onModo2fa?.(f.value); }
       });
       setLoading(false);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const guardar = async (key: string, value: string) => {
@@ -150,6 +159,45 @@ export default function SeguridadAccesoCard({ activosSinUsuario = 0 }: { activos
             </p>
           )}
         </div>
+        <div className="space-y-1.5">
+          <Label>Segundo factor</Label>
+          <Select
+            value={modo2fa}
+            disabled={loading}
+            onValueChange={async (v) => {
+              if (v === "activo") {
+                const { data } = await supabase.auth.mfa.listFactors();
+                if (!data?.totp?.length) {
+                  toast({
+                    title: "Configura antes tu segundo factor",
+                    description: "No puedes activarlo para todos los administradores sin tener el tuyo configurado. Márcate a ti mismo y pasa por modo «Solo marcados».",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+              }
+              const ok = await guardar("segundo_factor_modo", v);
+              if (ok) { setModo2fa(v); onModo2fa?.(v); }
+            }}
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="desactivado">Desactivado</SelectItem>
+              <SelectItem value="marcados">Solo usuarios marcados</SelectItem>
+              <SelectItem value="activo">Marcados y todos los administradores</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Pide un código de Microsoft Authenticator o Google Authenticator al entrar. Quien lo tenga exigido y no lo haya
+            configurado tendrá que darlo de alta en su próximo acceso.
+          </p>
+        </div>
+        {modo2fa === "activo" && (
+          <p className="sm:col-span-2 lg:col-span-3 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+            Atención: el segundo factor es obligatorio para todos los administradores. Si alguien pierde el móvil, tendrá que
+            restablecérselo otro administrador.
+          </p>
+        )}
         {modo === "bloqueo" && (
           <p className="sm:col-span-2 lg:col-span-3 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
             Atención: el modo bloqueo está activo. Un comercial con un equipo nuevo o bloqueado no podrá acceder.
