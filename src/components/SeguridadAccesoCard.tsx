@@ -7,12 +7,13 @@ import { ShieldAlert } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { registrarEvento } from "@/lib/auditoria";
 
-const CLAVES = ["control_acceso_modo", "alta_dispositivo_modo", "control_sesiones_activo"] as const;
+const CLAVES = ["control_acceso_modo", "alta_dispositivo_modo", "control_sesiones_activo", "acceso_permite_correo"] as const;
 
-export default function SeguridadAccesoCard() {
+export default function SeguridadAccesoCard({ activosSinUsuario = 0 }: { activosSinUsuario?: number }) {
   const [modo, setModo] = useState("observacion");
   const [altaModo, setAltaModo] = useState("auto");
   const [sesionesActivo, setSesionesActivo] = useState("true");
+  const [permiteCorreo, setPermiteCorreo] = useState("true");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,6 +27,7 @@ export default function SeguridadAccesoCard() {
         if (f.key === "control_acceso_modo") setModo(f.value);
         if (f.key === "alta_dispositivo_modo") setAltaModo(f.value);
         if (f.key === "control_sesiones_activo") setSesionesActivo(f.value);
+        if (f.key === "acceso_permite_correo") setPermiteCorreo(f.value);
       });
       setLoading(false);
     })();
@@ -114,6 +116,39 @@ export default function SeguridadAccesoCard() {
             Limita desde cuántos equipos distintos puede entrar cada usuario a la vez. Desactívalo solo de forma
             temporal si alguien se ha quedado fuera.
           </p>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Permitir acceso con correo</Label>
+          <Select
+            value={permiteCorreo}
+            disabled={loading}
+            onValueChange={async (v) => {
+              if (v === "false" && activosSinUsuario > 0) {
+                toast({
+                  title: "No se puede desactivar todavía",
+                  description: `Hay ${activosSinUsuario} usuario${activosSinUsuario === 1 ? "" : "s"} activo${activosSinUsuario === 1 ? "" : "s"} sin nombre de usuario.`,
+                  variant: "destructive",
+                });
+                return;
+              }
+              const ok = await guardar("acceso_permite_correo", v);
+              if (ok) setPermiteCorreo(v);
+            }}
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="true">Sí (usuario o correo)</SelectItem>
+              <SelectItem value="false" disabled={activosSinUsuario > 0}>No (solo nombre de usuario)</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Si lo desactivas, solo se podrá entrar con el nombre de usuario. Quien no tenga uno asignado no podrá acceder.
+          </p>
+          {activosSinUsuario > 0 && (
+            <p className="text-xs text-destructive">
+              {activosSinUsuario} usuario{activosSinUsuario === 1 ? "" : "s"} activo{activosSinUsuario === 1 ? "" : "s"} sin nombre de usuario.
+            </p>
+          )}
         </div>
         {modo === "bloqueo" && (
           <p className="sm:col-span-2 lg:col-span-3 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">

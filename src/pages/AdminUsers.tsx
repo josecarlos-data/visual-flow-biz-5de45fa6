@@ -47,6 +47,9 @@ interface UserRow {
   bloqueado_hasta: string | null;
   marcada_sospechosa: boolean;
   username: string | null;
+  fallos: number;
+  ciclos: number;
+  ultimo_fallo_en: string | null;
 }
 
 const ESTADOS: { value: string; label: string }[] = [
@@ -106,13 +109,19 @@ export default function AdminUsers() {
 
 
     const userIds = profiles.map((p) => p.user_id);
-    const [rolesRes, accessRes] = await Promise.all([
+    const [rolesRes, accessRes, intentosRes] = await Promise.all([
       supabase.from("user_roles").select("user_id, role").in("user_id", userIds),
+      supabase.from("intentos_acceso" as any).select("user_id, fallos, ciclos, ultimo_fallo_en, ultima_suspension_en").in("user_id", userIds),
       supabase.from("user_dashboard_access" as any).select("user_id, dashboard_key").in("user_id", userIds),
     ]);
 
     const rolesMap = new Map<string, AppRole>();
     (rolesRes.data ?? []).forEach((r) => rolesMap.set(r.user_id, r.role as AppRole));
+
+    type Intento = { user_id: string; fallos: number; ciclos: number; ultimo_fallo_en: string | null; ultima_suspension_en: string | null };
+    const intentosMap = new Map<string, Intento>();
+    (((intentosRes.data as any[]) ?? []) as Intento[]).forEach((i) => intentosMap.set(i.user_id, i));
+    const ahora = Date.now();
 
     const accessMap = new Map<string, string[]>();
     (((accessRes.data as any[]) ?? []) as { user_id: string; dashboard_key: string }[]).forEach((a) => {
@@ -143,6 +152,12 @@ export default function AdminUsers() {
         bloqueado_hasta: p.bloqueado_hasta ?? null,
         marcada_sospechosa: p.marcada_sospechosa ?? false,
         username: p.username ?? null,
+        ...(() => {
+          const i = intentosMap.get(p.user_id);
+          const fallosVigentes = i?.ultimo_fallo_en && ahora - new Date(i.ultimo_fallo_en).getTime() < 15 * 60 * 1000 ? i.fallos : 0;
+          const ciclosVigentes = i?.ultima_suspension_en && ahora - new Date(i.ultima_suspension_en).getTime() < 24 * 3600 * 1000 ? i.ciclos : 0;
+          return { fallos: fallosVigentes, ciclos: ciclosVigentes, ultimo_fallo_en: i?.ultimo_fallo_en ?? null };
+        })(),
       }))
     );
     setLoading(false);
@@ -357,11 +372,19 @@ export default function AdminUsers() {
           </SelectContent>
         </Select>
         <div className="flex flex-wrap gap-1">
-          {u.estado !== "activo" && <Badge variant="destructive" className="w-fit">{etiquetaEstado(u.estado)}</Badge>}
+          {u.estado !== "activo" && !suspensionVencida && <Badge variant="destructive" className="w-fit">{etiquetaEstado(u.estado)}</Badge>}
+          {suspensionVencida && <Badge variant="secondary" className="w-fit">Activo</Badge>}
           {u.marcada_sospechosa && <Badge variant="destructive" className="w-fit">Sospechosa</Badge>}
         </div>
         {u.estado === "suspendido_temporal" && u.bloqueado_hasta && (
-          <span className="text-xs text-muted-foreground">Hasta {fechaHora(u.bloqueado_hasta)}</span>
+          <span className="text-xs text-muted-foreground">
+            {suspensionVencida ? `Suspensión finalizada el ${fechaHora(u.bloqueado_hasta)}` : `Hasta ${fechaHora(u.bloqueado_hasta)}`}
+          </span>
+        )}
+        {(u.fallos > 0 || u.ciclos > 0) && (
+          <span className="text-xs text-muted-foreground">
+            {u.fallos} fallo{u.fallos === 1 ? "" : "s"} reciente{u.fallos === 1 ? "" : "s"} · {u.ciclos} ciclo{u.ciclos === 1 ? "" : "s"} en 24 h
+          </span>
         )}
         {u.estado_cambiado_en && (
           <span className="break-words text-xs text-muted-foreground">
@@ -539,7 +562,7 @@ export default function AdminUsers() {
         <p className="text-muted-foreground">Aprueba usuarios y asigna roles, vendedores y delegaciones</p>
       </div>
 
-      <SeguridadAccesoCard />
+      <SeguridadAccesoCard activosSinUsuario={users.filter((u) => u.is_approved && u.estado === "activo" && !u.username).length} />
 
       {pendingUsers.length > 0 && (
         <Card>
