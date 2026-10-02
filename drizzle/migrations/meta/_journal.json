@@ -43,6 +43,13 @@
       "when": 1790946259043,
       "tag": "0005_guardas_aprobacion_rpc_sin_comprobacion",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790952004102,
+      "tag": "0006_login_usuario_bloqueo_escalonado",
+      "breakpoints": true
     }
   ]
 }

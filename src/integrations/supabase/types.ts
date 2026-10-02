@@ -639,6 +639,30 @@ export type Database = {
         }
         Relationships: []
       }
+      intentos_acceso: {
+        Row: {
+          ciclos: number
+          fallos: number
+          ultima_suspension_en: string | null
+          ultimo_fallo_en: string | null
+          user_id: string
+        }
+        Insert: {
+          ciclos?: number
+          fallos?: number
+          ultima_suspension_en?: string | null
+          ultimo_fallo_en?: string | null
+          user_id: string
+        }
+        Update: {
+          ciclos?: number
+          fallos?: number
+          ultima_suspension_en?: string | null
+          ultimo_fallo_en?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       motivo_campos: {
         Row: {
           ayuda: string | null
@@ -2559,6 +2583,11 @@ export type Database = {
       refrescar_documentos_resumen: { Args: never; Returns: undefined }
       refrescar_resumenes_admin: { Args: never; Returns: undefined }
       refrescar_resumenes_ventas: { Args: never; Returns: undefined }
+      registrar_exito_acceso: { Args: { _user_id: string }; Returns: undefined }
+      registrar_fallo_acceso: {
+        Args: { _origen: string; _user_id: string }
+        Returns: Json
+      }
       registrar_geo_cliente: {
         Args: { _cod: number; _lat: number; _lng: number }
         Returns: boolean
