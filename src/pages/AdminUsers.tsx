@@ -581,7 +581,14 @@ export default function AdminUsers() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Usuarios aprobados</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle>Usuarios aprobados</CardTitle>
+            {numBajas > 0 && (
+              <Button size="sm" variant="outline" onClick={() => setVerBajas((v) => !v)}>
+                {verBajas ? "Ocultar bajas" : `Ver bajas (${numBajas})`}
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -618,9 +625,65 @@ export default function AdminUsers() {
                 ))}
               </TableBody>
             </Table>
+            </div>
+            </>
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!cambioEstado} onOpenChange={(v) => !v && setCambioEstado(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cambiar estado a «{cambioEstado ? etiquetaEstado(cambioEstado.estado) : ""}»</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cambioEstado?.estado === "activo"
+                ? `${cambioEstado.u.full_name || cambioEstado.u.email} podrá volver a entrar.`
+                : `${cambioEstado?.u.full_name || cambioEstado?.u.email} no podrá entrar y se cerrarán sus sesiones abiertas.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {cambioEstado && (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-sm font-medium" htmlFor="motivo-estado">
+                  Motivo{cambioEstado.estado === "activo" ? " (opcional)" : ""}
+                </label>
+                <Input id="motivo-estado" value={cambioEstado.motivo} onChange={(e) => setCambioEstado({ ...cambioEstado, motivo: e.target.value })} />
+              </div>
+              {cambioEstado.estado === "suspendido_temporal" && (
+                <div className="space-y-1">
+                  <label className="text-sm font-medium" htmlFor="hasta-estado">Fin de la suspensión</label>
+                  <Input id="hasta-estado" type="datetime-local" value={cambioEstado.hasta} onChange={(e) => setCambioEstado({ ...cambioEstado, hasta: e.target.value })} />
+                </div>
+              )}
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button onClick={confirmarEstado} disabled={guardando}>Confirmar</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!bajaDe} onOpenChange={(v) => !v && setBajaDe(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Dar de baja a {bajaDe?.u.full_name || bajaDe?.u.email}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bloquea su acceso, cierra sus sesiones abiertas y elimina sus equipos autorizados. Se conservan todos sus datos: visitas, objetivos y registros de auditoría.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {bajaDe && (
+            <div className="space-y-1">
+              <label className="text-sm font-medium" htmlFor="motivo-baja">Motivo</label>
+              <Input id="motivo-baja" value={bajaDe.motivo} onChange={(e) => setBajaDe({ ...bajaDe, motivo: e.target.value })} />
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button variant="destructive" onClick={confirmarBaja} disabled={guardando}>Dar de baja</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!accionPw} onOpenChange={(v) => !v && setAccionPw(null)}>
         <AlertDialogContent>
