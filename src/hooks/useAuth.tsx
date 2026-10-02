@@ -18,6 +18,8 @@ export type EstadoAcceso =
   | "denegado"
   | "pide_password"
   | "bloqueado"
+  | "pide_2fa"
+  | "alta_2fa"
   | "activo";
 
 export interface InfoBloqueo {
@@ -272,6 +274,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /** Decide si hace falta dar de alta o verificar el segundo factor. No escribe estado. */
+  const evaluarSegundoFactor = async (userId: string): Promise<"ok" | "alta_2fa" | "pide_2fa" | "error"> => {
+    try {
+      const { data: requiere, error } = await (supabase.rpc as any)("requiere_2fa", { _user_id: userId });
+      if (error) return "error";
+      if (requiere !== true) return "ok";
+      const { data: aal, error: aErr } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (aErr || !aal) return "error";
+      if (aal.currentLevel === "aal2") return "ok";
+      return aal.nextLevel === "aal2" ? "pide_2fa" : "alta_2fa";
+    } catch {
+      return "error";
+    }
+  };
+
   /** ÚNICA función que escribe estadoAcceso. */
   const resolverAcceso = async (s: Session | null, codigo?: string): Promise<void> => {
     const gen = ++generacion.current;
@@ -335,6 +352,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fijar("bloqueado");
         return;
       }
+
+      // Segundo factor (antes del control de equipo y de la contraseña)
+      const sf = await conLimite(evaluarSegundoFactor(userId), LIMITE_PASO_MS);
+      if (!vigente()) return;
+      if (sf === VENCIDO || sf === "error") {
+        setAuthError("No se ha podido comprobar el segundo factor. Recarga la página.");
+        fijar("pendiente_aprobacion");
+        return;
+      }
+      if (sf !== "ok") {
+        fijar(sf);
+        return;
+      }
+
       datosCargadosPara.current = userId;
       ultimoUsuarioAcceso.current = userId;
     }
@@ -420,6 +451,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const passwordGuardada = useCallback(async () => {
     recuperacionRef.current = false;
     await fnRef.current.resolverAcceso(sessionRef.current);
+  }, []);
+
+  /** Tras verificar o dar de alta el segundo factor: sesión aal2 nueva y recarga completa de perfil y dashboards. */
+  const segundoFactorListo = useCallback(async () => {
+    const { data } = await supabase.auth.getSession();
+    const s = data.session ?? sessionRef.current;
+    fijarSesion(s);
+    datosCargadosPara.current = null; // nada de lo leído con aal1 se reutiliza
+    await fnRef.current.resolverAcceso(s);
   }, []);
 
   const enviarCodigoAlta = useCallback(async (codigo: string) => {
