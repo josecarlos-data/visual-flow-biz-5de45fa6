@@ -67,6 +67,8 @@ interface AuthContextType {
   passwordGuardada: () => Promise<void>;
   /** Datos del bloqueo cuando estadoAcceso es 'bloqueado'. */
   bloqueo: InfoBloqueo | null;
+  /** Llamar tras verificar o dar de alta el segundo factor: recarga todo y relanza la cadena. */
+  segundoFactorListo: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -92,6 +94,7 @@ const AuthContext = createContext<AuthContextType>({
   modoPassword: null,
   passwordGuardada: async () => {},
   bloqueo: null,
+  segundoFactorListo: async () => {},
 });
 
 const LIMITE_PASO_MS = 8000;
@@ -602,7 +605,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         session, user, role, isApproved, isLoading, authError, employeeCode, delegacion, verMargen, dashboards,
         hasDashboard, signOut: signOutEstable, pideCodigoAlta, codigoError, enviarCodigoAlta, idEquipo, controlListo,
-        estadoAcceso, pidePassword, modoPassword, passwordGuardada, bloqueo,
+        estadoAcceso, pidePassword, modoPassword, passwordGuardada, bloqueo, segundoFactorListo,
       }}
     >
       {children}
