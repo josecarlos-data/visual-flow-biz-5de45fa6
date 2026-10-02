@@ -914,53 +914,74 @@ export type Database = {
       }
       profiles: {
         Row: {
+          bloqueado_hasta: string | null
           created_at: string
           debe_cambiar_password: boolean
           delegacion: string | null
           dispositivos_max: number
           email: string | null
           employee_code: string | null
+          estado: string
+          estado_cambiado_en: string | null
+          estado_cambiado_por: string | null
+          estado_motivo: string | null
           full_name: string | null
           id: string
           is_approved: boolean
+          marcada_sospechosa: boolean
           password_cambiada_en: string | null
           sesiones_max: number
           updated_at: string
           user_id: string
+          username: string | null
           ver_margen: boolean
           zone_id: string | null
         }
         Insert: {
+          bloqueado_hasta?: string | null
           created_at?: string
           debe_cambiar_password?: boolean
           delegacion?: string | null
           dispositivos_max?: number
           email?: string | null
           employee_code?: string | null
+          estado?: string
+          estado_cambiado_en?: string | null
+          estado_cambiado_por?: string | null
+          estado_motivo?: string | null
           full_name?: string | null
           id?: string
           is_approved?: boolean
+          marcada_sospechosa?: boolean
           password_cambiada_en?: string | null
           sesiones_max?: number
           updated_at?: string
           user_id: string
+          username?: string | null
           ver_margen?: boolean
           zone_id?: string | null
         }
         Update: {
+          bloqueado_hasta?: string | null
           created_at?: string
           debe_cambiar_password?: boolean
           delegacion?: string | null
           dispositivos_max?: number
           email?: string | null
           employee_code?: string | null
+          estado?: string
+          estado_cambiado_en?: string | null
+          estado_cambiado_por?: string | null
+          estado_motivo?: string | null
           full_name?: string | null
           id?: string
           is_approved?: boolean
+          marcada_sospechosa?: boolean
           password_cambiada_en?: string | null
           sesiones_max?: number
           updated_at?: string
           user_id?: string
+          username?: string | null
           ver_margen?: boolean
           zone_id?: string | null
         }
@@ -2145,6 +2166,23 @@ export type Database = {
           registrado_por: string
           ticket_medio: number
         }[]
+      }
+      admin_asignar_username: {
+        Args: { _user_id: string; _username: string }
+        Returns: string
+      }
+      admin_cambiar_estado: {
+        Args: {
+          _estado: string
+          _hasta?: string
+          _motivo: string
+          _user_id: string
+        }
+        Returns: undefined
+      }
+      admin_dar_baja: {
+        Args: { _motivo: string; _user_id: string }
+        Returns: undefined
       }
       admin_generar_codigo: { Args: { _user_id: string }; Returns: string }
       admin_gestionar_dispositivo: {
