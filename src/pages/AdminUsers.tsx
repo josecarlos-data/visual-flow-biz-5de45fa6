@@ -339,6 +339,8 @@ export default function AdminUsers() {
 
   const renderCuenta = (u: UserRow) => {
     const editando = usernameEdit?.userId === u.user_id;
+    const suspensionVencida =
+      u.estado === "suspendido_temporal" && !!u.bloqueado_hasta && new Date(u.bloqueado_hasta).getTime() <= Date.now();
     return (
       <div className="flex min-w-0 flex-col gap-2">
         <div className="flex min-w-0 items-center gap-1">
