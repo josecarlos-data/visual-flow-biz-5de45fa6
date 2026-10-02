@@ -1,41 +1,84 @@
-# Guardas de aprobación en funciones SECURITY DEFINER sin comprobación
+# Inicio de sesión por usuario con bloqueo escalonado y límite por IP
 
-## Estado actual (leído de la base y del código)
+## Estado actual comprobado
 
-| Función | Qué comprueba hoy | Quién la llama |
-|---|---|---|
-| `actividad_interna_filtros()` | `has_role(admin)` **o** fila en `user_dashboard_access` con clave `actividad_interna` (consulta directa, no vía `has_dashboard_access`). Si no, `RAISE 'No autorizado'`. No comprueba aprobación ni estado (`has_role` tampoco lo hace). | `useCrm.ts` (pantalla Actividad interna) |
-| `actividad_interna_usuarios(_anio, _almacen, _motivo)` | Igual que la anterior | `useCrm.ts` |
-| `actividad_interna_motivos(_anio, _almacen)` | Igual que la anterior | `useCrm.ts` |
-| `actividad_interna_almacenes(_anio)` | Igual que la anterior | `useCrm.ts` |
-| `cliente_top_productos(_cod, _desde, _hasta, _desde_prev, _hasta_prev)` (plpgsql) | `can_view_cliente(auth.uid(), _cod)`; margen según `puede_ver_margen` | `useCrm.ts` (ClienteDetalle, Productos) y la función `cliente-insights` (con el token del usuario) |
-| `cliente_top_productos(_cod, _anio)` (sql, sobrecarga) | Nada propio: delega en la versión de 5 argumentos | No se encuentra llamada desde la app |
-| `situaciones_activas()` (sql) | Nada | No se llama desde la app; la usan las funciones `panel_alertas`, `panel_dormidos` y `ruta_clientes` |
-| `has_dashboard_access(_user_id, _dashboard_key)` (sql) | `is_admin(_user_id)` (ya exige operativo) **o** fila en `user_dashboard_access`. La rama de la fila no exige aprobación. | Ninguna llamada en la app, ni en políticas, ni en otras funciones |
+- `profiles.estado` admite `activo`, `suspendido_temporal`, `bloqueado_intentos`, `bloqueado_admin` y `baja` (CHECK). `username` es único sin distinguir mayúsculas (índice sobre `lower(username)`) y tiene formato `^[a-z0-9._-]{3,30}$`.
+- Los 3 usuarios activos **no tienen nombre de usuario**. El acceso por correo tendrá que seguir encendido hasta que se les asigne uno.
+- `app_settings` solo pueden leerlo los usuarios aprobados. La pantalla de login (sin sesión) **no puede leer** `acceso_permite_correo` directamente. Ver la decisión 1.
+- `auditoria_eventos` no limita `tipo` (solo `resultado`), y ya tiene índice `(tipo, ocurrido_en)`.
+- `admin_cambiar_estado`: definición vigente leída. Al pasar a `activo` ya pone `marcada_sospechosa = false`, pero no toca ninguna tabla de intentos.
+- El evento `login` lo registran hoy `Auth.tsx` (fallo) y `useAuth.tsx` (ok).
+- `cambiar-password` comprueba la contraseña actual con `signInWithPassword` y devuelve `actual_incorrecta` si falla.
+- En `config.toml` solo `auth-email-hook` tiene `verify_jwt = false`.
 
-Ninguna obliga a cambiar la firma ni el tipo de retorno: todas se pueden recrear con CREATE OR REPLACE.
+## Decisiones que necesito antes de construir (desvíos del encargo)
 
-## Cambio (una migración en drizzle/migrations)
+1. **Cómo sabe la pantalla de login si se permite el correo.** Sin sesión no se puede leer `app_settings`. Propuesta: `iniciar-sesion` acepta además `{ "accion": "config" }` y devuelve solo `{ permite_correo: boolean }`. No abre `app_settings` al público ni añade ninguna función más.
+2. **Mensaje de suspensión vigente (paso B.3).** Una suspensión puesta a mano por un admin también es `suspendido_temporal`. Propuesta:
+   - si `estado_cambiado_por` es NULL (la puso el sistema), se usa el mensaje «…hasta las HH:MM por intentos fallidos»;
+   - si la puso un admin, «Cuenta suspendida temporalmente hasta las HH:MM.».
+   En ambos casos no se comprueba la contraseña ni se cuenta el intento.
+3. **Riesgo a verificar: límite de intentos del propio servicio de autenticación.** Todas las comprobaciones de contraseña saldrán ahora desde la IP de la función de servidor, no desde la de cada usuario. Si el servicio de autenticación aplica su límite por IP, un pico de intentos podría frenar el login de todos. Lo compruebo al construir con varios intentos seguidos. Si aparece, te lo digo antes de seguir.
 
-Cuerpos copiados literalmente de la definición vigente (`pg_get_functiondef`) en el momento de construir; solo se añade lo indicado. Sin DROP, sin tocar GRANT/REVOKE, misma firma, mismo SECURITY DEFINER, volatilidad y `search_path`.
+Si apruebas el plan sin comentar estos puntos, aplico las propuestas 1 y 2 tal cual.
 
-1. **Las cuatro `actividad_interna_*`**: primera línea del cuerpo
-   `IF NOT public.is_approved(auth.uid()) THEN RETURN; END IF;` (cero filas).
-   Se conserva detrás la comprobación existente (admin o acceso al panel `actividad_interna`) con su `RAISE`. Como ya exigen acceso al panel, no se añade una segunda comprobación; al ir después de `is_approved`, un admin o usuario con acceso ya solo pasa si está aprobado y operativo.
-2. **`cliente_top_productos` (5 argumentos, plpgsql)**: misma guarda al principio, antes de `can_view_cliente`.
-3. **`cliente_top_productos` (2 argumentos, sql)**: no se modifica; hereda la guarda al delegar en la anterior (si el usuario no está aprobado devuelve cero filas).
-4. **`situaciones_activas()` (sql)**: se añade `AND public.is_approved(auth.uid())` al WHERE (cero filas). Dentro de `panel_alertas`/`panel_dormidos`/`ruta_clientes`, `auth.uid()` sigue siendo el usuario que llama, así que para usuarios aprobados no cambia nada.
-5. **`has_dashboard_access`**: pasa a
-   `is_admin(_user_id) OR (is_approved(_user_id) AND EXISTS(...user_dashboard_access...))`. Sigue siendo SQL y STABLE.
+## A. Migración (una, en drizzle/migrations)
 
-Fuera de alcance: `has_role`, `puede_editar_bloque`, `fecha_corte_datos`, `promover_perfil_desde_bloque` y cualquier otra.
+1. Tabla `intentos_acceso` tal como la describes. Llevará GRANT ALL a service_role, REVOKE de anon/authenticated y RLS activado, con una única policy SELECT para `is_admin(auth.uid())`.
+   - Excepción necesaria: GRANT SELECT a authenticated. Sin ese permiso, la policy de admin no puede funcionar desde el panel. Los no admin no ven nada por RLS.
+2. `registrar_fallo_acceso(_user_id, _origen)` con la lógica especificada:
+   - `INSERT … ON CONFLICT DO NOTHING` y después `SELECT … FOR UPDATE`;
+   - ventanas de 15 min y 24 h;
+   - duración 15/30/60 min;
+   - solo cambia el estado si es `activo` o una suspensión vencida;
+   - `marcada_sospechosa` a partir del ciclo 2;
+   - evento `suspension_automatica` con `_origen` en el detalle;
+   - devuelve `{suspendido, hasta}`.
+3. `registrar_exito_acceso(_user_id)`: pone `fallos` a 0 y cierra las suspensiones vencidas con el evento `fin_suspension`. No toca `ciclos` ni `marcada_sospechosa`.
+4. Las dos funciones: REVOKE EXECUTE de PUBLIC, anon y authenticated; GRANT solo a service_role.
+5. `admin_cambiar_estado`: copia literal de la definición vigente con un único añadido: al pasar a `activo`, `DELETE FROM intentos_acceso WHERE user_id = _user_id`.
+6. Fila de ajuste `acceso_permite_correo = 'true'`, con `ON CONFLICT DO NOTHING`.
 
-## Verificación tras aplicar
+## B. Función `iniciar-sesion` (verify_jwt = false)
 
-- Comparar con `pg_get_functiondef` que solo cambian las líneas añadidas y que los privilegios (`proacl`) son idénticos a los de antes.
-- Con un usuario aprobado: Actividad interna, productos del cliente, alertas y ruta muestran lo mismo que antes.
-- Ejecutar el linter de la base.
+Orden estricto, como en el encargo:
+1. IP con la misma lógica que `registrar-evento`. Si esa IP acumula 20 o más `login` con resultado `fallo` en 15 min, la función corta ahí con el mensaje de espera.
+2. Busca la cuenta por email (solo si se permite el correo) o por `lower(username)`. Si no existe, registra el evento `usuario_desconocido` y da la respuesta genérica.
+3. Si hay una suspensión vigente, responde con el mensaje de la decisión 2.
+4. Comprueba la contraseña con la clave anónima (`persistSession: false`).
+   - Si falla, llama a `registrar_fallo_acceso(uid, 'login')`, registra el evento con IP y user agent, y da la respuesta genérica o el mensaje de suspensión.
+5. Contraseña correcta pero usuario `bloqueado_admin`, `bloqueado_intentos` o `baja`: cierra esa sesión nueva, registra `login` denegado y muestra «Tu usuario está bloqueado…».
+6. Contraseña correcta y usuario operativo: `registrar_exito_acceso`, registra `login` ok y devuelve `access_token` y `refresh_token`.
 
-## Nota
+## C. `cambiar-password`
 
-Hoy un admin no aprobado que llame a `actividad_interna_*` recibe "No autorizado" solo si no es admin; tras el cambio, cualquier usuario no aprobado recibe cero filas sin error, como pide el objetivo.
+Si falla la contraseña actual (modos voluntario y forzado), llama a `registrar_fallo_acceso(uid, 'cambio_password')`. Nada más cambia.
+
+## D. `registrar-evento`
+
+Se elimina la rama que acepta eventos sin token. Desde ahora todo evento exige un JWT válido.
+
+## E. Cliente
+
+- `Auth.tsx`: campo «Usuario» (con «o correo» si se permite), llamada a `iniciar-sesion` y `supabase.auth.setSession()`. Se quita el registro de `login` fallido.
+- `useAuth.tsx`: se quita el registro de `login` ok. No se tocan `resolverAcceso`, el `logout`, `registrar_sesion` ni `verificar_sesion`.
+- `auditoria.ts` y `registrar-evento`: no se añaden tipos. Los eventos nuevos solo se escriben en el servidor. Pantalla de Auditoría: etiquetas legibles para `suspension_automatica` y `fin_suspension`, si tiene un mapa de etiquetas.
+
+## F. Panel de usuarios
+
+- Estado efectivo: una suspensión vencida se muestra como «Activo» con la nota «Suspensión finalizada el …». La insignia roja solo aparece con la suspensión vigente.
+- Junto al estado, fallos recientes y ciclos, leídos de `intentos_acceso`.
+- Interruptor «Permitir acceso con correo»:
+  - con advertencia y aviso del número de usuarios activos sin nombre de usuario (hoy 3);
+  - no se puede apagar mientras ese número sea mayor que 0;
+  - registra `cambio_config_seguridad`.
+
+## Verificación
+
+- Mismos privilegios de `admin_cambiar_estado` antes y después, y en su definición solo cambia la línea añadida.
+- Con una cuenta de prueba: login por correo; 5 fallos hasta la suspensión de 15 min; mensaje sin comprobar la contraseña; fin de la suspensión al entrar después.
+- Usuario inexistente y contraseña errónea devuelven el mismo texto.
+- Un evento sin token en `registrar-evento` no se guarda.
+- Linter de la base.
+
+Fuera de alcance: avisos por correo, segundo factor, `has_role`, `resolverAcceso`, `registrar_sesion` y `verificar_sesion`.
