@@ -17,7 +17,10 @@ export type TipoEvento =
   | "codigo_invalido"
   | "password_cambiada"
   | "password_restablecer_enviado"
-  | "password_cambio_forzado";
+  | "password_cambio_forzado"
+  | "2fa_alta"
+  | "2fa_verificado"
+  | "2fa_fallido";
 
 export type ResultadoEvento = "ok" | "denegado" | "fallo";
 
