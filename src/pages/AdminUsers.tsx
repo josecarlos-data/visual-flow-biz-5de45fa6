@@ -409,83 +409,76 @@ export default function AdminUsers() {
     );
   };
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Gestión de Usuarios</h1>
-        <p className="text-muted-foreground">Aprueba usuarios y asigna roles, vendedores y delegaciones</p>
-      </div>
+  const renderVendedor = (u: UserRow) => (
+    <>
+                      <Select value={u.employee_code ?? "__none__"} onValueChange={(val) => assignVendedor(u.user_id, val)}>
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Asignar vendedor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Ninguno</SelectItem>
+                          {vendedores.map((v) => (
+                            <SelectItem key={v} value={v}>{v}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+    </>
+  );
 
-      <SeguridadAccesoCard />
+  const renderRol = (u: UserRow) => (
+    <>
+                      <Select value={u.role ?? ""} onValueChange={(val) => assignRole(u.user_id, val as AppRole)}>
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Asignar rol" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="comercial">Comercial</SelectItem>
+                          <SelectItem value="jefe_de_zona">Jefe de Zona</SelectItem>
+                          <SelectItem value="director_comercial">Director Comercial</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+    </>
+  );
 
-      {pendingUsers.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              Pendientes de aprobación
-              <Badge variant="destructive">{pendingUsers.length}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pendingUsers.map((u) => (
-                  <TableRow key={u.user_id}>
-                    <TableCell>{u.full_name || "Sin nombre"}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{u.email || "—"}</TableCell>
-                    <TableCell className="flex gap-2">
-                      <Button size="sm" onClick={() => approveUser(u.user_id)}>
-                        <Check className="mr-1 h-4 w-4" /> Aprobar
-                      </Button>
-                      <Button size="sm" variant="destructive" onClick={() => rejectUser(u.user_id)}>
-                        <X className="mr-1 h-4 w-4" /> Rechazar
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+  const renderDelegacion = (u: UserRow) => (
+    <>
+                      <Select value={u.delegacion ?? "__none__"} onValueChange={(val) => assignDelegacion(u.user_id, val)}>
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Asignar delegación" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Ninguno</SelectItem>
+                          {delegaciones.map((d) => (
+                            <SelectItem key={d} value={d}>{d}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+    </>
+  );
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Usuarios aprobados</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-muted-foreground">Cargando...</p>
-          ) : approvedUsers.length === 0 ? (
-            <p className="text-muted-foreground">No hay usuarios aprobados aún.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Vendedor</TableHead>
-                  <TableHead>Rol</TableHead>
-                  <TableHead>Delegación</TableHead>
-                  <TableHead>Margen</TableHead>
-                  <TableHead>Dashboards</TableHead>
-                  <TableHead>Equipos</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {approvedUsers.map((u) => (
-                  <TableRow key={u.user_id}>
+  const renderMargen = (u: UserRow) => (
+    <>
+                      {u.role === "admin" ? (
+                        <Badge variant="secondary" className="opacity-70">Siempre</Badge>
+                      ) : (
+                        <Badge
+                          variant={u.ver_margen ? "default" : "outline"}
+                          className="cursor-pointer select-none"
+                          onClick={() => toggleMargen(u.user_id, u.ver_margen)}
+                        >                {approvedUsers.map((u) => (
+                  <TableRow key={u.user_id} className={u.estado !== "activo" ? "bg-muted/40" : undefined}>
                     <TableCell>{renderEditableName(u)}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{u.email || "—"}</TableCell>
-                    <TableCell>
-                      <Select value={u.employee_code ?? "__none__"} onValueChange={(val) => assignVendedor(u.user_id, val)}>
+                    <TableCell className="align-top">{renderCuenta(u)}</TableCell>
+                    <TableCell>{renderVendedor(u)}</TableCell>
+                    <TableCell>{renderRol(u)}</TableCell>
+                    <TableCell>{renderDelegacion(u)}</TableCell>
+                    <TableCell>{renderMargen(u)}</TableCell>
+                    <TableCell>{renderDashboards(u)}</TableCell>
+                    <TableCell>{renderEquipos(u)}</TableCell>
+                  </TableRow>
+              <Select value={u.employee_code ?? "__none__"} onValueChange={(val) => assignVendedor(u.user_id, val)}>
                         <SelectTrigger className="w-[180px]">
                           <SelectValue placeholder="Asignar vendedor" />
                         </SelectTrigger>
@@ -593,9 +586,65 @@ export default function AdminUsers() {
                 ))}
               </TableBody>
             </Table>
+            </div>
+            </>
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!cambioEstado} onOpenChange={(v) => !v && setCambioEstado(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cambiar estado a «{cambioEstado ? etiquetaEstado(cambioEstado.estado) : ""}»</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cambioEstado?.estado === "activo"
+                ? `${cambioEstado.u.full_name || cambioEstado.u.email} podrá volver a entrar.`
+                : `${cambioEstado?.u.full_name || cambioEstado?.u.email} no podrá entrar y se cerrarán sus sesiones abiertas.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {cambioEstado && (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-sm font-medium" htmlFor="motivo-estado">
+                  Motivo{cambioEstado.estado === "activo" ? " (opcional)" : ""}
+                </label>
+                <Input id="motivo-estado" value={cambioEstado.motivo} onChange={(e) => setCambioEstado({ ...cambioEstado, motivo: e.target.value })} />
+              </div>
+              {cambioEstado.estado === "suspendido_temporal" && (
+                <div className="space-y-1">
+                  <label className="text-sm font-medium" htmlFor="hasta-estado">Fin de la suspensión</label>
+                  <Input id="hasta-estado" type="datetime-local" value={cambioEstado.hasta} onChange={(e) => setCambioEstado({ ...cambioEstado, hasta: e.target.value })} />
+                </div>
+              )}
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button onClick={confirmarEstado} disabled={guardando}>Confirmar</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!bajaDe} onOpenChange={(v) => !v && setBajaDe(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Dar de baja a {bajaDe?.u.full_name || bajaDe?.u.email}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bloquea su acceso, cierra sus sesiones abiertas y elimina sus equipos autorizados. Se conservan todos sus datos: visitas, objetivos y registros de auditoría.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {bajaDe && (
+            <div className="space-y-1">
+              <label className="text-sm font-medium" htmlFor="motivo-baja">Motivo</label>
+              <Input id="motivo-baja" value={bajaDe.motivo} onChange={(e) => setBajaDe({ ...bajaDe, motivo: e.target.value })} />
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button variant="destructive" onClick={confirmarBaja} disabled={guardando}>Dar de baja</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!accionPw} onOpenChange={(v) => !v && setAccionPw(null)}>
         <AlertDialogContent>
