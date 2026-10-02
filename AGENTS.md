@@ -1,2 +1,3 @@
 - Password changes go through the cambiar-password edge function acting as the user (updateUser), never the admin API, so server password checks (HIBP) apply and only that function clears profiles.debe_cambiar_password.
 - User state (profiles.estado) is enforced in the database via is_approved and is_admin; state changes go only through the admin_cambiar_estado / admin_dar_baja RPCs so sessions and audit stay consistent.
+- Second factor (TOTP) is enforced in the database: is_approved/is_admin require public.sesion_cumple_2fa() when evaluating the caller; resetting factors goes only through the admin-segundo-factor function. Why: the client gate alone can be bypassed.

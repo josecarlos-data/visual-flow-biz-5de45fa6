@@ -12,8 +12,8 @@
 - [x] Migración separada: proteger por estado las funciones sin comprobación (actividad_interna_*, cliente_top_productos, situaciones_activas)
 - [x] Login por usuario vía iniciar-sesion, bloqueo escalonado, límite por IP, solo credenciales incorrectas cuentan
 - [x] Verificar límite del servicio de autenticación (riesgo 3) — comprobado por el usuario
-- [ ] 2FA: migración (exige_2fa, modo, requiere_2fa, sesion_cumple_2fa, is_approved/is_admin)
-- [ ] 2FA: useAuth estados pide_2fa/alta_2fa con recarga de perfil y dashboards
-- [ ] 2FA: pantallas alta/verificación, eventos
-- [ ] 2FA: función admin-segundo-factor (admin + sesion_cumple_2fa) y panel
-- [ ] 2FA: EXPLAIN ANALYZE ventas_diarias comercial, modo desactivado vs activo (parar si >20 %)
+- [x] 2FA: migración (exige_2fa, modo, requiere_2fa, sesion_cumple_2fa, is_approved/is_admin)
+- [x] 2FA: useAuth estados pide_2fa/alta_2fa con recarga de perfil y dashboards
+- [x] 2FA: pantallas alta/verificación, eventos
+- [x] 2FA: función admin-segundo-factor (admin + sesion_cumple_2fa) y panel
+- [x] 2FA: EXPLAIN ANALYZE ventas_diarias comercial, modo desactivado vs activo (parar si >20 %)
