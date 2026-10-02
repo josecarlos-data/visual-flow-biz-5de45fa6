@@ -3,3 +3,6 @@ project_id = "mxsnnxnqzrdydcpzdqmu"
 [functions]
   [functions.auth-email-hook]
     verify_jwt = false
+
+  [functions.iniciar-sesion]
+    verify_jwt = false
