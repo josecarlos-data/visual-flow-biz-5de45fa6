@@ -37,6 +37,10 @@ const TIPOS: { value: string; label: string }[] = [
   { value: "aprobacion_usuario", label: "Aprobación de usuario" },
   { value: "baja_usuario", label: "Baja de usuario" },
   { value: "cambio_ver_margen", label: "Cambio de visibilidad de margen" },
+  { value: "2fa_alta", label: "Alta de segundo factor" },
+  { value: "2fa_verificado", label: "Segundo factor verificado" },
+  { value: "2fa_fallido", label: "Segundo factor fallido" },
+  { value: "2fa_reseteado", label: "Segundo factor restablecido" },
 ];
 
 const RESULTADOS: { value: string; label: string }[] = [

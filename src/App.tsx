@@ -35,6 +35,7 @@ const Objetivos = lazy(() => import("./pages/Objetivos"));
 const Documentos = lazy(() => import("./pages/Documentos"));
 const ActividadInterna = lazy(() => import("./pages/ActividadInterna"));
 const CodigoAlta = lazy(() => import("./pages/CodigoAlta"));
+const SegundoFactor = lazy(() => import("./pages/SegundoFactor"));
 const EstablecerPassword = lazy(() => import("./components/EstablecerPassword"));
 const CambiarPassword = lazy(() => import("./pages/CambiarPassword"));
 
@@ -175,6 +176,13 @@ function ControlAcceso({ children }: { children: React.ReactNode }) {
   }
   if (estadoAcceso === "bloqueado") {
     return <UsuarioBloqueado />;
+  }
+  if (estadoAcceso === "alta_2fa" || estadoAcceso === "pide_2fa") {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <SegundoFactor key={estadoAcceso} modo={estadoAcceso === "alta_2fa" ? "alta" : "verificar"} />
+      </Suspense>
+    );
   }
   if (pideCodigoAlta) {
     return (

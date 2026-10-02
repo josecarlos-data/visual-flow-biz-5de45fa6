@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { Check, X, Pencil, Save, MonitorSmartphone } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import type { Database } from "@/integrations/supabase/types";
 import { registrarEvento } from "@/lib/auditoria";
 import SeguridadAccesoCard from "@/components/SeguridadAccesoCard";
@@ -46,6 +47,7 @@ interface UserRow {
   estado_cambiado_por: string | null;
   bloqueado_hasta: string | null;
   marcada_sospechosa: boolean;
+  exige_2fa: boolean;
   username: string | null;
   fallos: number;
   ciclos: number;
@@ -83,11 +85,41 @@ export default function AdminUsers() {
   const [bajaDe, setBajaDe] = useState<{ u: UserRow; motivo: string } | null>(null);
   const [usernameEdit, setUsernameEdit] = useState<{ userId: string; valor: string } | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [modo2fa, setModo2fa] = useState("desactivado");
+  const [estado2fa, setEstado2fa] = useState<Record<string, boolean>>({});
+  const [resetear2faDe, setResetear2faDe] = useState<UserRow | null>(null);
+
+  const cargarEstado2fa = async (ids: string[]) => {
+    if (!ids.length) return;
+    const { data, error } = await supabase.functions.invoke("admin-segundo-factor", { body: { accion: "estado", user_ids: ids } });
+    if (!error && data?.estado) setEstado2fa(data.estado);
+  };
+
+  const toggleExige2fa = async (u: UserRow) => {
+    const { error } = await supabase.from("profiles").update({ exige_2fa: !u.exige_2fa } as any).eq("user_id", u.user_id);
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    registrarEvento("cambio_config_seguridad", { entidad: "usuario", entidad_id: u.user_id, detalle: { exige_2fa: !u.exige_2fa } });
+    toast({ title: !u.exige_2fa ? "Segundo factor exigido" : "Segundo factor no exigido" });
+    fetchData();
+  };
+
+  const ejecutarReset2fa = async () => {
+    const u = resetear2faDe;
+    setResetear2faDe(null);
+    if (!u) return;
+    const { data, error } = await supabase.functions.invoke("admin-segundo-factor", { body: { accion: "resetear", user_id: u.user_id } });
+    if (error || !data?.ok) {
+      toast({ title: "No se ha podido restablecer", description: "Comprueba que tu propia sesión cumple el segundo factor.", variant: "destructive" });
+      return;
+    }
+    toast({ title: "Segundo factor restablecido", description: "Lo volverá a configurar en su próximo acceso." });
+    setEstado2fa((e) => ({ ...e, [u.user_id]: false }));
+  };
 
   const fetchData = async () => {
     setLoading(true);
     const [profilesRes, vendedoresRes, delegacionesRes, dashboardsRes] = await Promise.all([
-      supabase.from("profiles").select("user_id, full_name, email, employee_code, is_approved, delegacion, ver_margen, sesiones_max, dispositivos_max, debe_cambiar_password, password_cambiada_en, estado, estado_motivo, estado_cambiado_en, estado_cambiado_por, bloqueado_hasta, marcada_sospechosa, username"),
+      supabase.from("profiles").select("user_id, full_name, email, employee_code, is_approved, delegacion, ver_margen, sesiones_max, dispositivos_max, debe_cambiar_password, password_cambiada_en, estado, estado_motivo, estado_cambiado_en, estado_cambiado_por, bloqueado_hasta, marcada_sospechosa, username, exige_2fa"),
       supabase.rpc("get_distinct_vendedores"),
       supabase.rpc("get_distinct_delegaciones"),
       supabase
@@ -151,6 +183,7 @@ export default function AdminUsers() {
         estado_cambiado_por: p.estado_cambiado_por ?? null,
         bloqueado_hasta: p.bloqueado_hasta ?? null,
         marcada_sospechosa: p.marcada_sospechosa ?? false,
+        exige_2fa: (p as any).exige_2fa ?? false,
         username: p.username ?? null,
         ...(() => {
           const i = intentosMap.get(p.user_id);
@@ -161,6 +194,7 @@ export default function AdminUsers() {
       }))
     );
     setLoading(false);
+    void cargarEstado2fa(userIds);
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -552,6 +586,29 @@ export default function AdminUsers() {
                           <Button size="sm" variant="ghost" className="h-7 justify-start px-2 text-xs" onClick={() => setAccionPw({ u, tipo: "forzar" })}>
                             Forzar cambio de contraseña
                           </Button>
+                          <div className="mt-1 flex flex-col gap-1 border-t pt-2">
+                            {(() => {
+                              const obligatorio = u.role === "admin" && modo2fa === "activo";
+                              const marcado = obligatorio || u.exige_2fa;
+                              return (
+                                <>
+                                  <label className="flex items-center gap-2 text-xs">
+                                    <Switch checked={marcado} disabled={obligatorio} onCheckedChange={() => toggleExige2fa(u)} />
+                                    Exigir segundo factor
+                                  </label>
+                                  {obligatorio && <span className="text-xs text-muted-foreground">obligatorio para administradores</span>}
+                                </>
+                              );
+                            })()}
+                            <Badge variant={estado2fa[u.user_id] ? "secondary" : "outline"} className="w-fit">
+                              {estado2fa[u.user_id] === undefined ? "…" : estado2fa[u.user_id] ? "Configurado" : "Pendiente"}
+                            </Badge>
+                            {estado2fa[u.user_id] && (
+                              <Button size="sm" variant="ghost" className="h-7 justify-start px-2 text-xs" onClick={() => setResetear2faDe(u)}>
+                                Restablecer segundo factor
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       )}
     </>
@@ -564,7 +621,27 @@ export default function AdminUsers() {
         <p className="text-muted-foreground">Aprueba usuarios y asigna roles, vendedores y delegaciones</p>
       </div>
 
-      <SeguridadAccesoCard activosSinUsuario={users.filter((u) => u.is_approved && u.estado === "activo" && !u.username).length} />
+      <SeguridadAccesoCard
+        activosSinUsuario={users.filter((u) => u.is_approved && u.estado === "activo" && !u.username).length}
+        onModo2fa={setModo2fa}
+      />
+
+      <AlertDialog open={!!resetear2faDe} onOpenChange={(o) => { if (!o) setResetear2faDe(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restablecer segundo factor</AlertDialogTitle>
+            <AlertDialogDescription>
+              Antes de continuar, verifica la identidad de quien lo pide (por ejemplo, llamándole tú a su teléfono conocido).
+              Se borrará el segundo factor de {resetear2faDe?.full_name || resetear2faDe?.email} y tendrá que configurarlo de
+              nuevo en su próximo acceso.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={ejecutarReset2fa}>Restablecer</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {pendingUsers.length > 0 && (
         <Card>

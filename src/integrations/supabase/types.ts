@@ -949,6 +949,7 @@ export type Database = {
           estado_cambiado_en: string | null
           estado_cambiado_por: string | null
           estado_motivo: string | null
+          exige_2fa: boolean
           full_name: string | null
           id: string
           is_approved: boolean
@@ -973,6 +974,7 @@ export type Database = {
           estado_cambiado_en?: string | null
           estado_cambiado_por?: string | null
           estado_motivo?: string | null
+          exige_2fa?: boolean
           full_name?: string | null
           id?: string
           is_approved?: boolean
@@ -997,6 +999,7 @@ export type Database = {
           estado_cambiado_en?: string | null
           estado_cambiado_por?: string | null
           estado_motivo?: string | null
+          exige_2fa?: boolean
           full_name?: string | null
           id?: string
           is_approved?: boolean
@@ -2609,6 +2612,7 @@ export type Database = {
         Args: { _limite?: number }
         Returns: number
       }
+      requiere_2fa: { Args: { _user_id: string }; Returns: boolean }
       reset_maestro_isi_data: { Args: never; Returns: undefined }
       ruta_clientes: {
         Args: { _ruta: string; _solo_activos?: boolean }
@@ -2645,6 +2649,7 @@ export type Database = {
         }[]
       }
       sembrar_geo_clientes: { Args: never; Returns: number }
+      sesion_cumple_2fa: { Args: never; Returns: boolean }
       situaciones_activas: {
         Args: never
         Returns: {

@@ -50,6 +50,13 @@
       "when": 1790952004102,
       "tag": "0006_login_usuario_bloqueo_escalonado",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790954561270,
+      "tag": "0007_segundo_factor_totp",
+      "breakpoints": true
     }
   ]
 }

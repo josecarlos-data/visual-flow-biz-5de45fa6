@@ -19,6 +19,9 @@ const TIPOS_PERMITIDOS = [
   "password_cambiada",
   "password_restablecer_enviado",
   "password_cambio_forzado",
+  "2fa_alta",
+  "2fa_verificado",
+  "2fa_fallido",
 ] as const;
 
 const RESULTADOS = ["ok", "denegado", "fallo"];
