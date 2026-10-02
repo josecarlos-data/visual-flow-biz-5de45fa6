@@ -1,52 +1,52 @@
-# Contraseñas: política, cambio voluntario, restablecer y forzar cambio
+# Estado de usuario, baja en un clic y nombre de usuario
 
-## Respuestas previas
+## Inventario previo (leído de la base de datos)
 
-1. **URL de redirección.** El código no fija hoy ningún `redirectTo` (no existe ningún flujo de restablecimiento), así que los correos usarían la Site URL del backend. No he podido leer la Site URL ni la lista de URLs permitidas: ninguna herramienta disponible las muestra. Para fijarla: Cloud → Users → Auth Settings → URL Configuration. Ahí se pone `https://crmrimosa.josecarlossobrino.com` como Site URL y se añade `https://crmrimosa.josecarlossobrino.com/**` a las Redirect URLs. Hay que comprobarlo ahí antes de probar.
-2. **Envío de correos.** No hay ningún dominio de correo configurado. Los correos de autenticación salen hoy con el remitente por defecto de Lovable, con un límite de envíos por hora bajo, pensado para pruebas y no para producción (no consta la cifra exacta). El remitente y las plantillas en español solo se pueden personalizar después de configurar un dominio propio, por ejemplo `notify.josecarlossobrino.com`. Recomiendo hacerlo antes de usar «Restablecer contraseña» con usuarios reales.
+Tablas con alguna policy que usa `is_approved`: app_settings, catalogos_opciones, cliente_insights, clientes, dashboards, motivo_campos, motivos_visita, objetivos (solo SELECT), productos, rutas, visitas, visitas_planificadas.
 
-## DETENCIÓN: punto A.3 no es viable tal como está
+Tablas cuyas policies NO usan `is_approved` directamente:
 
-En Lovable Cloud no se pueden crear triggers en el esquema `auth`. `on_auth_user_created` es una excepción que heredó la plantilla, no un permiso general. Así que no puedo crear `AFTER UPDATE OF encrypted_password ON auth.users`.
+| Tabla | Función que usan | ¿Queda cubierta por estado? |
+|---|---|---|
+| cliente_kpis, cliente_perfil_datos, resumen_cliente_familia/marca/mes, resumen_documentos, situaciones_cliente (SELECT), ventas_diarias (SELECT) | `can_view_cliente` | Sí, indirectamente: `can_view_cliente` llama a `is_approved` |
+| visita_bloques SELECT | `puede_ver_bloque` (usa `can_view_cliente` + `is_admin`) | Parcial: la rama admin no |
+| visita_bloques INSERT/UPDATE/DELETE | `puede_editar_bloque` (`is_admin` + propiedad) | **No** |
+| objetivos ALL, situaciones_cliente escritura | `is_admin` OR `has_role('director_comercial')` | **No** |
+| perfil_atributos SELECT | `true` | **No** (catálogo, no datos de clientes) |
+| profiles, user_roles, user_dashboard_access, dispositivos, sesiones_activas | `auth.uid() = user_id` / `is_admin` / `has_role` | No, y debe seguir así: el bloqueado necesita leer su perfil para ver la pantalla |
+| auditoria_eventos, codigos_alta, sync_config, sync_log, system_functions, todas las de escritura admin | `is_admin` | **No** |
 
-**Alternativa propuesta (no es una RPC llamable sin cambiar la contraseña).** Una función de servidor `cambiar-password`:
-- Valida el JWT y obtiene el usuario con `auth.getUser()`.
-- Valida la política (12 caracteres o más, coincidencia) también en el servidor.
-- Cambia la contraseña con la API de administración (`auth.admin.updateUserById(uid, { password })`).
-- **Solo si ese cambio tiene éxito**, pone `debe_cambiar_password=false` y `password_cambiada_en=now()` con la clave de servicio, que no pasa por el trigger anti-escalado.
-- Traduce los errores (contraseña filtrada, débil, igual que la anterior, sesión caducada) a códigos que el cliente muestra en español.
-- Registra `password_cambiada` en `auditoria_eventos`.
+RPC SECURITY DEFINER (se saltan RLS): las de panel, documentos, rutas y fichas pasan por `clientes_visibles`/`can_view_cliente` y quedan cubiertas. Las `actividad_interna_*` (4), `cliente_top_productos`, `situaciones_activas`, `fecha_corte_datos` y `promover_perfil_desde_bloque` no comprueban aprobación; `has_dashboard_access` tampoco.
 
-La marca solo se limpia en el mismo paso que cambia el hash. Si alguien llama a `updateUser` directamente desde el navegador, la contraseña cambia pero la marca sigue en true, que es el lado seguro. La política mínima de 12 se aplica en el servidor en esta vía.
+## DETENCIÓN: un hueco que el plan no cierra
 
-Si apruebas esta alternativa, el resto del plan queda así:
+`is_admin` no mira ni aprobación ni estado. Si un administrador bloquea o da de baja a **otro administrador**, este conserva por RLS todo el poder de administración (y lo mismo un director comercial sobre objetivos y situaciones) mientras tenga un token válido (hasta 1 h). El vigilante del navegador lo echa, pero una llamada directa a la API no.
 
-## A. Migración (una, en drizzle/migrations/)
-- `profiles`: `debe_cambiar_password boolean NOT NULL DEFAULT false`, `password_cambiada_en timestamptz NULL`.
-- `CREATE OR REPLACE public.prevent_profile_self_escalation` conservando íntegras las nueve comprobaciones y añadiendo las dos columnas nuevas. Antes se lee la definición vigente y se copia literal.
-- La RPC de admin `admin_forzar_cambio_password(_user_id uuid)` es SECURITY DEFINER, con `search_path=public` y `is_admin` obligatorio. Pone la marca a true. Se revoca de PUBLIC/anon y se concede a authenticated.
-- Ampliar la RPC de listado de usuarios del panel para que devuelva las dos columnas, si el panel usa RPC. Si no, basta con la lectura actual.
+Opciones (elige una antes de construir):
+- **A (recomendada):** en la misma migración, `CREATE OR REPLACE public.is_admin` con la misma firma y sin tocar GRANT, añadiendo la condición de usuario operativo. Cierra todas las filas "No" que dependen de `is_admin`. Efecto: la exención del trigger y las RPC admin también exigen admin operativo (correcto).
+- **B:** dejarlo así y documentarlo como riesgo aceptado; las RPC nuevas impiden bloquear al último admin activo.
 
-## B. useAuth
-- Nuevo estado `pide_password`, que solo escribe `resolverAcceso`. Cadena: sesión → perfil → equipo → contraseña → activo.
-- `cargarDatosUsuario` lee `debe_cambiar_password`.
-- El evento `PASSWORD_RECOVERY` activa una marca `recuperacionRef` y lanza la cadena diferida con setTimeout. Con esa marca, el resultado es `pide_password` aunque la columna sea false.
-- Al guardar con éxito, se limpia `recuperacionRef` y se vuelve a lanzar `resolverAcceso`. La generación y los límites de 8 s no cambian.
-- Se expone `pidePassword`.
+Los `has_role('director_comercial')` y `puede_editar_bloque` siguen sin estado en ambas opciones; propongo dejarlos fuera de esta migración y tratarlos aparte.
 
-## C. Página Establecer contraseña
-- Componente `EstablecerPassword` con dos usos: pantalla bloqueante en App.tsx (con cerrar sesión) y ruta `/cuenta/contrasena` con enlace en el menú del usuario.
-- Mínimo 12 caracteres, sin reglas de composición, las dos contraseñas deben coincidir, contador en vivo y el texto de ayuda indicado.
-- Guarda llamando a la función `cambiar-password`. Errores siempre en español.
-- En Auth.tsx se quita `minLength={6}`.
+## Segundo punto a confirmar: interruptor de sesiones
 
-## D. Panel de usuarios
-- «Restablecer contraseña» (con confirmación): `resetPasswordForEmail(email, { redirectTo: "https://crmrimosa.josecarlossobrino.com" })` más la RPC de forzar. Evento `password_restablecer_enviado`.
-- «Forzar cambio de contraseña» (con confirmación): solo la RPC. Evento `password_cambio_forzado`.
-- Junto a cada usuario: insignia «Cambio pendiente» y la fecha de `password_cambiada_en`.
+Con el orden pedido, si `control_sesiones_activo` está apagado, `verificar_sesion` devuelve vigente antes de mirar el estado y un usuario bloqueado con sesión abierta no sería expulsado por el vigilante (sí perdería datos por RLS). Propongo poner la comprobación de estado **antes** del interruptor. Si prefieres el orden original, lo mantengo.
 
-## E. Auditoría
-- Lista blanca de `registrar-evento`: se añaden `password_cambiada`, `password_restablecer_enviado` y `password_cambio_forzado`. Nada más.
+## A. Migración (una, en drizzle/migrations)
+1. Columnas nuevas en `profiles` tal como se piden, con CHECK de estado, CHECK de formato de username (`^[a-z0-9._-]{3,30}$`) e índice UNIQUE sobre `lower(username)`.
+2. `prevent_profile_self_escalation`: copia literal de la versión 0003 (exención service_role/admin y las once comprobaciones) más las siete columnas nuevas.
+3. `is_approved`: misma firma, sin DROP ni cambio de GRANT, STABLE, añadiendo `estado = 'activo' OR (estado = 'suspendido_temporal' AND bloqueado_hasta <= now())`.
+4. `verificar_sesion`: DROP con firma `(text)`, recreación conservando todo y respuesta `{"vigente":false,"motivo":"usuario_bloqueado"}` si no está operativo; GRANT EXECUTE a authenticated restaurado.
+5. `admin_cambiar_estado`, 6. `admin_dar_baja`, 7. `admin_asignar_username` según especificación (admin obligatorio, no autobloqueo, no dejar cero admins activos, motivo obligatorio salvo a activo, auditoría, borrado de sesiones; la baja borra también dispositivos e invalida códigos pendientes poniendo `expira_en = now()`). REVOKE de PUBLIC/anon, GRANT a authenticated.
+8. Si eliges la opción A: `is_admin` con condición operativa.
+
+## B. useAuth y App
+- Estado `bloqueado` escrito solo por `resolverAcceso`, tras la aprobación; expone motivo y `bloqueado_hasta`.
+- Vigilante: `usuario_bloqueado` provoca cierre local con el aviso "Tu usuario ha sido bloqueado. Contacta con el administrador."
+- Pantalla bloqueante en App con mensaje, hora de fin si es suspensión temporal y botón de cerrar sesión.
+
+## C. Panel de usuarios
+Nombre de usuario editable, selector de los cinco estados en español con motivo obligatorio y fecha de fin para suspensión, insignia "Sospechosa", botón "Dar de baja" con confirmación explicativa, bajas ocultas con filtro, motivo/fecha/autor del cambio; tarjetas en móvil sin desplazamiento horizontal. Se amplía la RPC/lectura del listado para traer las columnas nuevas.
 
 ## Fuera de alcance
-Estado de usuario, bloqueo por intentos, acceso por nombre de usuario y 2FA. No se tocan `registrar_sesion` ni `verificar_sesion`.
+Login por nombre de usuario, bloqueo por intentos, correos, 2FA. No se tocan `registrar_sesion`, `cambiar-password` ni `registrar-evento`.
