@@ -145,10 +145,36 @@ function PendingRoute({ children }: { children: React.ReactNode }) {
 }
 
 /** Hasta que se sepa si el equipo está autorizado, no se renderiza ninguna sección del CRM. */
+function UsuarioBloqueado() {
+  const { bloqueo, signOut } = useAuth();
+  const hasta =
+    bloqueo?.estado === "suspendido_temporal" && bloqueo.hasta
+      ? new Date(bloqueo.hasta).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })
+      : null;
+  return (
+    <div className="flex min-h-screen items-center justify-center px-4">
+      <div className="w-full max-w-md rounded-lg border p-6 text-center">
+        <h1 className="mb-2 text-lg font-semibold">Acceso bloqueado</h1>
+        <p className="mb-2 text-sm text-muted-foreground">
+          Tu usuario ha sido bloqueado. Contacta con el administrador.
+        </p>
+        {hasta && <p className="mb-2 text-sm">La suspensión termina el {hasta}.</p>}
+        {bloqueo?.motivo && <p className="mb-4 break-words rounded bg-muted p-2 text-xs text-muted-foreground">{bloqueo.motivo}</p>}
+        <button className="rounded-md border px-3 py-2 text-sm" onClick={signOut}>
+          Cerrar sesión
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ControlAcceso({ children }: { children: React.ReactNode }) {
-  const { pideCodigoAlta, controlListo, pidePassword, modoPassword } = useAuth();
+  const { pideCodigoAlta, controlListo, pidePassword, modoPassword, estadoAcceso } = useAuth();
   if (!controlListo) {
     return <LoadingScreen />;
+  }
+  if (estadoAcceso === "bloqueado") {
+    return <UsuarioBloqueado />;
   }
   if (pideCodigoAlta) {
     return (
