@@ -40,7 +40,30 @@ interface UserRow {
   dispositivos_max: number;
   debe_cambiar_password: boolean;
   password_cambiada_en: string | null;
+  estado: string;
+  estado_motivo: string | null;
+  estado_cambiado_en: string | null;
+  estado_cambiado_por: string | null;
+  bloqueado_hasta: string | null;
+  marcada_sospechosa: boolean;
+  username: string | null;
 }
+
+const ESTADOS: { value: string; label: string }[] = [
+  { value: "activo", label: "Activo" },
+  { value: "suspendido_temporal", label: "Suspendido temporalmente" },
+  { value: "bloqueado_intentos", label: "Bloqueado por intentos" },
+  { value: "bloqueado_admin", label: "Bloqueado por el administrador" },
+  { value: "baja", label: "Baja" },
+];
+const etiquetaEstado = (e: string) => ESTADOS.find((x) => x.value === e)?.label ?? e;
+const fechaHora = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" }) : "";
+/** Formato para input datetime-local en hora local. */
+const aLocalInput = (d: Date) => {
+  const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return z.toISOString().slice(0, 16);
+};
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -52,11 +75,16 @@ export default function AdminUsers() {
   const [editValue, setEditValue] = useState("");
   const [dispositivosDe, setDispositivosDe] = useState<UserRow | null>(null);
   const [accionPw, setAccionPw] = useState<{ u: UserRow; tipo: "restablecer" | "forzar" } | null>(null);
+  const [verBajas, setVerBajas] = useState(false);
+  const [cambioEstado, setCambioEstado] = useState<{ u: UserRow; estado: string; motivo: string; hasta: string } | null>(null);
+  const [bajaDe, setBajaDe] = useState<{ u: UserRow; motivo: string } | null>(null);
+  const [usernameEdit, setUsernameEdit] = useState<{ userId: string; valor: string } | null>(null);
+  const [guardando, setGuardando] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
     const [profilesRes, vendedoresRes, delegacionesRes, dashboardsRes] = await Promise.all([
-      supabase.from("profiles").select("user_id, full_name, email, employee_code, is_approved, delegacion, ver_margen, sesiones_max, dispositivos_max, debe_cambiar_password, password_cambiada_en"),
+      supabase.from("profiles").select("user_id, full_name, email, employee_code, is_approved, delegacion, ver_margen, sesiones_max, dispositivos_max, debe_cambiar_password, password_cambiada_en, estado, estado_motivo, estado_cambiado_en, estado_cambiado_por, bloqueado_hasta, marcada_sospechosa, username"),
       supabase.rpc("get_distinct_vendedores"),
       supabase.rpc("get_distinct_delegaciones"),
       supabase
@@ -108,6 +136,13 @@ export default function AdminUsers() {
         dispositivos_max: (p as any).dispositivos_max ?? 2,
         debe_cambiar_password: (p as any).debe_cambiar_password ?? false,
         password_cambiada_en: (p as any).password_cambiada_en ?? null,
+        estado: p.estado ?? "activo",
+        estado_motivo: p.estado_motivo ?? null,
+        estado_cambiado_en: p.estado_cambiado_en ?? null,
+        estado_cambiado_por: p.estado_cambiado_por ?? null,
+        bloqueado_hasta: p.bloqueado_hasta ?? null,
+        marcada_sospechosa: p.marcada_sospechosa ?? false,
+        username: p.username ?? null,
       }))
     );
     setLoading(false);
@@ -225,8 +260,127 @@ export default function AdminUsers() {
 
   const cancelEdit = () => setEditingField(null);
 
+  const nombreDe = (userId: string | null) => {
+    if (!userId) return null;
+    const x = users.find((u) => u.user_id === userId);
+    return x ? x.full_name || x.email || "usuario" : "usuario eliminado";
+  };
+
+  const guardarUsername = async () => {
+    if (!usernameEdit) return;
+    setGuardando(true);
+    const { error } = await supabase.rpc("admin_asignar_username", { _user_id: usernameEdit.userId, _username: usernameEdit.valor });
+    setGuardando(false);
+    if (error) { toast({ title: "No se ha guardado", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Nombre de usuario guardado" });
+    setUsernameEdit(null);
+    fetchData();
+  };
+
+  const elegirEstado = (u: UserRow, estado: string) => {
+    if (estado === u.estado) return;
+    const hasta = aLocalInput(new Date(Date.now() + 24 * 3600 * 1000));
+    setCambioEstado({ u, estado, motivo: "", hasta });
+  };
+
+  const confirmarEstado = async () => {
+    if (!cambioEstado) return;
+    const { u, estado, motivo, hasta } = cambioEstado;
+    if (estado !== "activo" && !motivo.trim()) {
+      toast({ title: "El motivo es obligatorio", variant: "destructive" });
+      return;
+    }
+    let hastaIso: string | undefined;
+    if (estado === "suspendido_temporal") {
+      const d = new Date(hasta);
+      if (!hasta || isNaN(d.getTime()) || d.getTime() <= Date.now()) {
+        toast({ title: "Indica una fecha y hora de fin futura", variant: "destructive" });
+        return;
+      }
+      hastaIso = d.toISOString();
+    }
+    setGuardando(true);
+    const { error } = await supabase.rpc("admin_cambiar_estado", {
+      _user_id: u.user_id, _estado: estado, _motivo: motivo.trim(), ...(hastaIso ? { _hasta: hastaIso } : {}),
+    });
+    setGuardando(false);
+    if (error) { toast({ title: "No se ha cambiado el estado", description: error.message, variant: "destructive" }); return; }
+    toast({ title: `Estado: ${etiquetaEstado(estado)}` });
+    setCambioEstado(null);
+    fetchData();
+  };
+
+  const confirmarBaja = async () => {
+    if (!bajaDe) return;
+    if (!bajaDe.motivo.trim()) { toast({ title: "El motivo es obligatorio", variant: "destructive" }); return; }
+    setGuardando(true);
+    const { error } = await supabase.rpc("admin_dar_baja", { _user_id: bajaDe.u.user_id, _motivo: bajaDe.motivo.trim() });
+    setGuardando(false);
+    if (error) { toast({ title: "No se ha dado de baja", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Usuario dado de baja" });
+    setBajaDe(null);
+    fetchData();
+  };
+
+  const renderCuenta = (u: UserRow) => {
+    const editando = usernameEdit?.userId === u.user_id;
+    return (
+      <div className="flex min-w-0 flex-col gap-2">
+        <div className="flex min-w-0 items-center gap-1">
+          {editando ? (
+            <>
+              <Input
+                value={usernameEdit.valor}
+                onChange={(e) => setUsernameEdit({ userId: u.user_id, valor: e.target.value.toLowerCase() })}
+                onKeyDown={(e) => { if (e.key === "Enter") guardarUsername(); if (e.key === "Escape") setUsernameEdit(null); }}
+                placeholder="nombre.usuario"
+                className="h-8 min-w-0 flex-1"
+                maxLength={30}
+                autoFocus
+              />
+              <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" disabled={guardando} onClick={guardarUsername}><Save className="h-3.5 w-3.5" /></Button>
+              <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => setUsernameEdit(null)}><X className="h-3.5 w-3.5" /></Button>
+            </>
+          ) : (
+            <>
+              <span className="truncate text-sm">{u.username ? `@${u.username}` : <span className="text-muted-foreground">Sin nombre de usuario</span>}</span>
+              <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => setUsernameEdit({ userId: u.user_id, valor: u.username ?? "" })} aria-label="Editar nombre de usuario">
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            </>
+          )}
+        </div>
+        <Select value={u.estado} onValueChange={(v) => elegirEstado(u, v)}>
+          <SelectTrigger className="h-8 w-full sm:w-[220px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {ESTADOS.map((e) => <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <div className="flex flex-wrap gap-1">
+          {u.estado !== "activo" && <Badge variant="destructive" className="w-fit">{etiquetaEstado(u.estado)}</Badge>}
+          {u.marcada_sospechosa && <Badge variant="destructive" className="w-fit">Sospechosa</Badge>}
+        </div>
+        {u.estado === "suspendido_temporal" && u.bloqueado_hasta && (
+          <span className="text-xs text-muted-foreground">Hasta {fechaHora(u.bloqueado_hasta)}</span>
+        )}
+        {u.estado_cambiado_en && (
+          <span className="break-words text-xs text-muted-foreground">
+            {u.estado_motivo ? `${u.estado_motivo} · ` : ""}{fechaHora(u.estado_cambiado_en)}{u.estado_cambiado_por ? ` · ${nombreDe(u.estado_cambiado_por)}` : ""}
+          </span>
+        )}
+        {u.estado !== "baja" && (
+          <Button size="sm" variant="outline" className="h-7 w-fit text-xs text-destructive" onClick={() => setBajaDe({ u, motivo: "" })}>
+            Dar de baja
+          </Button>
+        )}
+      </div>
+    );
+  };
+
   const pendingUsers = users.filter((u) => !u.is_approved);
-  const approvedUsers = users.filter((u) => u.is_approved);
+  const approvedTodos = users.filter((u) => u.is_approved);
+  const numBajas = approvedTodos.filter((u) => u.estado === "baja").length;
+  const approvedUsers = verBajas ? approvedTodos : approvedTodos.filter((u) => u.estado !== "baja");
 
   const renderEditableName = (user: UserRow) => {
     const isEditing = editingField?.userId === user.user_id;
