@@ -1,51 +1,41 @@
-# Vaciar la caché de React Query al cambiar de usuario
+# Guardas de aprobación en funciones SECURITY DEFINER sin comprobación
 
-Sin SQL. Un solo fichero: `src/hooks/useAuth.tsx`.
+## Estado actual (leído de la base y del código)
 
-## Problema
-El `QueryClient` de `src/App.tsx` guarda datos 5 minutos y nunca se vacía al cambiar de usuario. Al cerrar sesión y entrar con otra cuenta en el mismo navegador se ven datos del usuario anterior hasta que caducan o se recarga la página: fuga de datos entre usuarios en equipos compartidos.
+| Función | Qué comprueba hoy | Quién la llama |
+|---|---|---|
+| `actividad_interna_filtros()` | `has_role(admin)` **o** fila en `user_dashboard_access` con clave `actividad_interna` (consulta directa, no vía `has_dashboard_access`). Si no, `RAISE 'No autorizado'`. No comprueba aprobación ni estado (`has_role` tampoco lo hace). | `useCrm.ts` (pantalla Actividad interna) |
+| `actividad_interna_usuarios(_anio, _almacen, _motivo)` | Igual que la anterior | `useCrm.ts` |
+| `actividad_interna_motivos(_anio, _almacen)` | Igual que la anterior | `useCrm.ts` |
+| `actividad_interna_almacenes(_anio)` | Igual que la anterior | `useCrm.ts` |
+| `cliente_top_productos(_cod, _desde, _hasta, _desde_prev, _hasta_prev)` (plpgsql) | `can_view_cliente(auth.uid(), _cod)`; margen según `puede_ver_margen` | `useCrm.ts` (ClienteDetalle, Productos) y la función `cliente-insights` (con el token del usuario) |
+| `cliente_top_productos(_cod, _anio)` (sql, sobrecarga) | Nada propio: delega en la versión de 5 argumentos | No se encuentra llamada desde la app |
+| `situaciones_activas()` (sql) | Nada | No se llama desde la app; la usan las funciones `panel_alertas`, `panel_dormidos` y `ruta_clientes` |
+| `has_dashboard_access(_user_id, _dashboard_key)` (sql) | `is_admin(_user_id)` (ya exige operativo) **o** fila en `user_dashboard_access`. La rama de la fila no exige aprobación. | Ninguna llamada en la app, ni en políticas, ni en otras funciones |
 
-## Verificación previa
-`AuthProvider` está dentro de `QueryClientProvider` (`src/App.tsx`, líneas 197–202: `QueryClientProvider` → … → `BrowserRouter` → `AuthProvider`), así que `useQueryClient()` funciona dentro de `useAuth.tsx` sin cambiar el orden de los proveedores.
+Ninguna obliga a cambiar la firma ni el tipo de retorno: todas se pueden recrear con CREATE OR REPLACE.
 
-## Cambios
+## Cambio (una migración en drizzle/migrations)
 
-### 1. En `limpiarEstadoLocal` (líneas 349–353)
-- Añadir `const queryClient = useQueryClient();` en el cuerpo de `AuthProvider`.
-- Llamar a `queryClient.clear()` ANTES de `void resolverAcceso(null);`.
-- Cubre cierre manual, expulsión, bloqueo y denegación (todas pasan por `limpiarEstadoLocal`).
+Cuerpos copiados literalmente de la definición vigente (`pg_get_functiondef`) en el momento de construir; solo se añade lo indicado. Sin DROP, sin tocar GRANT/REVOKE, misma firma, mismo SECURITY DEFINER, volatilidad y `search_path`.
 
-```ts
-const limpiarEstadoLocal = () => {
-  fijarSesion(null);
-  ultimoPathnameComprobado.current = null;
-  queryClient.clear();
-  void resolverAcceso(null);
-};
-```
+1. **Las cuatro `actividad_interna_*`**: primera línea del cuerpo
+   `IF NOT public.is_approved(auth.uid()) THEN RETURN; END IF;` (cero filas).
+   Se conserva detrás la comprobación existente (admin o acceso al panel `actividad_interna`) con su `RAISE`. Como ya exigen acceso al panel, no se añade una segunda comprobación; al ir después de `is_approved`, un admin o usuario con acceso ya solo pasa si está aprobado y operativo.
+2. **`cliente_top_productos` (5 argumentos, plpgsql)**: misma guarda al principio, antes de `can_view_cliente`.
+3. **`cliente_top_productos` (2 argumentos, sql)**: no se modifica; hereda la guarda al delegar en la anterior (si el usuario no está aprobado devuelve cero filas).
+4. **`situaciones_activas()` (sql)**: se añade `AND public.is_approved(auth.uid())` al WHERE (cero filas). Dentro de `panel_alertas`/`panel_dormidos`/`ruta_clientes`, `auth.uid()` sigue siendo el usuario que llama, así que para usuarios aprobados no cambia nada.
+5. **`has_dashboard_access`**: pasa a
+   `is_admin(_user_id) OR (is_approved(_user_id) AND EXISTS(...user_dashboard_access...))`. Sigue siendo SQL y STABLE.
 
-### 2. En `resolverAcceso` (dentro de la rama `!reintentoCodigo`)
-- Nuevo `const ultimoUsuarioAcceso = useRef<string | null>(null);`.
-- Cuando la sesión que llega pertenece a un usuario DISTINTO del último que tuvo acceso, llamar a `queryClient.clear()` antes de `fijar("cargando")` y de cargar su perfil.
-- Marcar `ultimoUsuarioAcceso.current = userId;` junto a `datosCargadosPara.current = userId;` (cuando el usuario pasa a activo).
-- No se resetea a null en la rama de sesión nula: así un inicio posterior con otro usuario limpia la caché aunque el logout anterior haya fallado a medias; si el logout ya la limpió, `clear()` es idempotente y no daña nada.
+Fuera de alcance: `has_role`, `puede_editar_bloque`, `fecha_corte_datos`, `promover_perfil_desde_bloque` y cualquier otra.
 
-```ts
-if (!reintentoCodigo) {
-  if (ultimoUsuarioAcceso.current && ultimoUsuarioAcceso.current !== userId) {
-    queryClient.clear();
-  }
-  fijar("cargando");
-  ...
-  datosCargadosPara.current = userId;
-  ultimoUsuarioAcceso.current = userId;
-}
-```
+## Verificación tras aplicar
 
-## Nada más
-- No se toca `App.tsx`, ni el orden de proveedores, ni ningún otro fichero.
-- Los refetches activos al vaciar se detienen solos (comportamiento de `queryClient.clear()`).
+- Comparar con `pg_get_functiondef` que solo cambian las líneas añadidas y que los privilegios (`proacl`) son idénticos a los de antes.
+- Con un usuario aprobado: Actividad interna, productos del cliente, alertas y ruta muestran lo mismo que antes.
+- Ejecutar el linter de la base.
 
-## Verificación
-- `tsgo` typecheck y build limpios.
-- Prueba manual sugerida: cerrar sesión y entrar con otra cuenta; los listados (Clientes, Documentos, Visitas) deben recargar datos propios sin mostrar los del usuario anterior.
+## Nota
+
+Hoy un admin no aprobado que llame a `actividad_interna_*` recibe "No autorizado" solo si no es admin; tras el cambio, cualquier usuario no aprobado recibe cero filas sin error, como pide el objetivo.
