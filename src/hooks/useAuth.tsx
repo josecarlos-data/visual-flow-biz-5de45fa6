@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, createContext, useContext, ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Session, User } from "@supabase/supabase-js";
 import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -199,6 +200,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const intentosCodigo = useRef(0);
   const comprobandoSesion = useRef(false);
   const ultimoPathnameComprobado = useRef<string | null>(null);
+  const ultimoUsuarioAcceso = useRef<string | null>(null);
+  const queryClient = useQueryClient();
   const idEquipo = typeof window !== "undefined" ? getDispositivoId() : "";
   const location = useLocation();
   const pathnameRef = useRef(location.pathname);
@@ -300,6 +303,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const reintentoCodigo = codigo !== undefined && datosCargadosPara.current === userId;
 
     if (!reintentoCodigo) {
+      if (ultimoUsuarioAcceso.current && ultimoUsuarioAcceso.current !== userId) {
+        queryClient.clear();
+      }
       fijar("cargando");
       datosCargadosPara.current = null;
       const r = await conLimite(cargarDatosUsuario(userId), LIMITE_PASO_MS);
@@ -330,6 +336,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       datosCargadosPara.current = userId;
+      ultimoUsuarioAcceso.current = userId;
     }
 
     const v = await conLimite(evaluarControl(codigo), LIMITE_PASO_MS);
@@ -349,6 +356,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const limpiarEstadoLocal = () => {
     fijarSesion(null);
     ultimoPathnameComprobado.current = null;
+    queryClient.clear();
     void resolverAcceso(null);
   };
 
