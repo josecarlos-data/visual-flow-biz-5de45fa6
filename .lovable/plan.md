@@ -1,84 +1,60 @@
-# Inicio de sesión por usuario con bloqueo escalonado y límite por IP
+# Segundo factor TOTP
 
-## Estado actual comprobado
+## Respuestas previas
 
-- `profiles.estado` admite `activo`, `suspendido_temporal`, `bloqueado_intentos`, `bloqueado_admin` y `baja` (CHECK). `username` es único sin distinguir mayúsculas (índice sobre `lower(username)`) y tiene formato `^[a-z0-9._-]{3,30}$`.
-- Los 3 usuarios activos **no tienen nombre de usuario**. El acceso por correo tendrá que seguir encendido hasta que se les asigne uno.
-- `app_settings` solo pueden leerlo los usuarios aprobados. La pantalla de login (sin sesión) **no puede leer** `acceso_permite_correo` directamente. Ver la decisión 1.
-- `auditoria_eventos` no limita `tipo` (solo `resultado`), y ya tiene índice `(tipo, ocurrido_en)`.
-- `admin_cambiar_estado`: definición vigente leída. Al pasar a `activo` ya pone `marcada_sospechosa = false`, pero no toca ninguna tabla de intentos.
-- El evento `login` lo registran hoy `Auth.tsx` (fallo) y `useAuth.tsx` (ok).
-- `cambiar-password` comprueba la contraseña actual con `signInWithPassword` y devuelve `actual_incorrecta` si falla.
-- En `config.toml` solo `auth-email-hook` tiene `verify_jwt = false`.
+1. **TOTP (enroll / challenge / verify).** El servicio de acceso lo trae activado por defecto. No veo ningún ajuste que lo apague y mis herramientas de configuración no tienen opción de MFA, ni para encenderlo ni para apagarlo. **No lo he confirmado en vivo:** hace falta una sesión de usuario real y una inscripción, y eso cambia datos. Por eso es el paso 0 del plan. Si falla, me detengo y te lo digo, sin alternativas propias.
+2. **Claim `aal`.** Sí. Todos los JWT llevan `aal` (`aal1` o `aal2`) y `amr`, y en SQL se lee con `auth.jwt()->>'aal'`. Lo confirmo en el paso 0 decodificando un token real.
+3. **Borrar factores de otro usuario.** Sí. Desde una función de servidor con la clave de servicio se usan `auth.admin.mfa.listFactors({ userId })` y `auth.admin.mfa.deleteFactor({ id, userId })`.
 
-## Decisiones que necesito antes de construir (desvíos del encargo)
+## Paso 0. Verificación (antes de tocar nada más)
+Con la cuenta de pruebas que me indiques:
+- inscribo un TOTP, compruebo `challenge` y `verify` y que el token pasa a `aal2`;
+- después borro ese factor con la API de administración.
 
-1. **Cómo sabe la pantalla de login si se permite el correo.** Sin sesión no se puede leer `app_settings`. Propuesta: `iniciar-sesion` acepta además `{ "accion": "config" }` y devuelve solo `{ permite_correo: boolean }`. No abre `app_settings` al público ni añade ninguna función más.
-2. **Mensaje de suspensión vigente (paso B.3).** Una suspensión puesta a mano por un admin también es `suspendido_temporal`. Propuesta:
-   - si `estado_cambiado_por` es NULL (la puso el sistema), se usa el mensaje «…hasta las HH:MM por intentos fallidos»;
-   - si la puso un admin, «Cuenta suspendida temporalmente hasta las HH:MM.».
-   En ambos casos no se comprueba la contraseña ni se cuenta el intento.
-3. **Riesgo a verificar: límite de intentos del propio servicio de autenticación.** Todas las comprobaciones de contraseña saldrán ahora desde la IP de la función de servidor, no desde la de cada usuario. Si el servicio de autenticación aplica su límite por IP, un pico de intentos podría frenar el login de todos. Lo compruebo al construir con varios intentos seguidos. Si aparece, te lo digo antes de seguir.
-
-Si apruebas el plan sin comentar estos puntos, aplico las propuestas 1 y 2 tal cual.
+Si alguno de los tres puntos falla, me detengo.
 
 ## A. Migración (una, en drizzle/migrations)
+1. Añadir `profiles.exige_2fa boolean NOT NULL DEFAULT false`. Recreo `prevent_profile_self_escalation` con una copia literal de la versión vigente (exención de service_role y admin, más las 18 comprobaciones) y una comprobación nueva para `exige_2fa`.
+2. Fila `segundo_factor_modo = 'desactivado'` con `ON CONFLICT DO NOTHING`.
+3. `requiere_2fa(_user_id)`: STABLE y SECURITY DEFINER, con `search_path=public`. Comprueba el rol directamente en `user_roles`, sin pasar por `is_admin`.
+4. `sesion_cumple_2fa()`: STABLE y SECURITY DEFINER.
+5. `is_approved` e `is_admin`: `CREATE OR REPLACE` con una copia literal y un único añadido: `AND (_user_id IS DISTINCT FROM auth.uid() OR (SELECT public.sesion_cumple_2fa()))`. Sin DROP y sin tocar GRANT.
+6. Funciones nuevas: REVOKE de PUBLIC y anon, GRANT EXECUTE a authenticated.
 
-1. Tabla `intentos_acceso` tal como la describes. Llevará GRANT ALL a service_role, REVOKE de anon/authenticated y RLS activado, con una única policy SELECT para `is_admin(auth.uid())`.
-   - Excepción necesaria: GRANT SELECT a authenticated. Sin ese permiso, la policy de admin no puede funcionar desde el panel. Los no admin no ven nada por RLS.
-2. `registrar_fallo_acceso(_user_id, _origen)` con la lógica especificada:
-   - `INSERT … ON CONFLICT DO NOTHING` y después `SELECT … FOR UPDATE`;
-   - ventanas de 15 min y 24 h;
-   - duración 15/30/60 min;
-   - solo cambia el estado si es `activo` o una suspensión vencida;
-   - `marcada_sospechosa` a partir del ciclo 2;
-   - evento `suspension_automatica` con `_origen` en el detalle;
-   - devuelve `{suspendido, hasta}`.
-3. `registrar_exito_acceso(_user_id)`: pone `fallos` a 0 y cierra las suspensiones vencidas con el evento `fin_suspension`. No toca `ciclos` ni `marcada_sospechosa`.
-4. Las dos funciones: REVOKE EXECUTE de PUBLIC, anon y authenticated; GRANT solo a service_role.
-5. `admin_cambiar_estado`: copia literal de la definición vigente con un único añadido: al pasar a `activo`, `DELETE FROM intentos_acceso WHERE user_id = _user_id`.
-6. Fila de ajuste `acceso_permite_correo = 'true'`, con `ON CONFLICT DO NOTHING`.
+Comprobaciones:
+- `pg_get_functiondef` y `proacl` antes y después: solo cambia la línea añadida;
+- con el modo en `desactivado`, la misma consulta devuelve lo mismo que antes para un usuario aprobado y para uno no aprobado.
 
-## B. Función `iniciar-sesion` (verify_jwt = false)
+## B. Cadena de acceso (useAuth)
+- Estados nuevos `pide_2fa` y `alta_2fa`. Solo los escribe `resolverAcceso`.
+- Orden: sesión -> perfil y estado -> segundo factor -> equipo -> contraseña -> activo. Se aplica igual en `PASSWORD_RECOVERY`, antes de la pantalla de nueva contraseña.
+- Tras el perfil, llamada a `requiere_2fa` y `getAuthenticatorAssuranceLevel()`:
+  - sin factor verificado: `alta_2fa`;
+  - con factor y nivel `aal1`: `pide_2fa`;
+  - con `aal2`: sigue adelante.
 
-Orden estricto, como en el encargo:
-1. IP con la misma lógica que `registrar-evento`. Si esa IP acumula 20 o más `login` con resultado `fallo` en 15 min, la función corta ahí con el mensaje de espera.
-2. Busca la cuenta por email (solo si se permite el correo) o por `lower(username)`. Si no existe, registra el evento `usuario_desconocido` y da la respuesta genérica.
-3. Si hay una suspensión vigente, responde con el mensaje de la decisión 2.
-4. Comprueba la contraseña con la clave anónima (`persistSession: false`).
-   - Si falla, llama a `registrar_fallo_acceso(uid, 'login')`, registra el evento con IP y user agent, y da la respuesta genérica o el mensaje de suspensión.
-5. Contraseña correcta pero usuario `bloqueado_admin`, `bloqueado_intentos` o `baja`: cierra esa sesión nueva, registra `login` denegado y muestra «Tu usuario está bloqueado…».
-6. Contraseña correcta y usuario operativo: `registrar_exito_acceso`, registra `login` ok y devuelve `access_token` y `refresh_token`.
+  Mismo control de generación y límite de 8 s por paso.
+- Tras verificar o dar de alta, `refreshSession()` y se relanza `resolverAcceso`.
+- Riesgo a revisar al construir: con una sesión `aal1`, la cadena debe poder leer el propio perfil y llamar a `requiere_2fa`. Si alguna policy del perfil depende de `is_approved(auth.uid())`, esa lectura fallaría con el modo activo. Leo las policies antes de migrar. Si alguna depende, me detengo y te lo explico.
 
-## C. `cambiar-password`
+## C. Pantallas bloqueantes (como la del código de alta)
+- **Alta:** QR, clave para teclear a mano y campo de 6 dígitos. Texto: «Escanea el código con Microsoft Authenticator o Google Authenticator». Si había un factor sin verificar a medias, se borra antes de inscribir otro.
+- **Verificación:** campo de 6 dígitos.
+- Ambas con botón de cerrar sesión.
+- Eventos `2fa_alta`, `2fa_verificado` y `2fa_fallido`, con sus etiquetas legibles en Auditoría.
 
-Si falla la contraseña actual (modos voluntario y forzado), llama a `registrar_fallo_acceso(uid, 'cambio_password')`. Nada más cambia.
+## D. Panel de usuarios
+- Por usuario:
+  - interruptor «Exigir segundo factor». En administradores con el modo en `activo`, aparece marcado y deshabilitado, con la nota «obligatorio para administradores»;
+  - estado «Configurado» o «Pendiente», obtenido de la nueva función de servidor (acción `estado`, que lista los factores verificados de cada usuario).
+- «Restablecer segundo factor», con una confirmación que recuerda verificar la identidad de quien lo pide. Llama a la función de servidor `admin-segundo-factor`, que:
+  - exige que quien llama sea admin y tenga una sesión `aal2`;
+  - borra los factores del usuario;
+  - registra `2fa_reseteado`.
+- Selector global del modo, con advertencia. Bloquea el paso a `activo` si el administrador no tiene su propio factor verificado. Registra `cambio_config_seguridad`.
 
-## D. `registrar-evento`
+## Fuera de alcance
+Códigos de recuperación, avisos por correo, `has_role`, `iniciar-sesion`, `registrar_sesion` y `verificar_sesion`.
 
-Se elimina la rama que acepta eventos sin token. Desde ahora todo evento exige un JWT válido.
-
-## E. Cliente
-
-- `Auth.tsx`: campo «Usuario» (con «o correo» si se permite), llamada a `iniciar-sesion` y `supabase.auth.setSession()`. Se quita el registro de `login` fallido.
-- `useAuth.tsx`: se quita el registro de `login` ok. No se tocan `resolverAcceso`, el `logout`, `registrar_sesion` ni `verificar_sesion`.
-- `auditoria.ts` y `registrar-evento`: no se añaden tipos. Los eventos nuevos solo se escriben en el servidor. Pantalla de Auditoría: etiquetas legibles para `suspension_automatica` y `fin_suspension`, si tiene un mapa de etiquetas.
-
-## F. Panel de usuarios
-
-- Estado efectivo: una suspensión vencida se muestra como «Activo» con la nota «Suspensión finalizada el …». La insignia roja solo aparece con la suspensión vigente.
-- Junto al estado, fallos recientes y ciclos, leídos de `intentos_acceso`.
-- Interruptor «Permitir acceso con correo»:
-  - con advertencia y aviso del número de usuarios activos sin nombre de usuario (hoy 3);
-  - no se puede apagar mientras ese número sea mayor que 0;
-  - registra `cambio_config_seguridad`.
-
-## Verificación
-
-- Mismos privilegios de `admin_cambiar_estado` antes y después, y en su definición solo cambia la línea añadida.
-- Con una cuenta de prueba: login por correo; 5 fallos hasta la suspensión de 15 min; mensaje sin comprobar la contraseña; fin de la suspensión al entrar después.
-- Usuario inexistente y contraseña errónea devuelven el mismo texto.
-- Un evento sin token en `registrar-evento` no se guarda.
-- Linter de la base.
-
-Fuera de alcance: avisos por correo, segundo factor, `has_role`, `resolverAcceso`, `registrar_sesion` y `verificar_sesion`.
+## Necesito de ti
+La cuenta de pruebas para el paso 0. El paso 0 también resuelve la tarea pendiente de comprobar el límite del servicio de autenticación.
