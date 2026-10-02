@@ -596,11 +596,36 @@ export default function AdminUsers() {
           ) : approvedUsers.length === 0 ? (
             <p className="text-muted-foreground">No hay usuarios aprobados aún.</p>
           ) : (
+            <>
+            <div className="space-y-3 md:hidden">
+              {approvedUsers.map((u) => (
+                <div key={u.user_id} className={`min-w-0 space-y-3 rounded-lg border p-3 ${u.estado !== "activo" ? "bg-muted/40" : ""}`}>
+                  <div className="min-w-0">
+                    {renderEditableName(u)}
+                    <p className="truncate text-sm text-muted-foreground">{u.email || "—"}</p>
+                  </div>
+                  {renderCuenta(u)}
+                  <div className="grid min-w-0 gap-2 [&_button[role=combobox]]:w-full">
+                    <span className="text-xs text-muted-foreground">Vendedor</span>
+                    {renderVendedor(u)}
+                    <span className="text-xs text-muted-foreground">Rol</span>
+                    {renderRol(u)}
+                    <span className="text-xs text-muted-foreground">Delegación</span>
+                    {renderDelegacion(u)}
+                  </div>
+                  <div>{renderMargen(u)}</div>
+                  <div className="min-w-0">{renderDashboards(u)}</div>
+                  <div>{renderEquipos(u)}</div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Email</TableHead>
+                  <TableHead>Cuenta</TableHead>
                   <TableHead>Vendedor</TableHead>
                   <TableHead>Rol</TableHead>
                   <TableHead>Delegación</TableHead>
