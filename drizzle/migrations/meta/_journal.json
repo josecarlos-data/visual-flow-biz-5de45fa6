@@ -57,6 +57,13 @@
       "when": 1790954561270,
       "tag": "0007_segundo_factor_totp",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791291268943,
+      "tag": "0008_caducidad_sesion_y_auditoria_usuarios",
+      "breakpoints": true
     }
   ]
 }
