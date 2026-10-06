@@ -17,3 +17,6 @@
 - [x] 2FA: pantallas alta/verificación, eventos
 - [x] 2FA: función admin-segundo-factor (admin + sesion_cumple_2fa) y panel
 - [x] 2FA: EXPLAIN ANALYZE ventas_diarias comercial, modo desactivado vs activo (parar si >20 %)
+- [ ] Pruebas 2FA 1–5 con cuenta Bautista (sesión interna)
+- [ ] Esperar reseteo del usuario y comprobar alta_2fa (prueba 6)
+- [ ] Limpieza: borrar factores, modo desactivado, exige_2fa false; informe con eventos
