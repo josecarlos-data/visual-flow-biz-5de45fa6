@@ -1,60 +1,38 @@
-# Segundo factor TOTP
+# Pruebas del segundo factor con la cuenta de Bautista
 
-## Respuestas previas
+## Dos puntos a resolver antes de empezar
 
-1. **TOTP (enroll / challenge / verify).** El servicio de acceso lo trae activado por defecto. No veo ningún ajuste que lo apague y mis herramientas de configuración no tienen opción de MFA, ni para encenderlo ni para apagarlo. **No lo he confirmado en vivo:** hace falta una sesión de usuario real y una inscripción, y eso cambia datos. Por eso es el paso 0 del plan. Si falla, me detengo y te lo digo, sin alternativas propias.
-2. **Claim `aal`.** Sí. Todos los JWT llevan `aal` (`aal1` o `aal2`) y `amr`, y en SQL se lee con `auth.jwt()->>'aal'`. Lo confirmo en el paso 0 decodificando un token real.
-3. **Borrar factores de otro usuario.** Sí. Desde una función de servidor con la clave de servicio se usan `auth.admin.mfa.listFactors({ userId })` y `auth.admin.mfa.deleteFactor({ id, userId })`.
+1. **Credenciales.** El mensaje me llegó con los marcadores `<usuario de Bautista>` y `<contraseña temporal>`, no con los valores reales. Hay dos opciones:
+   - **(a)** Me pegas el usuario y la contraseña reales. Los uso solo para entrar y no los repito en ningún sitio.
+   - **(b)** No me pasas la contraseña y yo abro las sesiones de prueba de esa misma cuenta con la herramienta interna de pruebas. Te saldrá una tarjeta para aprobarlo. Con esta opción no se prueba el formulario de inicio de sesión, aunque sí toda la cadena que va detrás.
+2. **Prueba 6 (reseteo).** La función de reseteo solo la puede usar un administrador, y la cuenta de pruebas es comercial. Para la prueba 6 tengo que llamarla como administrador con tu propia sesión. Esa llamada será la única excepción a «ninguna otra cuenta»: con tu sesión no se inicia sesión en la aplicación ni se cambia ningún dato tuyo. Si no lo autorizas, la prueba 6 la tendrías que hacer tú desde el panel.
 
-## Paso 0. Verificación (antes de tocar nada más)
-Con la cuenta de pruebas que me indiques:
-- inscribo un TOTP, compruebo `challenge` y `verify` y que el token pasa a `aal2`;
-- después borro ese factor con la API de administración.
+## Preparación
+- Pongo `exige_2fa = true` en la cuenta de pruebas.
+- Los códigos de 6 dígitos los calculo yo a partir de la clave que da el alta, como haría la aplicación del móvil.
 
-Si alguno de los tres puntos falla, me detengo.
+## Pruebas (navegador automatizado sobre la vista previa)
+1. **Modo «desactivado»:** la cuenta entra, termina en la pantalla normal y lee clientes y ventas igual que antes.
+2. **Modo «marcados», sin factor:** termina en la pantalla de alta (`alta_2fa`).
+3. **Alta:** QR, clave y código correcto. Compruebo:
+   - que el nivel de la sesión pasa a aal2;
+   - que el perfil y los dashboards se recargan;
+   - que el menú no queda vacío.
+4. **Nuevo inicio de sesión:** termina en la pantalla de verificación (`pide_2fa`).
+   - Un código erróneo falla y deja `2fa_fallido`.
+   - El código correcto da aal2.
+5. **Clientes según el nivel de la sesión:**
+   - con la sesión aal1, la consulta a clientes devuelve 0 filas;
+   - con la sesión aal2, devuelve los clientes de Bautista.
+6. **Reseteo** con la función de servidor. Vuelvo a entrar con la cuenta de pruebas y compruebo que termina en `alta_2fa`.
+7. **Rendimiento:** la misma consulta de ventas que la vez anterior, como Bautista, en modo «desactivado» y en modo «activo». Si «activo» es más de un 20 % más lento, me detengo y te lo explico.
 
-## A. Migración (una, en drizzle/migrations)
-1. Añadir `profiles.exige_2fa boolean NOT NULL DEFAULT false`. Recreo `prevent_profile_self_escalation` con una copia literal de la versión vigente (exención de service_role y admin, más las 18 comprobaciones) y una comprobación nueva para `exige_2fa`.
-2. Fila `segundo_factor_modo = 'desactivado'` con `ON CONFLICT DO NOTHING`.
-3. `requiere_2fa(_user_id)`: STABLE y SECURITY DEFINER, con `search_path=public`. Comprueba el rol directamente en `user_roles`, sin pasar por `is_admin`.
-4. `sesion_cumple_2fa()`: STABLE y SECURITY DEFINER.
-5. `is_approved` e `is_admin`: `CREATE OR REPLACE` con una copia literal y un único añadido: `AND (_user_id IS DISTINCT FROM auth.uid() OR (SELECT public.sesion_cumple_2fa()))`. Sin DROP y sin tocar GRANT.
-6. Funciones nuevas: REVOKE de PUBLIC y anon, GRANT EXECUTE a authenticated.
+## Limpieza obligatoria (también si alguna prueba falla)
+- Borro todos los factores de la cuenta de pruebas.
+- Dejo el modo en «desactivado» y `exige_2fa = false`.
+- Compruebo las tres cosas con consultas antes de cerrar.
 
-Comprobaciones:
-- `pg_get_functiondef` y `proacl` antes y después: solo cambia la línea añadida;
-- con el modo en `desactivado`, la misma consulta devuelve lo mismo que antes para un usuario aprobado y para uno no aprobado.
-
-## B. Cadena de acceso (useAuth)
-- Estados nuevos `pide_2fa` y `alta_2fa`. Solo los escribe `resolverAcceso`.
-- Orden: sesión -> perfil y estado -> segundo factor -> equipo -> contraseña -> activo. Se aplica igual en `PASSWORD_RECOVERY`, antes de la pantalla de nueva contraseña.
-- Tras el perfil, llamada a `requiere_2fa` y `getAuthenticatorAssuranceLevel()`:
-  - sin factor verificado: `alta_2fa`;
-  - con factor y nivel `aal1`: `pide_2fa`;
-  - con `aal2`: sigue adelante.
-
-  Mismo control de generación y límite de 8 s por paso.
-- Tras verificar o dar de alta, `refreshSession()` y se relanza `resolverAcceso`.
-- Riesgo a revisar al construir: con una sesión `aal1`, la cadena debe poder leer el propio perfil y llamar a `requiere_2fa`. Si alguna policy del perfil depende de `is_approved(auth.uid())`, esa lectura fallaría con el modo activo. Leo las policies antes de migrar. Si alguna depende, me detengo y te lo explico.
-
-## C. Pantallas bloqueantes (como la del código de alta)
-- **Alta:** QR, clave para teclear a mano y campo de 6 dígitos. Texto: «Escanea el código con Microsoft Authenticator o Google Authenticator». Si había un factor sin verificar a medias, se borra antes de inscribir otro.
-- **Verificación:** campo de 6 dígitos.
-- Ambas con botón de cerrar sesión.
-- Eventos `2fa_alta`, `2fa_verificado` y `2fa_fallido`, con sus etiquetas legibles en Auditoría.
-
-## D. Panel de usuarios
-- Por usuario:
-  - interruptor «Exigir segundo factor». En administradores con el modo en `activo`, aparece marcado y deshabilitado, con la nota «obligatorio para administradores»;
-  - estado «Configurado» o «Pendiente», obtenido de la nueva función de servidor (acción `estado`, que lista los factores verificados de cada usuario).
-- «Restablecer segundo factor», con una confirmación que recuerda verificar la identidad de quien lo pide. Llama a la función de servidor `admin-segundo-factor`, que:
-  - exige que quien llama sea admin y tenga una sesión `aal2`;
-  - borra los factores del usuario;
-  - registra `2fa_reseteado`.
-- Selector global del modo, con advertencia. Bloquea el paso a `activo` si el administrador no tiene su propio factor verificado. Registra `cambio_config_seguridad`.
-
-## Fuera de alcance
-Códigos de recuperación, avisos por correo, `has_role`, `iniciar-sesion`, `registrar_sesion` y `verificar_sesion`.
-
-## Necesito de ti
-La cuenta de pruebas para el paso 0. El paso 0 también resuelve la tarea pendiente de comprobar el límite del servicio de autenticación.
+## Informe
+- Resultado de cada prueba: correcto o fallo, con la evidencia (pantalla final, nivel de sesión, número de filas).
+- Los dos tiempos de la prueba 7.
+- Lista de los eventos de Auditoría generados durante la prueba: tipo, resultado y hora.
