@@ -20,3 +20,4 @@
 - [ ] Pruebas 2FA 1–5 con cuenta Bautista (sesión interna)
 - [ ] Esperar reseteo del usuario y comprobar alta_2fa (prueba 6)
 - [ ] Limpieza: borrar factores, modo desactivado, exige_2fa false; informe con eventos
+- [ ] Caducidad de sesión (amr más antiguo, ajuste en migración) + auditoría de cambios en usuarios
