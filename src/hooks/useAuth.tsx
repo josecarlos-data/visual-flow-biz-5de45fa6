@@ -527,15 +527,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = (data ?? {}) as { vigente?: boolean; motivo?: string };
       if (res.vigente !== false) return;
       const bloqueado = res.motivo === "usuario_bloqueado";
+      const caducada = res.motivo === "sesion_caducada";
       registrarEvento("sesion_expulsada", {
         resultado: "denegado",
-        detalle: { dispositivo_id: getDispositivoId(), motivo: bloqueado ? "usuario_bloqueado" : "otro_equipo" },
+        detalle: {
+          dispositivo_id: getDispositivoId(),
+          motivo: bloqueado ? "usuario_bloqueado" : caducada ? "sesion_caducada" : "otro_equipo",
+        },
       });
       toast({
-        title: "Sesión cerrada",
+        title: caducada ? "Sesión caducada" : "Sesión cerrada",
         description: bloqueado
           ? "Tu usuario ha sido bloqueado. Contacta con el administrador."
-          : "Se ha iniciado sesión en otro equipo, por lo que esta sesión se ha cerrado.",
+          : caducada
+            ? "Tu sesión ha caducado. Vuelve a iniciar sesión."
+            : "Se ha iniciado sesión en otro equipo, por lo que esta sesión se ha cerrado.",
         variant: "destructive",
       });
       // Cierre LOCAL: un signOut global revocaría el token también en la sesión ganadora.
@@ -569,6 +575,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     ultimoPathnameComprobado.current = pathnameRef.current;
+    // Comprobación inmediata al pasar a 'activo' (registrar_sesion ya terminó en la cadena).
+    void comprobarSesion();
     const intervalo = setInterval(() => void comprobarSesion(), 20000);
     const alEnfocar = () => void comprobarSesion();
     const alVisibilidad = () => {
