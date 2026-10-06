@@ -20,7 +20,10 @@ export type TipoEvento =
   | "password_cambio_forzado"
   | "2fa_alta"
   | "2fa_verificado"
-  | "2fa_fallido";
+  | "2fa_fallido"
+  | "usuario_alta"
+  | "usuario_cambio"
+  | "usuario_baja";
 
 export type ResultadoEvento = "ok" | "denegado" | "fallo";
 

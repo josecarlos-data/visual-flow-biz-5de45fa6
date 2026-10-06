@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ShieldAlert } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { registrarEvento } from "@/lib/auditoria";
 
-const CLAVES = ["control_acceso_modo", "alta_dispositivo_modo", "control_sesiones_activo", "acceso_permite_correo", "segundo_factor_modo"] as const;
+const CLAVES = ["control_acceso_modo", "alta_dispositivo_modo", "control_sesiones_activo", "acceso_permite_correo", "segundo_factor_modo", "sesion_duracion_horas"] as const;
 
 export default function SeguridadAccesoCard({
   activosSinUsuario = 0,
@@ -21,6 +23,7 @@ export default function SeguridadAccesoCard({
   const [sesionesActivo, setSesionesActivo] = useState("true");
   const [permiteCorreo, setPermiteCorreo] = useState("true");
   const [modo2fa, setModo2fa] = useState("desactivado");
+  const [duracion, setDuracion] = useState("0");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -36,6 +39,7 @@ export default function SeguridadAccesoCard({
         if (f.key === "control_sesiones_activo") setSesionesActivo(f.value);
         if (f.key === "acceso_permite_correo") setPermiteCorreo(f.value);
         if (f.key === "segundo_factor_modo") { setModo2fa(f.value); onModo2fa?.(f.value); }
+        if (f.key === "sesion_duracion_horas") setDuracion(f.value.trim() || "0");
       });
       setLoading(false);
     })();
@@ -190,6 +194,39 @@ export default function SeguridadAccesoCard({
           <p className="text-xs text-muted-foreground">
             Pide un código de Microsoft Authenticator o Google Authenticator al entrar. Quien lo tenga exigido y no lo haya
             configurado tendrá que darlo de alta en su próximo acceso.
+          </p>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="duracion-sesion">Duración máxima de sesión (horas)</Label>
+          <div className="flex gap-2">
+            <Input
+              id="duracion-sesion"
+              type="number"
+              min={0}
+              max={720}
+              value={duracion}
+              disabled={loading}
+              onChange={(e) => setDuracion(e.target.value)}
+              className="max-w-[120px]"
+            />
+            <Button
+              variant="outline"
+              disabled={loading}
+              onClick={async () => {
+                const n = Number(duracion);
+                if (!Number.isInteger(n) || n < 0 || n > 720) {
+                  toast({ title: "Valor no válido", description: "Introduce un número entero entre 0 y 720.", variant: "destructive" });
+                  return;
+                }
+                const ok = await guardar("sesion_duracion_horas", String(n));
+                if (ok) setDuracion(String(n));
+              }}
+            >
+              Guardar
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Pasado este tiempo desde que el usuario inició sesión, tendrá que volver a entrar. 0 = sin límite.
           </p>
         </div>
         {modo2fa === "activo" && (
