@@ -40,6 +40,9 @@ const TIPOS: { value: string; label: string }[] = [
   { value: "2fa_alta", label: "Alta de segundo factor" },
   { value: "2fa_verificado", label: "Segundo factor verificado" },
   { value: "2fa_fallido", label: "Segundo factor fallido" },
+  { value: "usuario_alta", label: "Usuario: alta" },
+  { value: "usuario_cambio", label: "Usuario: cambio" },
+  { value: "usuario_baja", label: "Usuario: baja" },
   { value: "2fa_reseteado", label: "Segundo factor restablecido" },
 ];
 
