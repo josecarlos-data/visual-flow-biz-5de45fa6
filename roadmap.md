@@ -22,4 +22,5 @@
 - [ ] Limpieza: borrar factores, modo desactivado, exige_2fa false; informe con eventos
 - [x] Caducidad de sesión (amr más antiguo, ajuste en migración) + auditoría de cambios en usuarios
 - [x] Auditoría: recorrer el grupo 'seguridad' del detalle, traducir Operación/Origen y mostrar el nombre en la columna Entidad
-- [ ] Avisos de seguridad: construir y desplegar; luego el usuario ejecuta el bloque SQL del secreto y yo verifico latido, correo y 401
+- [x] Avisos de seguridad: construido y desplegado
+- [ ] Avisos: tras el usuario ejecuta el bloque SQL del secreto y yo verifico latido, correo y 401
