@@ -230,6 +230,23 @@ export default function AdminAuditoria() {
 
   const nombreUsuario = (r: EventoRow) => r.full_name || r.email || (r.user_id ? "—" : "Sin sesión");
 
+  const nombreEntidad = (r: EventoRow) => {
+    if (!r.entidad) return "—";
+    if (r.entidad === "usuario" && r.entidad_id) {
+      const u = usuarios.find((x) => x.user_id === r.entidad_id);
+      if (u) return u.full_name || u.email || r.entidad_id;
+    }
+    return r.entidad_id ? `${r.entidad}: ${r.entidad_id}` : r.entidad;
+  };
+
+  const alternarExpandido = (id: string) =>
+    setExpandidos((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
   return (
     <div className="space-y-4 p-4 md:p-6">
       <div>
