@@ -404,13 +404,13 @@ export default function AdminAuditoria() {
                         </TableCell>
                       </TableRow>
                       {expandidos.has(r.id) && (
-                        <TableRow key={`${r.id}-detalle`}>
+                        <TableRow>
                           <TableCell colSpan={8} className="bg-muted/30">
                             <DetalleEvento detalle={r.detalle} />
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </Fragment>
                   ))}
                 </TableBody>
               </Table>
