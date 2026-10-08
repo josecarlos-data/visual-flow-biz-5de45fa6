@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface EventoRow {
@@ -63,6 +63,95 @@ const variantResultado = (r: string): "default" | "secondary" | "destructive" =>
 const fechaLarga = (iso: string) =>
   new Date(iso).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "medium" });
 
+const NOMBRES_CAMPO: Record<string, string> = {
+  is_approved: "Aprobado",
+  estado: "Estado",
+  exige_2fa: "Exigir segundo factor",
+  sesiones_max: "Sesiones simultáneas",
+  dispositivos_max: "Máximo de equipos",
+  debe_cambiar_password: "Cambio de contraseña pendiente",
+  ver_margen: "Ver margen",
+  username: "Nombre de usuario",
+  marcada_sospechosa: "Sospechosa",
+  role: "Rol",
+  full_name: "Nombre",
+  motivo: "Motivo",
+  origen: "Origen",
+  modo: "Modo",
+  dispositivo_id: "Identificador de equipo",
+  codigo: "Código",
+  factores_borrados: "Factores borrados",
+};
+
+const CAMPOS_OCULTOS = new Set(["x_forwarded_for", "cf_connecting_ip", "autenticado"]);
+
+const nombreCampo = (k: string) => NOMBRES_CAMPO[k] ?? k;
+
+const valorLegible = (v: unknown): string => {
+  if (v === null || v === undefined) return "—";
+  if (typeof v === "boolean") return v ? "Sí" : "No";
+  if (typeof v === "object") return JSON.stringify(v);
+  return String(v);
+};
+
+interface LineaDetalle {
+  etiqueta: string;
+  antes?: unknown;
+  despues?: unknown;
+  valor?: unknown;
+}
+
+function lineasDetalle(detalle: Record<string, unknown> | null): LineaDetalle[] {
+  if (!detalle || typeof detalle !== "object") return [];
+  const lineas: LineaDetalle[] = [];
+  const campos = detalle.campos;
+  if (Array.isArray(campos) && campos.length > 0) {
+    lineas.push({ etiqueta: "Campos modificados", valor: campos.map((c) => nombreCampo(String(c))).join(", ") });
+  }
+  const esPar = (v: unknown): v is { antes: unknown; despues: unknown } =>
+    !!v && typeof v === "object" && ("antes" in (v as object) || "despues" in (v as object));
+  const antesSuelto = esPar(detalle.antes) || typeof detalle.antes === "object" ? (detalle.antes as Record<string, unknown> | null) : null;
+  const despuesSuelto = typeof detalle.despues === "object" ? (detalle.despues as Record<string, unknown> | null) : null;
+  for (const [k, v] of Object.entries(detalle)) {
+    if (CAMPOS_OCULTOS.has(k) || k === "campos") continue;
+    if (k === "antes" || k === "despues") continue;
+    if (esPar(v)) {
+      lineas.push({ etiqueta: nombreCampo(k), antes: v.antes, despues: v.despues });
+    } else {
+      lineas.push({ etiqueta: nombreCampo(k), valor: v });
+    }
+  }
+  if (antesSuelto || despuesSuelto) {
+    const claves = new Set([...Object.keys(antesSuelto ?? {}), ...Object.keys(despuesSuelto ?? {})]);
+    for (const k of claves) {
+      if (CAMPOS_OCULTOS.has(k)) continue;
+      lineas.push({ etiqueta: nombreCampo(k), antes: antesSuelto?.[k], despues: despuesSuelto?.[k] });
+    }
+  }
+  return lineas;
+}
+
+function DetalleEvento({ detalle }: { detalle: Record<string, unknown> | null }) {
+  const lineas = lineasDetalle(detalle);
+  if (lineas.length === 0) {
+    return <p className="text-xs text-muted-foreground">Sin detalle adicional.</p>;
+  }
+  return (
+    <dl className="grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
+      {lineas.map((l, i) => (
+        <div key={i} className="flex flex-wrap gap-1">
+          <dt className="font-medium">{l.etiqueta}:</dt>
+          <dd className="break-words text-muted-foreground">
+            {l.antes !== undefined || l.despues !== undefined
+              ? `${valorLegible(l.antes)} → ${valorLegible(l.despues)}`
+              : valorLegible(l.valor)}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 export default function AdminAuditoria() {
   const isMobile = useIsMobile();
   const [rows, setRows] = useState<EventoRow[]>([]);
@@ -71,6 +160,7 @@ export default function AdminAuditoria() {
   const [loading, setLoading] = useState(true);
   const [usuarios, setUsuarios] = useState<{ user_id: string; full_name: string | null; email: string | null }[]>([]);
 
+  const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [usuario, setUsuario] = useState(TODOS);
@@ -139,6 +229,23 @@ export default function AdminAuditoria() {
   const totalPaginas = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total]);
 
   const nombreUsuario = (r: EventoRow) => r.full_name || r.email || (r.user_id ? "—" : "Sin sesión");
+
+  const nombreEntidad = (r: EventoRow) => {
+    if (!r.entidad) return "—";
+    if (r.entidad === "usuario" && r.entidad_id) {
+      const u = usuarios.find((x) => x.user_id === r.entidad_id);
+      if (u) return u.full_name || u.email || r.entidad_id;
+    }
+    return r.entidad_id ? `${r.entidad}: ${r.entidad_id}` : r.entidad;
+  };
+
+  const alternarExpandido = (id: string) =>
+    setExpandidos((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   return (
     <div className="space-y-4 p-4 md:p-6">
@@ -226,10 +333,19 @@ export default function AdminAuditoria() {
           ) : isMobile ? (
             <div className="space-y-3">
               {rows.map((r) => (
-                <div key={r.id} className="rounded-lg border p-3 text-sm">
+                <div
+                  key={r.id}
+                  className="cursor-pointer rounded-lg border p-3 text-sm"
+                  onClick={() => alternarExpandido(r.id)}
+                >
                   <div className="flex items-start justify-between gap-2">
                     <span className="font-medium">{etiquetaTipo(r.tipo)}</span>
-                    <Badge variant={variantResultado(r.resultado)}>{r.resultado}</Badge>
+                    <span className="flex items-center gap-1">
+                      <Badge variant={variantResultado(r.resultado)}>{r.resultado}</Badge>
+                      <ChevronDown
+                        className={`h-4 w-4 text-muted-foreground transition-transform ${expandidos.has(r.id) ? "rotate-180" : ""}`}
+                      />
+                    </span>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">{fechaLarga(r.ocurrido_en)}</p>
                   <p className="mt-1 break-words">{nombreUsuario(r)}</p>
@@ -237,10 +353,15 @@ export default function AdminAuditoria() {
                   {r.ruta && <p className="break-words text-xs text-muted-foreground">Ruta: {r.ruta}</p>}
                   {r.entidad && (
                     <p className="break-words text-xs text-muted-foreground">
-                      {r.entidad}: {r.entidad_id}
+                      {nombreEntidad(r)}
                     </p>
                   )}
                   {r.ip && <p className="text-xs text-muted-foreground">IP: {r.ip}</p>}
+                  {expandidos.has(r.id) && (
+                    <div className="mt-2 border-t pt-2">
+                      <DetalleEvento detalle={r.detalle} />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -256,24 +377,40 @@ export default function AdminAuditoria() {
                     <TableHead>Ruta</TableHead>
                     <TableHead>Entidad</TableHead>
                     <TableHead>IP</TableHead>
+                    <TableHead className="w-8" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rows.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="whitespace-nowrap text-xs">{fechaLarga(r.ocurrido_en)}</TableCell>
-                      <TableCell className="max-w-[220px]">
-                        <div className="truncate">{nombreUsuario(r)}</div>
-                        {r.email && <div className="truncate text-xs text-muted-foreground">{r.email}</div>}
-                      </TableCell>
-                      <TableCell className="text-sm">{etiquetaTipo(r.tipo)}</TableCell>
-                      <TableCell><Badge variant={variantResultado(r.resultado)}>{r.resultado}</Badge></TableCell>
-                      <TableCell className="max-w-[180px] truncate text-xs">{r.ruta ?? "—"}</TableCell>
-                      <TableCell className="max-w-[180px] truncate text-xs">
-                        {r.entidad ? `${r.entidad}: ${r.entidad_id ?? ""}` : "—"}
-                      </TableCell>
-                      <TableCell className="text-xs">{r.ip ?? "—"}</TableCell>
-                    </TableRow>
+                    <Fragment key={r.id}>
+                      <TableRow
+                        className="cursor-pointer"
+                        onClick={() => alternarExpandido(r.id)}
+                      >
+                        <TableCell className="whitespace-nowrap text-xs">{fechaLarga(r.ocurrido_en)}</TableCell>
+                        <TableCell className="max-w-[220px]">
+                          <div className="truncate">{nombreUsuario(r)}</div>
+                          {r.email && <div className="truncate text-xs text-muted-foreground">{r.email}</div>}
+                        </TableCell>
+                        <TableCell className="text-sm">{etiquetaTipo(r.tipo)}</TableCell>
+                        <TableCell><Badge variant={variantResultado(r.resultado)}>{r.resultado}</Badge></TableCell>
+                        <TableCell className="max-w-[180px] truncate text-xs">{r.ruta ?? "—"}</TableCell>
+                        <TableCell className="max-w-[180px] truncate text-xs">{nombreEntidad(r)}</TableCell>
+                        <TableCell className="text-xs">{r.ip ?? "—"}</TableCell>
+                        <TableCell>
+                          <ChevronDown
+                            className={`h-4 w-4 text-muted-foreground transition-transform ${expandidos.has(r.id) ? "rotate-180" : ""}`}
+                          />
+                        </TableCell>
+                      </TableRow>
+                      {expandidos.has(r.id) && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="bg-muted/30">
+                            <DetalleEvento detalle={r.detalle} />
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </Fragment>
                   ))}
                 </TableBody>
               </Table>
