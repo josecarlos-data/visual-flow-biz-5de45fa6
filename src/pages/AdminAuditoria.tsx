@@ -63,6 +63,95 @@ const variantResultado = (r: string): "default" | "secondary" | "destructive" =>
 const fechaLarga = (iso: string) =>
   new Date(iso).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "medium" });
 
+const NOMBRES_CAMPO: Record<string, string> = {
+  is_approved: "Aprobado",
+  estado: "Estado",
+  exige_2fa: "Exigir segundo factor",
+  sesiones_max: "Sesiones simultáneas",
+  dispositivos_max: "Máximo de equipos",
+  debe_cambiar_password: "Cambio de contraseña pendiente",
+  ver_margen: "Ver margen",
+  username: "Nombre de usuario",
+  marcada_sospechosa: "Sospechosa",
+  role: "Rol",
+  full_name: "Nombre",
+  motivo: "Motivo",
+  origen: "Origen",
+  modo: "Modo",
+  dispositivo_id: "Identificador de equipo",
+  codigo: "Código",
+  factores_borrados: "Factores borrados",
+};
+
+const CAMPOS_OCULTOS = new Set(["x_forwarded_for", "cf_connecting_ip", "autenticado"]);
+
+const nombreCampo = (k: string) => NOMBRES_CAMPO[k] ?? k;
+
+const valorLegible = (v: unknown): string => {
+  if (v === null || v === undefined) return "—";
+  if (typeof v === "boolean") return v ? "Sí" : "No";
+  if (typeof v === "object") return JSON.stringify(v);
+  return String(v);
+};
+
+interface LineaDetalle {
+  etiqueta: string;
+  antes?: unknown;
+  despues?: unknown;
+  valor?: unknown;
+}
+
+function lineasDetalle(detalle: Record<string, unknown> | null): LineaDetalle[] {
+  if (!detalle || typeof detalle !== "object") return [];
+  const lineas: LineaDetalle[] = [];
+  const campos = detalle.campos;
+  if (Array.isArray(campos) && campos.length > 0) {
+    lineas.push({ etiqueta: "Campos modificados", valor: campos.map((c) => nombreCampo(String(c))).join(", ") });
+  }
+  const esPar = (v: unknown): v is { antes: unknown; despues: unknown } =>
+    !!v && typeof v === "object" && ("antes" in (v as object) || "despues" in (v as object));
+  const antesSuelto = esPar(detalle.antes) || typeof detalle.antes === "object" ? (detalle.antes as Record<string, unknown> | null) : null;
+  const despuesSuelto = typeof detalle.despues === "object" ? (detalle.despues as Record<string, unknown> | null) : null;
+  for (const [k, v] of Object.entries(detalle)) {
+    if (CAMPOS_OCULTOS.has(k) || k === "campos") continue;
+    if (k === "antes" || k === "despues") continue;
+    if (esPar(v)) {
+      lineas.push({ etiqueta: nombreCampo(k), antes: v.antes, despues: v.despues });
+    } else {
+      lineas.push({ etiqueta: nombreCampo(k), valor: v });
+    }
+  }
+  if (antesSuelto || despuesSuelto) {
+    const claves = new Set([...Object.keys(antesSuelto ?? {}), ...Object.keys(despuesSuelto ?? {})]);
+    for (const k of claves) {
+      if (CAMPOS_OCULTOS.has(k)) continue;
+      lineas.push({ etiqueta: nombreCampo(k), antes: antesSuelto?.[k], despues: despuesSuelto?.[k] });
+    }
+  }
+  return lineas;
+}
+
+function DetalleEvento({ detalle }: { detalle: Record<string, unknown> | null }) {
+  const lineas = lineasDetalle(detalle);
+  if (lineas.length === 0) {
+    return <p className="text-xs text-muted-foreground">Sin detalle adicional.</p>;
+  }
+  return (
+    <dl className="grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
+      {lineas.map((l, i) => (
+        <div key={i} className="flex flex-wrap gap-1">
+          <dt className="font-medium">{l.etiqueta}:</dt>
+          <dd className="break-words text-muted-foreground">
+            {l.antes !== undefined || l.despues !== undefined
+              ? `${valorLegible(l.antes)} → ${valorLegible(l.despues)}`
+              : valorLegible(l.valor)}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 export default function AdminAuditoria() {
   const isMobile = useIsMobile();
   const [rows, setRows] = useState<EventoRow[]>([]);
