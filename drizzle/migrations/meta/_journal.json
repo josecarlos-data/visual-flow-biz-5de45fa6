@@ -64,6 +64,13 @@
       "when": 1791291268943,
       "tag": "0008_caducidad_sesion_y_auditoria_usuarios",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791470934951,
+      "tag": "0009_avisos_seguridad",
+      "breakpoints": true
     }
   ]
 }

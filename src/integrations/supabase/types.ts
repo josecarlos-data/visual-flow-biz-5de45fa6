@@ -86,6 +86,24 @@ export type Database = {
         }
         Relationships: []
       }
+      avisos_estado: {
+        Row: {
+          categoria: string
+          cursor: string
+          ultimo_envio: string | null
+        }
+        Insert: {
+          categoria: string
+          cursor?: string
+          ultimo_envio?: string | null
+        }
+        Update: {
+          categoria?: string
+          cursor?: string
+          ultimo_envio?: string | null
+        }
+        Relationships: []
+      }
       catalogos_opciones: {
         Row: {
           clave: string
@@ -2244,6 +2262,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      avisos_resumen_panel: { Args: never; Returns: Json }
       buscar_productos: {
         Args: { _limite?: number; _q: string }
         Returns: {
