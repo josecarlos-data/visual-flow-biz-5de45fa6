@@ -44,6 +44,7 @@ const TIPOS: { value: string; label: string }[] = [
   { value: "usuario_cambio", label: "Usuario: cambio" },
   { value: "usuario_baja", label: "Usuario: baja" },
   { value: "2fa_reseteado", label: "Segundo factor restablecido" },
+  { value: "aviso_seguridad", label: "Aviso de seguridad" },
 ];
 
 const RESULTADOS: { value: string; label: string }[] = [
@@ -67,6 +68,9 @@ const fechaLarga = (iso: string) =>
 
 const NOMBRES_CAMPO: Record<string, string> = {
   is_approved: "Aprobado",
+  categoria: "Categoría",
+  recuento: "Recuento",
+  destinatario: "Destinatario",
   estado: "Estado",
   exige_2fa: "Exigir segundo factor",
   sesiones_max: "Sesiones simultáneas",

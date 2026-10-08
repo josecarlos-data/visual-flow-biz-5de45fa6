@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ShieldAlert } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { registrarEvento } from "@/lib/auditoria";
+import AvisosSeguridadBloque from "@/components/AvisosSeguridadBloque";
 
 const CLAVES = ["control_acceso_modo", "alta_dispositivo_modo", "control_sesiones_activo", "acceso_permite_correo", "segundo_factor_modo", "sesion_duracion_horas"] as const;
 
@@ -229,6 +230,7 @@ export default function SeguridadAccesoCard({
             Pasado este tiempo desde que el usuario inició sesión, tendrá que volver a entrar. 0 = sin límite.
           </p>
         </div>
+        <AvisosSeguridadBloque guardar={guardar} />
         {modo2fa === "activo" && (
           <p className="sm:col-span-2 lg:col-span-3 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
             Atención: el segundo factor es obligatorio para todos los administradores. Si alguien pierde el móvil, tendrá que

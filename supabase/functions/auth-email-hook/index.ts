@@ -15,7 +15,7 @@ const corsHeaders = {
 }
 
 // Configuration
-const SITE_NAME = "Sales Navigator"
+const SITE_NAME = "CRM Rimosa"
 const SENDER_DOMAIN = "notify.crmrimosa.josecarlossobrino.com"
 const ROOT_DOMAIN = "crmrimosa.josecarlossobrino.com"
 const FROM_DOMAIN = "crmrimosa.josecarlossobrino.com"
