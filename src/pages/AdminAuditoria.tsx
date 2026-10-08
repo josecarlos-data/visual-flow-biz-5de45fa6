@@ -55,6 +55,8 @@ const RESULTADOS: { value: string; label: string }[] = [
 const PAGE_SIZE = 50;
 const TODOS = "__todos__";
 
+const TABLAS_USUARIO = new Set(["usuario", "profiles", "user_roles", "user_dashboard_access"]);
+
 const etiquetaTipo = (t: string) => TIPOS.find((x) => x.value === t)?.label ?? t;
 
 const variantResultado = (r: string): "default" | "secondary" | "destructive" =>
@@ -77,6 +79,7 @@ const NOMBRES_CAMPO: Record<string, string> = {
   full_name: "Nombre",
   motivo: "Motivo",
   origen: "Origen",
+  operacion: "Operación",
   modo: "Modo",
   dispositivo_id: "Identificador de equipo",
   codigo: "Código",
@@ -87,6 +90,12 @@ const CAMPOS_OCULTOS = new Set(["x_forwarded_for", "cf_connecting_ip", "autentic
 
 const nombreCampo = (k: string) => NOMBRES_CAMPO[k] ?? k;
 
+const OPERACIONES: Record<string, string> = {
+  INSERT: "Alta",
+  UPDATE: "Modificación",
+  DELETE: "Baja",
+};
+
 const valorLegible = (v: unknown): string => {
   if (v === null || v === undefined) return "—";
   if (typeof v === "boolean") return v ? "Sí" : "No";
@@ -94,41 +103,62 @@ const valorLegible = (v: unknown): string => {
   return String(v);
 };
 
+const valorDeClave = (k: string, v: unknown): string => {
+  if (typeof v === "string") {
+    if (k === "operacion") return OPERACIONES[v] ?? v;
+    if (k === "origen") return v.charAt(0).toUpperCase() + v.slice(1);
+  }
+  return valorLegible(v);
+};
+
 interface LineaDetalle {
+  clave: string;
   etiqueta: string;
   antes?: unknown;
   despues?: unknown;
   valor?: unknown;
 }
 
+const esObjeto = (v: unknown): v is Record<string, unknown> =>
+  !!v && typeof v === "object" && !Array.isArray(v);
+
+const esPar = (v: unknown): v is { antes: unknown; despues: unknown } =>
+  esObjeto(v) && ("antes" in v || "despues" in v);
+
 function lineasDetalle(detalle: Record<string, unknown> | null): LineaDetalle[] {
-  if (!detalle || typeof detalle !== "object") return [];
-  const lineas: LineaDetalle[] = [];
+  if (!esObjeto(detalle)) return [];
+  const cabecera: LineaDetalle[] = [];
+  const pares: LineaDetalle[] = [];
+  const sueltos: LineaDetalle[] = [];
   const campos = detalle.campos;
   if (Array.isArray(campos) && campos.length > 0) {
-    lineas.push({ etiqueta: "Campos modificados", valor: campos.map((c) => nombreCampo(String(c))).join(", ") });
+    cabecera.push({ clave: "campos", etiqueta: "Campos modificados", valor: campos.map((c) => nombreCampo(String(c))).join(", ") });
   }
-  const esPar = (v: unknown): v is { antes: unknown; despues: unknown } =>
-    !!v && typeof v === "object" && ("antes" in (v as object) || "despues" in (v as object));
-  const antesSuelto = esPar(detalle.antes) || typeof detalle.antes === "object" ? (detalle.antes as Record<string, unknown> | null) : null;
-  const despuesSuelto = typeof detalle.despues === "object" ? (detalle.despues as Record<string, unknown> | null) : null;
+  const antesSuelto = esObjeto(detalle.antes) ? detalle.antes : null;
+  const despuesSuelto = esObjeto(detalle.despues) ? detalle.despues : null;
   for (const [k, v] of Object.entries(detalle)) {
-    if (CAMPOS_OCULTOS.has(k) || k === "campos") continue;
-    if (k === "antes" || k === "despues") continue;
+    if (CAMPOS_OCULTOS.has(k) || k === "campos" || k === "antes" || k === "despues") continue;
     if (esPar(v)) {
-      lineas.push({ etiqueta: nombreCampo(k), antes: v.antes, despues: v.despues });
+      pares.push({ clave: k, etiqueta: nombreCampo(k), antes: v.antes, despues: v.despues });
+    } else if (esObjeto(v)) {
+      // Grupo anidado (p. ej. 'seguridad'): se recorren sus entradas sin mostrar el nombre del grupo.
+      for (const [k2, v2] of Object.entries(v)) {
+        if (CAMPOS_OCULTOS.has(k2)) continue;
+        if (esPar(v2)) pares.push({ clave: k2, etiqueta: nombreCampo(k2), antes: v2.antes, despues: v2.despues });
+        else if (!esObjeto(v2)) sueltos.push({ clave: k2, etiqueta: nombreCampo(k2), valor: v2 });
+      }
     } else {
-      lineas.push({ etiqueta: nombreCampo(k), valor: v });
+      sueltos.push({ clave: k, etiqueta: nombreCampo(k), valor: v });
     }
   }
   if (antesSuelto || despuesSuelto) {
     const claves = new Set([...Object.keys(antesSuelto ?? {}), ...Object.keys(despuesSuelto ?? {})]);
     for (const k of claves) {
       if (CAMPOS_OCULTOS.has(k)) continue;
-      lineas.push({ etiqueta: nombreCampo(k), antes: antesSuelto?.[k], despues: despuesSuelto?.[k] });
+      pares.push({ clave: k, etiqueta: nombreCampo(k), antes: antesSuelto?.[k], despues: despuesSuelto?.[k] });
     }
   }
-  return lineas;
+  return [...cabecera, ...pares, ...sueltos];
 }
 
 function DetalleEvento({ detalle }: { detalle: Record<string, unknown> | null }) {
@@ -143,8 +173,8 @@ function DetalleEvento({ detalle }: { detalle: Record<string, unknown> | null })
           <dt className="font-medium">{l.etiqueta}:</dt>
           <dd className="break-words text-muted-foreground">
             {l.antes !== undefined || l.despues !== undefined
-              ? `${valorLegible(l.antes)} → ${valorLegible(l.despues)}`
-              : valorLegible(l.valor)}
+              ? `${valorDeClave(l.clave, l.antes)} → ${valorDeClave(l.clave, l.despues)}`
+              : valorDeClave(l.clave, l.valor)}
           </dd>
         </div>
       ))}
@@ -232,7 +262,7 @@ export default function AdminAuditoria() {
 
   const nombreEntidad = (r: EventoRow) => {
     if (!r.entidad) return "—";
-    if (r.entidad === "usuario" && r.entidad_id) {
+    if (r.entidad_id && TABLAS_USUARIO.has(r.entidad)) {
       const u = usuarios.find((x) => x.user_id === r.entidad_id);
       if (u) return u.full_name || u.email || r.entidad_id;
     }
