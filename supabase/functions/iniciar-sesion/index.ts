@@ -1,12 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { LIMITE_IP, VENTANA_IP_MS } from "../_shared/limites-acceso.ts";
 
 const URL = Deno.env.get("SUPABASE_URL")!;
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-const LIMITE_IP = 20;
-const VENTANA_MS = 15 * 60 * 1000;
+const VENTANA_MS = VENTANA_IP_MS;
 
 const MSG_GENERICO = "Usuario o contraseña incorrectos";
 const MSG_IP = "Demasiados intentos desde esta conexión. Espera unos minutos.";

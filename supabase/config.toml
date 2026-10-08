@@ -6,3 +6,9 @@ project_id = "mxsnnxnqzrdydcpzdqmu"
 
   [functions.iniciar-sesion]
     verify_jwt = false
+
+  [functions.preview-transactional-email]
+    verify_jwt = false
+
+  [functions.avisos-seguridad]
+    verify_jwt = false
