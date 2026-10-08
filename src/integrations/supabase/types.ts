@@ -2263,6 +2263,7 @@ export type Database = {
         }[]
       }
       avisos_resumen_panel: { Args: never; Returns: Json }
+      avisos_token_valido: { Args: { _token: string }; Returns: boolean }
       buscar_productos: {
         Args: { _limite?: number; _q: string }
         Returns: {
