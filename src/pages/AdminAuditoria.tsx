@@ -68,6 +68,10 @@ const fechaLarga = (iso: string) =>
 
 const NOMBRES_CAMPO: Record<string, string> = {
   is_approved: "Aprobado",
+  categoria: "Categoría",
+  recuento: "Recuento",
+  destinatario: "Destinatario",
+  codigo: "Código",
   estado: "Estado",
   exige_2fa: "Exigir segundo factor",
   sesiones_max: "Sesiones simultáneas",
