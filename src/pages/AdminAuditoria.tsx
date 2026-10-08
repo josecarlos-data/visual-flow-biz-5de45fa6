@@ -160,6 +160,7 @@ export default function AdminAuditoria() {
   const [loading, setLoading] = useState(true);
   const [usuarios, setUsuarios] = useState<{ user_id: string; full_name: string | null; email: string | null }[]>([]);
 
+  const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [usuario, setUsuario] = useState(TODOS);
