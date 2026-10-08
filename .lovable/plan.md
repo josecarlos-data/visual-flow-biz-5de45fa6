@@ -1,77 +1,98 @@
-# Avisos de seguridad por correo al administrador
+# Avisos de seguridad por correo — construcción sin el secreto
 
-## Respuestas previas
+Todo lo que no depende del secreto lo construyo yo. Las tres piezas que tocan el almacén de secretos de la base no puedo aplicarlas: la herramienta las rechaza. Van en un único bloque SQL que ejecutas tú, abajo, y que se puede revisar línea a línea. Ninguna clave aparece en el repositorio ni en la configuración de las funciones.
 
-**Servicio de envío.** El correo propio de Lovable Cloud, el mismo que ya envía los correos de acceso. El dominio `notify.crmrimosa.josecarlossobrino.com` está verificado y sirve tal cual. Remitente: «CRM Rimosa <noreply@crmrimosa.josecarlossobrino.com>».
-- Límite: es un cupo por hora del espacio de trabajo que depende del plan; no es una cifra fija que pueda dar desde aquí. Si se supera, el servicio responde «espera N segundos» y no se pierde nada: el aviso se reintenta en la siguiente pasada. Con el diseño propuesto el máximo teórico son unos 40 correos/hora (6 categorías × 6 pasadas) y lo normal es cero.
-- Dos efectos del servicio que no se pueden desactivar: cada correo lleva un pie con enlace para darse de baja (si alguien lo pulsa, info3@rimosa.com deja de recibir **todos** los correos de la app, no los de acceso), y no admite adjuntos.
-- El servicio solo permite correos ligados a un hecho concreto y a un destinatario; un aviso de seguridad al administrador encaja. No se envía nunca a listas.
+## 1. Bloque SQL que ejecutas tú (revísalo antes)
 
-**Cómo se dispara.**
+Hace tres cosas, en este orden:
+- Crea el secreto. Su valor lo genera la base con `gen_random_bytes`.
+- Crea la función que lo comprueba. Solo puede ejecutarla `service_role`.
+- Programa la tarea. Se puede ejecutar más de una vez sin duplicar nada.
 
-| Opción | A favor | En contra |
-|---|---|---|
-| Trigger + pg_net por evento | Inmediato | Un ataque de 300 eventos lanza 300 llamadas; habría que agrupar igualmente; añade trabajo al camino del inicio de sesión |
-| Tarea programada cada 10 min que lee `auditoria_eventos` | Agrupa por naturaleza; no toca inicio de sesión ni ninguna función existente; si falla, la siguiente pasada recupera; no hace falta tabla de cola | Retraso de hasta 10 min |
+```sql
+-- 1) Secreto: valor aleatorio generado por la base; no se escribe en ningún sitio.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM vault.secrets WHERE name = 'avisos_seguridad_token') THEN
+    PERFORM vault.create_secret(
+      encode(extensions.gen_random_bytes(32), 'hex'),
+      'avisos_seguridad_token',
+      'Credencial de la tarea programada de avisos de seguridad');
+  END IF;
+END $$;
 
-Propongo la **tarea programada**. `auditoria_eventos` ya es la cola: no se crea ninguna tabla nueva. Un retraso de 10 minutos es aceptable para avisos que hoy nadie ve hasta días después.
+-- 2) Comprobación del secreto: solo service_role puede ejecutarla.
+CREATE OR REPLACE FUNCTION public.avisos_token_valido(_token text)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT coalesce(length(_token) = 64 AND EXISTS (
+    SELECT 1 FROM vault.decrypted_secrets
+    WHERE name = 'avisos_seguridad_token' AND decrypted_secret = _token), false)
+$$;
+REVOKE EXECUTE ON FUNCTION public.avisos_token_valido(text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.avisos_token_valido(text) TO service_role;
 
-## Qué se avisa
+-- 3) Tarea programada: cada 10 minutos (minutos 3, 13, 23...).
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'avisos-seguridad') THEN
+    PERFORM cron.unschedule('avisos-seguridad');
+  END IF;
+END $$;
+SELECT cron.schedule('avisos-seguridad', '3-59/10 * * * *', $cron$
+  SELECT net.http_post(
+    url := 'https://mxsnnxnqzrdydcpzdqmu.supabase.co/functions/v1/avisos-seguridad',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-avisos-token', (SELECT decrypted_secret FROM vault.decrypted_secrets
+                         WHERE name = 'avisos_seguridad_token')),
+    body := '{}'::jsonb);
+$cron$);
+```
 
-Cada pasada lee los eventos nuevos desde la última pasada y los agrupa en estas categorías. Cada categoría con algo nuevo genera **un** correo con el recuento y hasta 20 líneas (las demás se resumen como «y N más»).
+Un cambio respecto a tu punto 2: la función no devuelve el secreto, solo dice si el que recibe es correcto. Así el valor nunca sale de la base, ni siquiera hacia la función de avisos. Si prefieres que lo devuelva y que la comparación se haga en la función de avisos, la cambio.
 
-1. **Suspensión automática** (`suspension_automatica`). En el asunto se marca «CUENTA SOSPECHOSA» si algún evento es del ciclo 2 o posterior.
-2. **Límite por IP alcanzado.** Hoy `iniciar-sesion` rechaza la petición pero no deja un evento propio. Para no tocar esa función, la pasada lo calcula sobre los mismos datos: IPs con 10 o más fallos de contraseña (sin contar `error_servicio`) en la ventana que usa el inicio de sesión. Se avisa una vez por IP y ventana.
-3. **Configuración de seguridad.** Eventos que el trigger de servidor de `app_settings` ya escribe (no el evento que manda el navegador) para las claves de control de acceso, alta de equipos, sesiones simultáneas, modo del segundo factor y duración de sesión. Cada línea: «Clave: antes → después». Si se relaja una medida, el asunto lleva «MEDIDA RELAJADA»: control desactivado, segundo factor hacia `desactivado`, duración mayor o 0 (sin límite), más sesiones o equipos permitidos.
-4. **Nuevo administrador.** Alta o cambio en `user_roles` cuyo valor nuevo es `admin`.
-5. **Segundo factor restablecido** (`2fa_reseteado`).
-6. **Baja de usuario** (`baja_usuario`).
+El proyecto aparece en la URL. Eso no es secreto: es la misma dirección pública que ya usa la app.
 
-Lo que añado:
-- **Cambios en los propios avisos** (apagar el interruptor o cambiar el destinatario) cuentan como configuración relajada. Si se cambia el destinatario, el aviso se manda también a la dirección anterior: así nadie puede desviarlos sin que se note.
-- **Suspensión manual por un administrador** (`cambio_estado_usuario` a suspendido/bloqueado) va en la categoría 1.
+## 2. Lo que construyo yo
 
-Lo que descarto: inicios de sesión correctos, fallos sueltos de contraseña, `2fa_fallido` sueltos, cambios de nombre o de usuario, y el fin de una suspensión.
+**Migración única** (sin nada del almacén de secretos):
+- Activa las extensiones `pg_cron` y `pg_net`.
+- Crea la tabla `avisos_estado` con las columnas `categoria`, `cursor` y `ultimo_envio`, más una fila especial `_latido` para la última comprobación. Tiene RLS activado y ninguna política, con `REVOKE ALL` a `anon` y `authenticated` y `GRANT ALL` a `service_role`.
+- Crea `avisos_resumen_panel()`, una función SECURITY DEFINER que solo devuelve datos si quien llama es administrador. Da la última comprobación y el último aviso registrado (fecha y resultado). El panel no puede leer la tabla directamente, así que lo lee a través de esta función.
+- Añade los ajustes `avisos_seguridad_activo='true'` y `avisos_seguridad_email='info3@rimosa.com'` con `ON CONFLICT DO NOTHING`. No toco las políticas de `app_settings`.
 
-## Contenido del correo
+**Límite por IP en un único sitio:** un fichero compartido con `LIMITE_IP = 20` y la ventana de 15 minutos. `iniciar-sesion` lo importa en lugar de su constante local y su comportamiento no cambia. Vuelvo a desplegar esa función.
 
-Asunto: `[CRM Rimosa] 3 suspensiones automáticas (1 cuenta sospechosa)`.
-Cada línea dice qué ha pasado, a quién (nombre y usuario), cuándo (hora de Madrid) y desde qué IP, más quién lo hizo si fue un administrador. Al final, un botón «Abrir Auditoría» que lleva a la pantalla de Auditoría. Del detalle de cada evento solo se copian campos de una lista permitida: nunca se copian contraseñas, códigos, tokens, user-agent ni cabeceras.
+**Función `avisos-seguridad`**, que se ejecuta en cada pasada:
+1. Si la cabecera `x-avisos-token` falta o `avisos_token_valido` no devuelve verdadero, responde 401 y no hace nada más. En ese caso tampoco se guarda la hora de comprobación, y por eso el panel lo delata.
+2. Guarda la hora de comprobación, aunque no haya nada que enviar.
+3. Si el interruptor está apagado, termina.
+4. Si está encendido, sigue el plan aprobado:
+   - Agrupa por categoría los eventos nuevos.
+   - Calcula el límite por IP con la constante compartida.
+   - Envía como mucho un correo por categoría cada 30 minutos.
+   - Registra cada aviso en Auditoría como `aviso_seguridad`: `ok`, `denegado` o `fallo`.
+   - Avanza el cursor de la categoría solo si el correo se envió o el destinatario está dado de baja.
+   - Si se cambia el destinatario, avisa también a la dirección anterior.
 
-## Protección contra avalanchas
+**Plantilla de correo** `aviso-seguridad`, en castellano, con un botón «Abrir Auditoría».
 
-- Una pasada cada 10 minutos, como máximo un correo por categoría en cada pasada.
-- Por cada categoría, si ya se envió un correo en los últimos 30 minutos, los eventos nuevos se guardan para el siguiente correo en lugar de mandar otro. Así, un ataque continuado da como mucho 2 correos/hora por categoría, cada uno con el recuento acumulado.
-- Clave de no duplicado por categoría y tramo: si una pasada se reintenta, no sale el mismo correo dos veces.
+**Panel de seguridad**, en un nuevo bloque «Avisos por correo»:
+- Interruptor para activar o desactivar los avisos, y campo del destinatario.
+- «Último aviso enviado: …». Si el último aviso registrado es `denegado` o `fallo`, aparece en rojo «Los avisos no están llegando».
+- «Última comprobación: hace X minutos». Si han pasado más de 30 minutos o nunca ha habido comprobación, aparece en rojo «Los avisos no se están comprobando».
 
-## Panel de seguridad
+**Otros cambios:**
+- Auditoría: etiqueta y filtro para «Aviso de seguridad».
+- En los correos de acceso, el nombre del remitente pasa a ser «CRM Rimosa». No cambia nada más de esa función.
 
-En la tarjeta de seguridad ya existente se añade un bloque «Avisos por correo»:
-- Interruptor «Enviar avisos de seguridad» (`avisos_seguridad_activo`, por defecto activado).
-- Campo «Correo destinatario» (`avisos_seguridad_email` = `info3@rimosa.com`), con validación de formato.
-- Texto: «Último aviso enviado: …» leído de Auditoría.
+## 3. Orden
 
-## Registro de cada aviso
+1. Construyo y despliego todo lo anterior. Hasta que ejecutes el bloque, el panel mostrará en rojo «Los avisos no se están comprobando», que es lo esperado.
+2. Ejecutas el bloque SQL.
+3. En la siguiente pasada, como mucho 10 minutos después, compruebo que se ha guardado la hora de comprobación. Después hago la prueba: cambio un ajuste de seguridad inocuo, lo devuelvo a su valor, compruebo que llega un correo y que queda el evento `aviso_seguridad/ok`, y compruebo que una llamada sin el secreto recibe 401.
 
-Cada envío deja un evento en `auditoria_eventos`: `aviso_seguridad` con resultado `ok` (enviado), `denegado` (destinatario dado de baja) o `fallo` (con código de error, sin el contenido del correo). El detalle guarda la categoría, el recuento y la dirección. En Auditoría aparece con la etiqueta «Aviso de seguridad» y su filtro. La pasada ignora estos eventos al leer, para no avisar de sus propios avisos.
-
-## Garantía de no romper nada
-
-La pasada vive aparte: ningún inicio de sesión, ningún registro en auditoría y ninguna operación de usuario espera por ella ni depende de ella. Si el envío falla, solo queda el evento `fallo` y el cursor no avanza para esa categoría, así que se reintenta en la siguiente pasada.
-
-## Fuera de alcance
-
-No se tocan `iniciar-sesion`, `cambiar-password`, `registrar_sesion` ni `verificar_sesion`. En `auth-email-hook` solo cambia `SITE_NAME` a «CRM Rimosa».
-
-## Detalles técnicos
-
-- **Migración única** (`drizzle/migrations/0009_avisos_seguridad.sql`):
-  - `INSERT ... ON CONFLICT DO NOTHING` en `app_settings`: `avisos_seguridad_activo='true'`, `avisos_seguridad_email='info3@rimosa.com'`, `avisos_seguridad_estado='{}'` (cursor y última hora de envío por categoría, en jsonb). La última clave no se muestra en el panel y no se puede escribir desde el navegador (la escribe solo la función, con service role; la política de escritura de admin sobre `app_settings` excluye esa clave).
-  - Programación `pg_cron` + `pg_net` cada 10 min, en el minuto 3 (`3-59/10 * * * *`), llamando a la función. Advertencia: la URL del proyecto queda escrita en la migración; si se lleva la base a otra instancia hay que volver a crear esa programación con la URL nueva.
-- **Plantillas de correo de la app**: se crea la estructura una sola vez y una plantilla `aviso-seguridad` (React Email, fondo blanco, verde corporativo, todo en castellano).
-- **Función `avisos-seguridad`** (nueva, no acepta datos de entrada; destinatario y plantilla fijos en servidor; idempotente gracias al cursor, así que llamarla de más no genera correos). Con service role: lee ajustes, sale si el interruptor está apagado, consulta eventos con `ocurrido_en > cursor` y `tipo <> 'aviso_seguridad'`, agrupa, aplica la ventana de 30 min, envía con `sendTemplateEmail` y `idempotencyKey = avisos-<categoria>-<cursor>`, registra el evento y avanza el cursor por categoría solo si se envió o el destinatario estaba dado de baja. Si responde 429, respeta el tiempo de espera y lo deja para la siguiente pasada. Va con su `deno.json` y una entrada en `config.toml`.
-- Constantes de la ventana y el límite por IP copiadas de `iniciar-sesion` (10 fallos), con un comentario que diga que tienen que coincidir.
-- `SeguridadAccesoCard.tsx`: nuevo bloque, guarda con el mismo `upsert` que el resto.
-- `AdminAuditoria.tsx`: etiqueta y filtro para `aviso_seguridad`; nombres traducidos de `categoria`, `recuento` y `destinatario`.
-- `auth-email-hook/index.ts`: `SITE_NAME = "CRM Rimosa"` y despliegue.
-- Comprobación: activar, provocar un cambio de un ajuste de seguridad en un campo inocuo y devolverlo a su valor, lanzar la función a mano, ver que llega el correo y el evento `aviso_seguridad/ok`; volver a lanzarla y ver que no sale un segundo correo.
+**Coste:** 144 ejecuciones al día. Cada una es una consulta corta, pero las comprobaciones frecuentes mantienen la base en marcha. Ese es el precio de que un aviso llegue con 10 minutos de retraso como máximo.
