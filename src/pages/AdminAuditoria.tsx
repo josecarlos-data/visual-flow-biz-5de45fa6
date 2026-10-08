@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -382,9 +382,8 @@ export default function AdminAuditoria() {
                 </TableHeader>
                 <TableBody>
                   {rows.map((r) => (
-                    <>
+                    <Fragment key={r.id}>
                       <TableRow
-                        key={r.id}
                         className="cursor-pointer"
                         onClick={() => alternarExpandido(r.id)}
                       >
