@@ -333,10 +333,19 @@ export default function AdminAuditoria() {
           ) : isMobile ? (
             <div className="space-y-3">
               {rows.map((r) => (
-                <div key={r.id} className="rounded-lg border p-3 text-sm">
+                <div
+                  key={r.id}
+                  className="cursor-pointer rounded-lg border p-3 text-sm"
+                  onClick={() => alternarExpandido(r.id)}
+                >
                   <div className="flex items-start justify-between gap-2">
                     <span className="font-medium">{etiquetaTipo(r.tipo)}</span>
-                    <Badge variant={variantResultado(r.resultado)}>{r.resultado}</Badge>
+                    <span className="flex items-center gap-1">
+                      <Badge variant={variantResultado(r.resultado)}>{r.resultado}</Badge>
+                      <ChevronDown
+                        className={`h-4 w-4 text-muted-foreground transition-transform ${expandidos.has(r.id) ? "rotate-180" : ""}`}
+                      />
+                    </span>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">{fechaLarga(r.ocurrido_en)}</p>
                   <p className="mt-1 break-words">{nombreUsuario(r)}</p>
@@ -344,10 +353,15 @@ export default function AdminAuditoria() {
                   {r.ruta && <p className="break-words text-xs text-muted-foreground">Ruta: {r.ruta}</p>}
                   {r.entidad && (
                     <p className="break-words text-xs text-muted-foreground">
-                      {r.entidad}: {r.entidad_id}
+                      {nombreEntidad(r)}
                     </p>
                   )}
                   {r.ip && <p className="text-xs text-muted-foreground">IP: {r.ip}</p>}
+                  {expandidos.has(r.id) && (
+                    <div className="mt-2 border-t pt-2">
+                      <DetalleEvento detalle={r.detalle} />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
