@@ -212,15 +212,16 @@ Deno.serve(async (req) => {
     const { data: ajustes } = await db.from("app_settings").select("key, value")
       .in("key", ["avisos_seguridad_activo", "avisos_seguridad_email"]);
     const a = new Map((ajustes ?? []).map((x) => [x.key, x.value]));
-    if ((a.get("avisos_seguridad_activo") ?? "true") !== "true") {
-      // Aunque estén apagados, el cambio que los apaga sí se avisa (última vez).
-    }
     const activo = (a.get("avisos_seguridad_activo") ?? "true") === "true";
     const destino = (a.get("avisos_seguridad_email") ?? "").trim();
 
     for (const { cat, fn } of CATEGORIAS) {
       // Con avisos apagados solo se procesa configuración, para avisar de que se han apagado.
-      if (!activo && cat !== "configuracion") continue;
+      if (!activo && cat !== "configuracion") {
+        // Apagados: se descarta lo ocurrido para no recibir todo de golpe al reactivarlos.
+        await db.from("avisos_estado").upsert({ categoria: cat, cursor: ahora }, { onConflict: "categoria" });
+        continue;
+      }
       try {
         const st = await estado(cat);
         if (st.ultimo_envio && Date.now() - new Date(st.ultimo_envio).getTime() < ESPERA_MS) continue;

@@ -44,6 +44,7 @@ const TIPOS: { value: string; label: string }[] = [
   { value: "usuario_cambio", label: "Usuario: cambio" },
   { value: "usuario_baja", label: "Usuario: baja" },
   { value: "2fa_reseteado", label: "Segundo factor restablecido" },
+  { value: "aviso_seguridad", label: "Aviso de seguridad" },
 ];
 
 const RESULTADOS: { value: string; label: string }[] = [
