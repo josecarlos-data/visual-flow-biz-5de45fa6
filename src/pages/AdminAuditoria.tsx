@@ -71,7 +71,6 @@ const NOMBRES_CAMPO: Record<string, string> = {
   categoria: "Categoría",
   recuento: "Recuento",
   destinatario: "Destinatario",
-  codigo: "Código",
   estado: "Estado",
   exige_2fa: "Exigir segundo factor",
   sesiones_max: "Sesiones simultáneas",
