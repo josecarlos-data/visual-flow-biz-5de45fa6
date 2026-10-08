@@ -1,36 +1,56 @@
-# Duración máxima de sesión y auditoría de cambios en usuarios
+# Ajuste de la pestaña de Auditoría
 
-## Respuesta previa: claim `amr`
+Solo se modifica `src/pages/AdminAuditoria.tsx`. Sin migraciones, sin cambios en base de datos ni en funciones del backend.
 
-- **Sí lo incluye.** Al iniciar sesión con contraseña, el servicio de acceso guarda por sesión una entrada «método `password` + hora» y la vuelca en `amr` en cada token: `[{"method":"password","timestamp":<epoch>}]`. Lo he comprobado en la base: hay entradas `password` ligadas a sesiones reales (la última, de hoy a las 12:45 UTC).
-- **Se conserva igual al refrescar el token.** La entrada va ligada a la sesión, no al token, y el refresco la vuelve a leer sin cambiarla. Al verificar el segundo factor se añade una entrada `totp` aparte; la de `password` no se toca.
-- **Un caso límite que tienes que decidir:** las sesiones que abre la herramienta interna de pruebas no llevan `amr`; lo he comprobado en la sesión de Bautista. Las sesiones de usuarios reales, que entran por `iniciar-sesion` con contraseña, siempre lo llevan. Propongo: **si falta la marca `password`, no aplicar la caducidad** (la sesión sigue vigente) y registrar `motivo` en Auditoría solo la primera vez. La otra opción sería tratarla como caducada. Dime cuál prefieres; el plan usa la primera.
+## Qué se corrige
 
-## A. Duración máxima de sesión
+### 1. El bloque `seguridad` deja de verse como texto sin formato
 
-1. `app_settings`: `sesion_duracion_horas = '12'` (lo inserto como dato, fuera de la migración). Si está vacío o vale `0`, no hay límite.
-2. `verificar_sesion`: `DROP FUNCTION` con la firma exacta y se vuelve a crear con el cuerpo actual copiado literalmente. Añado un solo bloque **después** de la comprobación de estado y **antes** del interruptor `control_sesiones_activo`:
-   - Leo las horas. Si son > 0, tomo el `timestamp` de la entrada `password` de `auth.jwt()->'amr'`. Si `now() - to_timestamp(ts)` supera las horas, devuelvo `{"vigente":false,"motivo":"sesion_caducada"}`.
-   - Este bloque no lee `sesiones_activas`, así que la regla «sin filas = vigente» no lo salta.
-   - Vuelvo a dar `GRANT EXECUTE` a authenticated. Comparo `pg_get_functiondef` y `proacl` antes y después.
-3. `useAuth`:
-   - Con motivo `sesion_caducada`, se cierra la sesión igual que en la expulsión: `signOut({scope:'local'})`, se borra `crm_sesion_id` y se limpia el estado local. Aviso propio: «Tu sesión ha caducado. Vuelve a iniciar sesión.»
-   - El vigilante hace una comprobación inmediata al entrar en `activo`, además del intervalo de 20 s y sin quitar la protección contra solapamientos.
-4. Panel (`SeguridadAccesoCard`): campo numérico «Duración máxima de sesión (horas)» (0 = sin límite), con entero 0–720 y botón Guardar. Registra `cambio_config_seguridad`.
+Hoy los eventos «Usuario: cambio» guardan los valores anteriores y nuevos dentro de una clave `seguridad`, y la pantalla pinta ese objeto entero como JSON. Se recorre ese objeto y cada valor se pinta como una línea propia, con las mismas etiquetas traducidas que el resto:
 
-## B. Auditoría de cambios en usuarios
+```text
+Campos modificados: Sesiones simultáneas, Máximo de equipos
+Sesiones simultáneas: 1 → 2
+Máximo de equipos: 8 → 3
+```
 
-Función nueva `public.auditar_cambio_usuario()` (`auditar_cambio` no se toca). SECURITY DEFINER, `search_path=public`, sin GRANT EXECUTE y con `REVOKE` de PUBLIC. Triggers AFTER INSERT OR UPDATE OR DELETE en `profiles`, `user_roles` y `user_dashboard_access`.
+- La clave `seguridad` no se muestra como tal.
+- Se ignoran los grupos vacíos (un `seguridad: {}` no pinta nada).
+- Los valores siguen con las reglas ya aplicadas: booleanos como Sí / No, vacíos como «—».
+- Se ocultan también dentro de estos grupos las claves técnicas de red (dirección de origen, etc.).
 
-- Tipos `usuario_alta`, `usuario_cambio` y `usuario_baja`. `entidad` = tabla; `entidad_id` = usuario afectado.
-- Si `auth.uid()` es nulo, `user_id` queda null y `detalle.origen = 'sistema'`; si no, `origen = 'usuario'`.
-- En UPDATE: lista de campos cambiados, sin `created_at` ni `updated_at`. Si no cambia nada, no escribe.
-- Antes y después solo para: `is_approved`, `estado`, `estado_motivo`, `ver_margen`, `exige_2fa`, `sesiones_max`, `dispositivos_max`, `debe_cambiar_password`, `username`, `marcada_sospechosa` y `role`. Del resto, solo el nombre del campo.
-- Todo dentro de `EXCEPTION WHEN OTHERS`: un fallo de auditoría nunca bloquea la operación original.
-- Fuera de la migración: añado los tres tipos a `TipoEvento` y a las etiquetas de Auditoría para que se vean con nombre legible. La función de servidor `registrar-evento` no cambia, porque la escritura la hace el trigger.
+### 2. Etiquetas de «Operación» y «Origen»
+
+- `operacion` se traduce: INSERT → Alta, UPDATE → Modificación, DELETE → Baja. La etiqueta es «Operación».
+- `origen` se muestra con mayúscula inicial: Usuario / Sistema. La etiqueta sigue siendo «Origen».
+
+### 3. Columna Entidad
+
+Hoy solo se resuelve el nombre cuando la entidad es `usuario`; para el resto se ve `profiles: 6b97411d-…`.
+
+Se resuelve el nombre también cuando la entidad es `profiles`, `user_roles` o `user_dashboard_access`, usando la lista de perfiles ya cargada para el filtro de usuarios (sin consultas por fila) y mostrando **solo el nombre**, sin el prefijo de la tabla:
+
+```text
+antes: profiles: 6b97411d-a43b-45d2-…
+ahora: Bautista …
+```
+
+Si el identificador no está entre los perfiles cargados, se mantiene el comportamiento actual (`tabla: identificador`) para que se vea que no se ha podido resolver.
+
+En móvil, el detalle desplegable de cada tarjeta se beneficia automáticamente del punto 1, ya que usa el mismo componente.
+
+## Criterio de comprobación
+
+- Filtrar por «Usuario: cambio» y desplegar una fila con cambios de sesiones o máximo de equipos: se ven las líneas «Sesiones simultáneas: 1 → 2» y «Máximo de equipos: 8 → 3», nunca JSON.
+- La misma fila muestra «Operación: Modificación» y «Origen: Usuario».
+- Una fila con `exige_2fa` muestra «Exigir segundo factor: No → Sí».
+- La columna Entidad de esas filas muestra el nombre de la persona, no un UUID.
+- Los eventos de ajustes (`antes` / `despues` sueltos, como `sesion_duracion_horas`) siguen viéndose como hasta ahora.
 
 ## Detalles técnicos
-- Una sola migración: `verificar_sesion` + `auditar_cambio_usuario` + tres triggers.
-- Fuera de alcance: correo, `registrar_sesion`, `iniciar-sesion`, `cambiar-password`, `admin-segundo-factor` y los textos del segundo factor.
-- Verificación: con un JWT simulado (`set_config('request.jwt.claims')`) con `amr` de hace 13 h, la respuesta es `sesion_caducada`; con uno de hace 1 h, es vigente. Además, un UPDATE de prueba en un perfil deja un evento con los campos correctos; después lo revierto.
-- Nota: las pruebas del segundo factor (reseteo y limpieza) siguen pendientes y no se mezclan con este cambio.
+
+- `lineasDetalle` (en `src/pages/AdminAuditoria.tsx`) pasa a recorrer, además de los pares sueltos, cualquier objeto anidado cuyas entradas sean pares antes/después o valores simples, saltando grupos vacíos y aplicando `CAMPOS_OCULTOS` también dentro del grupo.
+- Orden de las líneas: «Campos modificados», después los pares del grupo de seguridad, después el resto de valores simples (Operación, Origen, etc.) y por último los pares sueltos de siempre.
+- `NOMBRES_CAMPO` incorpora `operacion` → «Operación» y `seguridad` deja de usarse como etiqueta visible.
+- Traducción de valores dependiente de la clave: un pequeño helper `valorDeClave(clave, valor)` devuelve «Alta/Modificación/Baja» para `operacion` y capitaliza `origen`; el resto pasa por `valorLegible` sin cambios.
+- `nombreEntidad` pasa a usar un conjunto `{usuario, profiles, user_roles, user_dashboard_access}` para buscar en `usuarios` por `entidad_id`; si encuentra coincidencia devuelve solo `full_name || email`, si no, el prefijo actual.
