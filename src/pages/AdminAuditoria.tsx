@@ -377,24 +377,41 @@ export default function AdminAuditoria() {
                     <TableHead>Ruta</TableHead>
                     <TableHead>Entidad</TableHead>
                     <TableHead>IP</TableHead>
+                    <TableHead className="w-8" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rows.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="whitespace-nowrap text-xs">{fechaLarga(r.ocurrido_en)}</TableCell>
-                      <TableCell className="max-w-[220px]">
-                        <div className="truncate">{nombreUsuario(r)}</div>
-                        {r.email && <div className="truncate text-xs text-muted-foreground">{r.email}</div>}
-                      </TableCell>
-                      <TableCell className="text-sm">{etiquetaTipo(r.tipo)}</TableCell>
-                      <TableCell><Badge variant={variantResultado(r.resultado)}>{r.resultado}</Badge></TableCell>
-                      <TableCell className="max-w-[180px] truncate text-xs">{r.ruta ?? "—"}</TableCell>
-                      <TableCell className="max-w-[180px] truncate text-xs">
-                        {r.entidad ? `${r.entidad}: ${r.entidad_id ?? ""}` : "—"}
-                      </TableCell>
-                      <TableCell className="text-xs">{r.ip ?? "—"}</TableCell>
-                    </TableRow>
+                    <>
+                      <TableRow
+                        key={r.id}
+                        className="cursor-pointer"
+                        onClick={() => alternarExpandido(r.id)}
+                      >
+                        <TableCell className="whitespace-nowrap text-xs">{fechaLarga(r.ocurrido_en)}</TableCell>
+                        <TableCell className="max-w-[220px]">
+                          <div className="truncate">{nombreUsuario(r)}</div>
+                          {r.email && <div className="truncate text-xs text-muted-foreground">{r.email}</div>}
+                        </TableCell>
+                        <TableCell className="text-sm">{etiquetaTipo(r.tipo)}</TableCell>
+                        <TableCell><Badge variant={variantResultado(r.resultado)}>{r.resultado}</Badge></TableCell>
+                        <TableCell className="max-w-[180px] truncate text-xs">{r.ruta ?? "—"}</TableCell>
+                        <TableCell className="max-w-[180px] truncate text-xs">{nombreEntidad(r)}</TableCell>
+                        <TableCell className="text-xs">{r.ip ?? "—"}</TableCell>
+                        <TableCell>
+                          <ChevronDown
+                            className={`h-4 w-4 text-muted-foreground transition-transform ${expandidos.has(r.id) ? "rotate-180" : ""}`}
+                          />
+                        </TableCell>
+                      </TableRow>
+                      {expandidos.has(r.id) && (
+                        <TableRow key={`${r.id}-detalle`}>
+                          <TableCell colSpan={8} className="bg-muted/30">
+                            <DetalleEvento detalle={r.detalle} />
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
                   ))}
                 </TableBody>
               </Table>
