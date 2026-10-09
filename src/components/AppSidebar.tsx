@@ -32,6 +32,7 @@ export function AppSidebar() {
   const adminItems = isAdmin
     ? [
         { title: "Usuarios", url: "/admin/users", icon: Users },
+        { title: "Seguridad", url: "/admin/seguridad", icon: Icons.Shield },
         { title: "Datos", url: "/admin/data", icon: Database },
         { title: "Plantillas de visita", url: "/admin/visitas", icon: Icons.ClipboardList },
         { title: "Situaciones de cliente", url: "/admin/situaciones", icon: Icons.ShieldAlert },
