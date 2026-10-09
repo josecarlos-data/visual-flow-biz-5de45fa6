@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
@@ -114,6 +114,12 @@ export default function ClienteDetalle() {
     const params = Object.fromEntries(searchParams.entries());
     setSearchParams({ ...params, tab: nueva }, { replace: true });
   };
+
+  // Registro de consultas: sin esperar respuesta; si falla, el usuario no lo nota.
+  useEffect(() => {
+    if (codNum == null || !Number.isFinite(codNum)) return;
+    void (supabase.rpc as any)("registrar_consulta", { _cod: codNum, _pestana: tab }).then(() => {}, () => {});
+  }, [codNum, tab]);
 
   const { data: cliente, isLoading } = useCliente(codNum);
   const { data: ventas } = useClienteVentas(codNum);

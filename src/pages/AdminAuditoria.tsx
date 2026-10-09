@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { ChevronDown, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ConsultasAuditoria from "@/components/ConsultasAuditoria";
 
 interface EventoRow {
   id: string;
@@ -62,7 +64,22 @@ const TIPOS: { value: string; label: string }[] = [
   { value: "cambio_rol", label: "Cambio de rol" },
   { value: "aprobacion_usuario", label: "Aprobación de usuario" },
   { value: "cambio_ver_margen", label: "Cambio de visibilidad de margen" },
+  { value: "consulta_actividad", label: "Consulta del registro de consultas" },
 ];
+
+/** Nombre en singular de cada tabla auditada, para «Alta de visita», «Cambio de perfil de cliente»… */
+const TABLAS: Record<string, string> = {
+  visitas: "visita",
+  clientes: "cliente",
+  objetivos: "objetivo",
+  situaciones_cliente: "situación de cliente",
+  cliente_perfil_datos: "perfil de cliente",
+  app_settings: "ajuste",
+};
+const OPERACION_DATO: Record<string, string> = { dato_alta: "Alta", dato_cambio: "Cambio", dato_baja: "Baja" };
+
+/** Nombres de atributos del perfil de cliente, cargados una vez al abrir la pantalla. */
+const ATRIBUTOS: Record<string, string> = {};
 
 const RESULTADOS: { value: string; label: string }[] = [
   { value: "ok", label: "Correcto" },
@@ -92,6 +109,9 @@ const NOMBRES_AJUSTE: Record<string, string> = {
   avisos_seguridad_activo: "Avisos de seguridad",
   avisos_seguridad_email: "Destinatario de avisos",
   anios_cliente_activo: "Años para considerar activo a un cliente",
+  registro_consultas_activo: "Registro de consultas",
+  auditoria_retencion_dias: "Conservación de Auditoría (días)",
+  consultas_retencion_dias: "Conservación de consultas (días)",
 };
 
 const VALORES: Record<string, Record<string, string>> = {
@@ -109,7 +129,9 @@ const VALORES: Record<string, Record<string, string>> = {
   estado: {
     activo: "Activo", suspendido_temporal: "Suspendido temporalmente", bloqueado_intentos: "Bloqueado por intentos",
     bloqueado_admin: "Bloqueado por un administrador", baja: "Baja",
+    pendiente: "Pendiente", confirmado: "Confirmado", descartado: "Descartado",
   },
+  vista: { por_usuario: "Por usuario", por_cliente: "Por cliente" },
   accion: { autorizar: "Autorizar", bloquear: "Bloquear", desbloquear: "Desbloquear", renombrar: "Renombrar", eliminar: "Eliminar" },
   operacion: { INSERT: "Alta", UPDATE: "Modificación", DELETE: "Baja" },
   origen: { usuario: "Usuario", sistema: "Sistema" },
@@ -163,6 +185,12 @@ const NOMBRES_CAMPO: Record<string, string> = {
   delegacion: "Delegación",
   email: "Correo",
   is_active: "Activo",
+  cod_cliente: "Código de cliente",
+  atributo: "Atributo del perfil",
+  valor_texto: "Valor",
+  motivo_descarte: "Motivo de descarte",
+  vista: "Vista",
+  desde: "Desde",
 };
 
 const CAMPOS_OCULTOS = new Set(["x_forwarded_for", "cf_connecting_ip", "autenticado"]);
@@ -175,6 +203,8 @@ const valorDeClave = (k: string, v: unknown): string => {
   if (Array.isArray(v)) return v.map((x) => valorDeClave(k, x)).join(", ");
   if (typeof v === "object") return JSON.stringify(v);
   const t = String(v);
+  if (k === "atributo") return ATRIBUTOS[t] ?? t;
+  if ((k === "desde" || k === "hasta") && /^\d{4}-\d{2}-\d{2}T/.test(t)) return fechaLarga(t);
   return VALORES[k]?.[t] ?? t;
 };
 
@@ -284,6 +314,48 @@ export default function AdminAuditoria() {
   const [usuarios, setUsuarios] = useState<{ user_id: string; full_name: string | null; email: string | null }[]>([]);
 
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+  const [nombresCliente, setNombresCliente] = useState<Record<number, string>>({});
+  const [codPorVisita, setCodPorVisita] = useState<Record<string, number>>({});
+  const [codPorClienteId, setCodPorClienteId] = useState<Record<string, number>>({});
+  const [, setAtributosListos] = useState(0);
+
+  const codClienteDe = (r: EventoRow): number | null => {
+    const d = r.detalle as Record<string, unknown> | null;
+    if (d && d.cod_cliente != null && Number.isFinite(Number(d.cod_cliente))) return Number(d.cod_cliente);
+    if (r.entidad === "cliente" && r.entidad_id) return Number(r.entidad_id);
+    if (r.entidad === "visitas" && r.entidad_id && codPorVisita[r.entidad_id] != null) return codPorVisita[r.entidad_id];
+    if (r.entidad === "clientes" && r.entidad_id && codPorClienteId[r.entidad_id] != null) return codPorClienteId[r.entidad_id];
+    return null;
+  };
+
+  /** Resuelve nombres de cliente de la página con pocas consultas agrupadas, no una por fila. */
+  const resolverClientes = async (list: EventoRow[]) => {
+    const ids = (ent: string) => [...new Set(list.filter((r) => r.entidad === ent && r.entidad_id && !(r.detalle as any)?.cod_cliente).map((r) => r.entidad_id!))];
+    const visIds = ids("visitas");
+    const cliIds = ids("clientes");
+    const [vis, cli] = await Promise.all([
+      visIds.length ? supabase.from("visitas").select("id, cod_cliente").in("id", visIds) : Promise.resolve({ data: [] as any[] }),
+      cliIds.length ? supabase.from("clientes").select("id, cod_cliente").in("id", cliIds) : Promise.resolve({ data: [] as any[] }),
+    ]);
+    const mv: Record<string, number> = {};
+    ((vis.data as any[]) ?? []).forEach((v) => { if (v.cod_cliente != null) mv[v.id] = v.cod_cliente; });
+    const mc: Record<string, number> = {};
+    ((cli.data as any[]) ?? []).forEach((c) => { mc[c.id] = c.cod_cliente; });
+    setCodPorVisita(mv);
+    setCodPorClienteId(mc);
+    const cods = new Set<number>([...Object.values(mv), ...Object.values(mc)]);
+    list.forEach((r) => {
+      const d = r.detalle as any;
+      if (d?.cod_cliente != null) cods.add(Number(d.cod_cliente));
+      if (r.entidad === "cliente" && r.entidad_id) cods.add(Number(r.entidad_id));
+    });
+    const lista = [...cods].filter((c) => Number.isFinite(c));
+    if (!lista.length) return;
+    const { data } = await supabase.from("clientes").select("cod_cliente, cliente").in("cod_cliente", lista);
+    const m: Record<number, string> = {};
+    ((data as any[]) ?? []).forEach((c) => { m[c.cod_cliente] = c.cliente; });
+    setNombresCliente((prev) => ({ ...prev, ...m }));
+  };
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [usuario, setUsuario] = useState(TODOS);
@@ -317,6 +389,7 @@ export default function AdminAuditoria() {
     } else {
       const list = ((data as any[]) ?? []) as EventoRow[];
       setRows(list);
+      void resolverClientes(list);
       setTotal(list.length ? Number(list[0].total_filas) : 0);
     }
     setLoading(false);
@@ -325,6 +398,10 @@ export default function AdminAuditoria() {
   useEffect(() => {
     fetchUsuarios();
     fetchData(0);
+    void supabase.from("perfil_atributos").select("key, nombre").then(({ data }) => {
+      ((data as any[]) ?? []).forEach((a) => { ATRIBUTOS[a.key] = a.nombre; });
+      setAtributosListos((n) => n + 1);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -353,7 +430,14 @@ export default function AdminAuditoria() {
 
   const nombreUsuario = (r: EventoRow) => r.full_name || r.email || (r.user_id ? "—" : "Sistema");
 
-  const tipoLegible = (t: string) => etiquetaTipo(t) ?? <Tecnico>{t}</Tecnico>;
+  const tipoLegible = (r: EventoRow) => {
+    const op = OPERACION_DATO[r.tipo];
+    if (op && r.entidad) {
+      const tabla = TABLAS[r.entidad];
+      return tabla ? `${op} de ${tabla}` : <>{op} de <Tecnico>{r.entidad}</Tecnico></>;
+    }
+    return etiquetaTipo(r.tipo) ?? <Tecnico>{r.tipo}</Tecnico>;
+  };
   const resultadoLegible = (x: string) => VALORES.resultado[x] ?? x;
 
   const nombreEntidad = (r: EventoRow): React.ReactNode => {
@@ -365,6 +449,12 @@ export default function AdminAuditoria() {
     if (r.entidad === "app_settings" || r.entidad === "ajuste") {
       const k = r.entidad_id ?? "";
       return NOMBRES_AJUSTE[k] ?? <Tecnico>{k}</Tecnico>;
+    }
+    const cod = codClienteDe(r);
+    if (cod != null) return nombresCliente[cod] ?? `Cliente ${cod}`;
+    if (r.entidad && TABLAS[r.entidad]) {
+      const t = TABLAS[r.entidad];
+      return t.charAt(0).toUpperCase() + t.slice(1) + (r.entidad === "visitas" ? " (eliminada)" : "");
     }
     if (r.entidad === "dispositivo") return "Equipo";
     if (r.entidad === "aviso") return "Aviso";
@@ -389,6 +479,12 @@ export default function AdminAuditoria() {
         </p>
       </div>
 
+      <Tabs defaultValue="eventos" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="eventos">Eventos</TabsTrigger>
+          <TabsTrigger value="consultas">Consultas</TabsTrigger>
+        </TabsList>
+        <TabsContent value="eventos" className="space-y-4">
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Filtros</CardTitle>
@@ -472,7 +568,7 @@ export default function AdminAuditoria() {
                   onClick={() => alternarExpandido(r.id)}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <span className="font-medium">{tipoLegible(r.tipo)}</span>
+                    <span className="font-medium">{tipoLegible(r)}</span>
                     <span className="flex items-center gap-1">
                       <Badge variant={variantResultado(r.resultado)}>{resultadoLegible(r.resultado)}</Badge>
                       <ChevronDown
@@ -525,7 +621,7 @@ export default function AdminAuditoria() {
                           <div className="truncate">{nombreUsuario(r)}</div>
                           {r.email && <div className="truncate text-xs text-muted-foreground">{r.email}</div>}
                         </TableCell>
-                        <TableCell className="text-sm">{tipoLegible(r.tipo)}</TableCell>
+                        <TableCell className="text-sm">{tipoLegible(r)}</TableCell>
                         <TableCell><Badge variant={variantResultado(r.resultado)}>{resultadoLegible(r.resultado)}</Badge></TableCell>
                         <TableCell className="max-w-[180px] truncate text-xs">{r.ruta ?? "—"}</TableCell>
                         <TableCell className="max-w-[180px] truncate text-xs">{nombreEntidad(r)}</TableCell>
@@ -570,6 +666,11 @@ export default function AdminAuditoria() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+        <TabsContent value="consultas">
+          <ConsultasAuditoria usuarios={usuarios} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

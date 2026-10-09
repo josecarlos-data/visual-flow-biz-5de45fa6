@@ -585,6 +585,30 @@ export type Database = {
         }
         Relationships: []
       }
+      consultas_cliente: {
+        Row: {
+          cod_cliente: number
+          id: number
+          ocurrido_en: string
+          pestana: string
+          user_id: string
+        }
+        Insert: {
+          cod_cliente: number
+          id?: never
+          ocurrido_en?: string
+          pestana: string
+          user_id: string
+        }
+        Update: {
+          cod_cliente?: number
+          id?: never
+          ocurrido_en?: string
+          pestana?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       dashboards: {
         Row: {
           created_at: string
@@ -2363,6 +2387,14 @@ export type Database = {
           vendedor: string
         }[]
       }
+      consultas_por_cliente: {
+        Args: { _cod: number; _desde: string; _hasta: string }
+        Returns: Json
+      }
+      consultas_por_usuario: {
+        Args: { _desde: string; _hasta: string; _user_id: string }
+        Returns: Json
+      }
       dispositivos_usuario: {
         Args: { _user_id: string }
         Returns: {
@@ -2601,11 +2633,16 @@ export type Database = {
       puede_ver_bloque: { Args: { _visita_id: string }; Returns: boolean }
       puede_ver_margen: { Args: { _user_id: string }; Returns: boolean }
       purgar_auditoria: { Args: never; Returns: number }
+      purgar_consultas: { Args: never; Returns: number }
       quincena_corte: { Args: { _anio: number }; Returns: number }
       quincena_de: { Args: { _f: string }; Returns: number }
       refrescar_documentos_resumen: { Args: never; Returns: undefined }
       refrescar_resumenes_admin: { Args: never; Returns: undefined }
       refrescar_resumenes_ventas: { Args: never; Returns: undefined }
+      registrar_consulta: {
+        Args: { _cod: number; _pestana: string }
+        Returns: undefined
+      }
       registrar_exito_acceso: { Args: { _user_id: string }; Returns: undefined }
       registrar_fallo_acceso: {
         Args: { _origen: string; _user_id: string }
