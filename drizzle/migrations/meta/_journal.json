@@ -85,6 +85,13 @@
       "when": 1791532196162,
       "tag": "0011_auditoria_ip_desde_peticion",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791545071395,
+      "tag": "0012_consultas_cliente_y_auditoria_por_tabla",
+      "breakpoints": true
     }
   ]
 }
