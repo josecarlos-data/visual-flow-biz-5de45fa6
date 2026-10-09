@@ -191,7 +191,6 @@ const NOMBRES_CAMPO: Record<string, string> = {
   motivo_descarte: "Motivo de descarte",
   vista: "Vista",
   desde: "Desde",
-  hasta: "Hasta",
 };
 
 const CAMPOS_OCULTOS = new Set(["x_forwarded_for", "cf_connecting_ip", "autenticado"]);
