@@ -71,6 +71,13 @@
       "when": 1791470934951,
       "tag": "0009_avisos_seguridad",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791528649766,
+      "tag": "0010_auditar_cambio_ajustes",
+      "breakpoints": true
     }
   ]
 }
