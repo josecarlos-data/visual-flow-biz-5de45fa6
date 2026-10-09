@@ -24,4 +24,4 @@
 - [x] Auditoría: recorrer el grupo 'seguridad' del detalle, traducir Operación/Origen y mostrar el nombre en la columna Entidad
 - [x] Avisos de seguridad: construido y desplegado
 - [x] Avisos: el usuario ejecuta el bloque SQL del secreto y yo verifico latido, correo y 401
-- [ ] Auditar cambios de app_settings sin usuario (función aparte) + título «CRM Rimosa»; prueba leyendo y restaurando el valor real
+- [x] Auditar cambios de app_settings sin usuario (función aparte) + título «CRM Rimosa»; prueba leyendo y restaurando el valor real
