@@ -167,8 +167,6 @@ const NOMBRES_CAMPO: Record<string, string> = {
 
 const CAMPOS_OCULTOS = new Set(["x_forwarded_for", "cf_connecting_ip", "autenticado"]);
 
-const OPERACIONES = VALORES.operacion;
-void OPERACIONES;
 
 /** Valor legible; null si no hay traducción para un texto técnico conocido. */
 const valorDeClave = (k: string, v: unknown): string => {
