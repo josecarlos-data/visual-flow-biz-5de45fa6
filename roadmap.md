@@ -25,4 +25,4 @@
 - [x] Avisos de seguridad: construido y desplegado
 - [x] Avisos: el usuario ejecuta el bloque SQL del secreto y yo verifico latido, correo y 401
 - [x] Auditar cambios de app_settings sin usuario (función aparte) + título «CRM Rimosa»; prueba leyendo y restaurando el valor real
-- [ ] Auditoría legible + página Seguridad: IP en triggers solo con usuario, rol con UPDATE, quitar duplicados, prueba con rol de Bautista
+- [x] Auditoría legible + página Seguridad (pendiente: confirmar aviso de la pasada de las 08:13)
