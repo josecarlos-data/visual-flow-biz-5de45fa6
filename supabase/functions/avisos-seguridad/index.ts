@@ -17,6 +17,7 @@ const db = createClient(URL, SERVICE, { auth: { persistSession: false, autoRefre
 const CLAVES_CONFIG = [
   "control_acceso_modo", "alta_dispositivo_modo", "control_sesiones_activo", "segundo_factor_modo",
   "sesion_duracion_horas", "acceso_permite_correo", "avisos_seguridad_activo", "avisos_seguridad_email",
+  "registro_consultas_activo", "auditoria_retencion_dias", "consultas_retencion_dias",
 ];
 const ESTADOS_SUSPENSION = ["suspendido_temporal", "bloqueado_intentos", "bloqueado_admin"];
 
@@ -36,6 +37,8 @@ const NOMBRE_CLAVE: Record<string, string> = {
   control_sesiones_activo: "Sesiones simultáneas", segundo_factor_modo: "Segundo factor",
   sesion_duracion_horas: "Duración máxima de sesión (h)", acceso_permite_correo: "Acceso con correo",
   avisos_seguridad_activo: "Avisos de seguridad", avisos_seguridad_email: "Destinatario de avisos",
+  registro_consultas_activo: "Registro de consultas",
+  auditoria_retencion_dias: "Conservación de Auditoría (días)", consultas_retencion_dias: "Conservación de consultas (días)",
 };
 const NIVEL_2FA: Record<string, number> = { desactivado: 0, marcados: 1, activo: 2 };
 
@@ -53,6 +56,12 @@ function relaja(clave: string, antes: string | null, despues: string | null): bo
     }
     case "avisos_seguridad_activo": return antes === "true" && despues !== "true";
     case "avisos_seguridad_email": return true;
+    case "registro_consultas_activo": return antes === "true" && despues !== "true";
+    case "auditoria_retencion_dias":
+    case "consultas_retencion_dias": {
+      const a = Number(antes), d = Number(despues);
+      return Number.isFinite(a) && Number.isFinite(d) && d < a;
+    }
   }
   return false;
 }
