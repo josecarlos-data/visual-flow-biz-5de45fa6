@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ShieldAlert } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { registrarEvento } from "@/lib/auditoria";
 import AvisosSeguridadBloque from "@/components/AvisosSeguridadBloque";
 
 const CLAVES = ["control_acceso_modo", "alta_dispositivo_modo", "control_sesiones_activo", "acceso_permite_correo", "segundo_factor_modo", "sesion_duracion_horas"] as const;
@@ -55,7 +54,6 @@ export default function SeguridadAccesoCard({
       toast({ title: "Error al guardar", description: error.message, variant: "destructive" });
       return false;
     }
-    registrarEvento("cambio_config_seguridad", { entidad: "ajuste", entidad_id: key, detalle: { key, value } });
     toast({ title: "Ajuste guardado" });
     return true;
   };
@@ -227,7 +225,7 @@ export default function SeguridadAccesoCard({
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Pasado este tiempo desde que el usuario inició sesión, tendrá que volver a entrar. 0 = sin límite.
+            Pasado este tiempo, el usuario tendrá que volver a entrar (0 = sin límite). Cuenta desde que el usuario inició sesión, no desde su última actividad. Para equipos desatendidos, usar el bloqueo de pantalla del dispositivo.
           </p>
         </div>
         <AvisosSeguridadBloque guardar={guardar} />
