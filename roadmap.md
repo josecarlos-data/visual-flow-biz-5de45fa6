@@ -26,4 +26,4 @@
 - [x] Avisos: el usuario ejecuta el bloque SQL del secreto y yo verifico latido, correo y 401
 - [x] Auditar cambios de app_settings sin usuario (función aparte) + título «CRM Rimosa»; prueba leyendo y restaurando el valor real
 - [x] Auditoría legible + página Seguridad
-- [ ] Auditoría por tabla + perfil de cliente + registro de consultas + pestaña Consultas + limpieza programada (pruebas con Bautista; dejar registro apagado)
+- [x] Auditoría por tabla + perfil de cliente + registro de consultas + limpieza programada (pendiente: probar vistas de Consultas con sesión de administrador)
