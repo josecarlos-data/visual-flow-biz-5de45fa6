@@ -1,70 +1,96 @@
-# Auditoría legible y página propia de Seguridad
+# Auditoría por tabla, perfil de cliente, registro de consultas y limpieza programada
 
 ## Comprobado antes de proponer
-- **Duplicados.** Cada cambio hecho desde el panel deja hoy dos eventos: el que registra la base y el que manda el navegador.
-  - Base: `dato_cambio` (ajustes) o `usuario_cambio` (perfil de usuario).
-  - Navegador: `cambio_config_seguridad`, `aprobacion_usuario`, `baja_usuario`, `cambio_rol` y `cambio_ver_margen`.
-  - Lo mandan Seguridad (cada ajuste), Usuarios (exigir segundo factor, aprobar, rechazar, rol, ver margen) y Dispositivos (límites de sesiones y equipos).
-- **Qué aporta el del navegador.** Solo la IP y la pantalla desde la que se hizo, que el de la base no guarda. Todo lo demás (quién, qué campo, antes → después) ya lo tiene el de la base.
-- **Asignar un rol** borra el rol anterior y crea el nuevo, así que la base deja dos eventos: «Usuario: baja» y «Usuario: alta».
-- **Rechazar un usuario pendiente** manda desde el navegador un evento «Baja de usuario». La tarea de avisos lo trata como una baja real y envía un aviso falso.
-- **Sin trigger en la base:** la gestión de equipos y la generación de códigos. Esos eventos del navegador se quedan.
-- **Ajustes:** la base guarda `antes` y `despues` como valores simples, y hoy la pantalla no los pinta.
+- **Tablas auditadas hoy:** `auditar_cambio` cubre visitas, clientes, objetivos y situaciones de cliente. Para esas tablas solo guarda la lista de campos cambiados, sin valores antes y después; `cliente_perfil_datos` no tiene trigger.
+- **Conservación:** `auditoria_retencion_dias` existe y vale **90**, no 365. `purgar_auditoria()` borra lo que tiene más de N días y no está programada; la única tarea programada es la de avisos. El evento más antiguo es del 7 de septiembre, así que hoy no borraría nada.
+- **Tamaño:** el registro de auditoría ocupa 688 kB con 797 eventos.
+- **Ficha de cliente:** las pestañas se controlan desde la dirección de la página (`tab`): resumen, visitas, productos, documentos, perfil e IA. Ya existe la función `can_view_cliente(_user_id, _cod)`, que dice si un usuario puede ver un cliente.
 
-## 1. Conservar la IP: una migración (justificada)
-Si quito el evento del navegador sin más, Auditoría pierde la IP de los cambios de configuración. La base puede leerla de la propia petición: la cabecera que acompaña a cada cambio hecho desde la app.
+## 1. Etiquetas por tabla y nombre del cliente (solo pantalla + un dato más en el trigger)
+- **Tipo.** Sale de la operación y la tabla: «Alta de visita», «Cambio de cliente», «Baja de objetivo», «Cambio de situación de cliente», «Alta de perfil de cliente»… «… de ajuste» queda solo para la tabla de ajustes.
+- **Cliente del registro.** `auditar_cambio` añade al detalle el código de cliente cuando el registro lo tiene (`cod_cliente`). En pantalla, Entidad muestra el nombre del cliente. Los nombres de cada página se resuelven con **una sola consulta**, no una por fila. Si no hay cliente, Entidad muestra «Visita», «Objetivo», etc.
+- **Eventos antiguos.** No tienen el código de cliente guardado, así que se resuelven por el identificador del registro cuando aún existe; si no existe, «Visita (eliminada)».
+- **Sin usuario.** `auditar_cambio` sigue ignorando los cambios sin usuario, como hasta ahora.
 
-La migración modifica las dos funciones que registran desde la base, `auditar_cambio_ajustes` y `auditar_cambio_usuario`. No se toca `auditar_cambio`.
-- Rellenan `ip` y `user_agent` con el mismo criterio que la función que registra los eventos del navegador: `cf-connecting-ip` primero y, si no está, la primera dirección de `x-forwarded-for`.
-- Si no hay petición (editor SQL, procesos internos), los dos campos quedan vacíos y el evento se registra igual.
-- Mismas firmas, mismos triggers, mismos permisos; el resto de la lógica no cambia.
+## 2. Auditar el perfil de cliente
+- **Trigger.** `cliente_perfil_datos` pasa a tener trigger con `auditar_cambio`.
+- **Detalle.** Para esta tabla el trigger guarda además el atributo y los valores antes y después (valor, estado y motivo de descarte).
+- **Pantalla.** El detalle se lee como «Perfil · Número de mecánicos: 3 → 5» o «Estado: Pendiente → Confirmado», con el nombre del atributo tomado de su catálogo.
+- No cambia cómo se guardan los perfiles.
 
-La pantalla desde la que se hizo el cambio no llega a la base y se pierde. Se puede deducir del tipo de evento, porque los ajustes solo se cambian en Seguridad y los usuarios en Usuarios.
+## 3. Registro de consultas (tabla propia)
+- **Tabla nueva `consultas_cliente`.** Campos: id, `ocurrido_en`, `user_id`, `cod_cliente` y pestaña.
+  - Índices por (`user_id`, `ocurrido_en`) y (`cod_cliente`, `ocurrido_en`).
+  - Seguridad de filas activada y ninguna política. Se revoca todo a anon y authenticated; nadie la lee ni la escribe directamente.
+- **Escritura: `registrar_consulta(_cod, _pestana)`.** Función SECURITY DEFINER que solo pueden ejecutar los usuarios con sesión.
+  - Toma el usuario de la sesión y comprueba que está aprobado.
+  - No hace nada si el interruptor `registro_consultas_activo` no es `true`.
+  - Solo registra si `can_view_cliente` lo permite y si la pestaña es una de las seis válidas.
+  - No repite la misma consulta (mismo usuario, cliente y pestaña) en menos de 5 minutos.
+- **Ficha del cliente.**
+  - Llama a la función al abrir la ficha y en cada cambio de pestaña, sin esperar la respuesta y sin avisar si falla.
+  - La llamada sale en paralelo y no retrasa ninguna de las cargas actuales.
+  - Con el interruptor apagado, la función termina en la primera comprobación.
+- **Interruptor.** El ajuste se crea en la migración apagado (`false`, sin sobrescribir si ya existe). Como es un ajuste, sus cambios quedan en Auditoría y generan aviso por correo: añado esta clave a las que vigila la tarea de avisos, con el nombre «Registro de consultas».
+  - Esto toca `avisos-seguridad`, solo su lista de claves vigiladas y la regla que dice qué cuenta como relajar la seguridad (apagarlo cuenta como relajarla).
+  - **Me detengo aquí para que lo apruebes expresamente.** Si prefieres no tocarla, el cambio queda en Auditoría pero no genera aviso.
 
-Antes de quitar nada del navegador compruebo con un cambio real que la IP llega a la base. **Si no llega, me detengo y te lo explico** sin quitar los eventos del navegador.
+## 4. Pestaña «Consultas» en Auditoría (solo administradores)
+Funciones de consulta SECURITY DEFINER que exigen `is_admin`.
+- **Por usuario y periodo: `consultas_por_usuario(_user_id, _desde, _hasta)`.** Una fila por cliente consultado.
+  - Veces, días distintos, primera y última consulta, y pestañas vistas.
+  - Su «media habitual» para ese cliente: veces por periodo de la misma duración en los 90 días anteriores al periodo.
+  - Arriba, un resumen: clientes distintos consultados al día en el periodo frente a su media de los 90 días anteriores.
+  - **Destacado, según una regla fija y explicada en pantalla:**
+    - un cliente que no había consultado nunca en esos 90 días;
+    - o que consulta al menos el triple que su media, y al menos 3 veces;
+    - y la pestaña Documentos o Productos, si es la que más pesa en sus consultas de ese cliente.
+- **Por cliente: `consultas_por_cliente(_cod, _desde, _hasta)`.** Quién lo ha consultado: veces, primera y última, y pestañas.
+- **Agregado.** Las dos vistas agrupan las consultas; no hay listado fila a fila.
+- **Rastro.** Cada uso de estas funciones deja un evento `consulta_actividad` en el registro de auditoría con quién consultó, a quién o qué cliente y el periodo. Lo inserta la propia función y no se tocan las políticas ni los permisos del registro. La tarea de avisos no lo trata, porque no es una de sus categorías.
+- **En móvil:** filtros apilados y resultados en tarjetas, sin desplazamiento horizontal.
 
-## 2. Quitar los duplicados del navegador
-- Seguridad: deja de mandar `cambio_config_seguridad` al guardar un ajuste.
-- Usuarios: dejan de mandarse exigir segundo factor, aprobar, rechazar (que es lo que provoca el aviso falso de baja), rol y ver margen.
-- Dispositivos: deja de mandarse el guardado de límites. **Se quedan** las acciones sobre equipos (autorizar, bloquear, renombrar) y «Código generado».
-- No cambia cómo se guarda nada.
-- Los eventos antiguos siguen en Auditoría tal cual: no borro ni oculto historial.
+## 5. Página Seguridad
+Un bloque nuevo «Registro de consultas»:
+- **Interruptor.** Apagado por defecto.
+- **Explicación.** Qué registra (aperturas de ficha y pestañas), para qué sirve (solo investigar una posible fuga, nunca evaluar el rendimiento de nadie), cuánto ocupa (unas 500 consultas al día, 15–20 MB con 6 meses) y el aviso «Antes de activarlo, informa a la plantilla».
+- **Conservación.** Dos campos: la de Auditoría (`auditoria_retencion_dias`) y la de consultas (`consultas_retencion_dias`, 180, creado en la migración sin sobrescribir). Admiten entre 30 y 3650 días y se guardan igual que el resto de ajustes.
 
-## 3. Pantalla de Auditoría en castellano
-- **Tipos.** Todos los que existen hoy tienen nombre: «Cambio de ajuste», «Cambio de usuario», «Alta de usuario», «Suspensión automática», «Fin de suspensión», «Cambio de estado de usuario», «Cambio de nombre de usuario», «Código usado», «Código no válido», «Equipo autorizado», «Equipo denegado», «Sesión expulsada», «Cambio de configuración de seguridad» (los antiguos y los de equipos), etc. El filtro de tipos usa la misma lista.
-- **Ajustes.** Cada cambio muestra «Duración máxima de sesión: 12 → 1». Las claves de ajuste tienen nombre legible, y algunos valores también: «bloqueo» → «Bloqueo», «true» → «Sí», etc.
-- **Entidad.** Muestra el nombre del ajuste («Duración máxima de sesión»), del usuario, «Equipo» o «Aviso», nunca el nombre técnico.
-- **Avisos.** Las categorías se traducen («configuracion» → «Configuración de seguridad», «limite_ip» → «Límite de intentos por conexión»…). «via: iniciar-sesion» pasa a «Vía: pantalla de acceso».
-- **Cambio de rol.** El par «Usuario: baja» y «Usuario: alta» del mismo rol, hecho por el mismo administrador sobre el mismo usuario en menos de 5 segundos, se muestra como una sola fila «Cambio de rol: Comercial → Administrador». Solo cambia la pantalla: en la base siguen siendo dos eventos. La alternativa es cambiar cómo se guarda el rol para que sea una sola modificación; no la hago porque toca cómo se guarda.
-- **Sin traducción.** Lo que no tenga nombre se muestra en gris y con su nombre técnico, para que se note.
-- **Usuario.** «Sistema» en lugar de «Sin sesión».
-- **Móvil.** Sin desplazamiento horizontal; el detalle se despliega dentro de la tarjeta, como ahora.
+## 6. Limpieza automática
+- **Funciones.**
+  - `purgar_consultas()`, nueva: borra las consultas con más días que `consultas_retencion_dias`.
+  - `purgar_auditoria()`: no cambia su lógica.
+  - Las dos solo puede ejecutarlas el rol del servidor.
+- **Comprobación antes de programar.** Sin borrar nada, cuento cuántas filas tienen más días que la conservación en cada tabla y te enseño la cifra. Hoy debería salir 0 en las dos: el primer evento es del 7 de septiembre y la tabla de consultas está vacía.
+- **Programación.** Una tarea diaria a las 03:30 UTC (05:30 en Madrid) que llama a las dos funciones. Es una sola ejecución al día, con coste despreciable.
+  - La programación no puede ir en la migración. La intento con la herramienta de datos. Si me la rechaza, **me detengo** y te paso el bloque exacto para que lo ejecutes:
+    ```sql
+    SELECT cron.schedule('purgar-registros', '30 3 * * *',
+      $$ SELECT public.purgar_auditoria(); SELECT public.purgar_consultas(); $$);
+    ```
 
-## 4. Página Seguridad
-- **Acceso.** Nueva entrada «Seguridad» en el menú de Administración, en `/admin/seguridad`, con el mismo control de acceso que Usuarios y Auditoría (solo administradores).
-- **Contenido.** Todo el panel actual: control de acceso, alta de equipos, sesiones simultáneas, acceso con correo, segundo factor, duración de sesión y avisos por correo. Cada ajuste lleva debajo una línea que explica qué hace.
-  - Duración máxima de sesión: «Cuenta desde que el usuario inició sesión, no desde su última actividad. Para equipos desatendidos, usar el bloqueo de pantalla del dispositivo.»
-  - Añado las líneas que faltan en los avisos (interruptor y destinatario).
-- **Comprobación de nombres de usuario.** La página calcula por su cuenta cuántos usuarios activos no tienen nombre de usuario, para seguir impidiendo que se desactive el acceso con correo mientras haya alguno.
-- **Lógica.** Los ajustes se guardan exactamente igual que ahora; solo cambian de sitio.
-
-**Usuarios** deja de mostrar el panel. Sigue leyendo el modo del segundo factor, que necesita para marcar a los administradores como obligatorios. Arriba solo aparece un aviso breve con el enlace «Ir a Seguridad», y solo cuando algo requiere atención:
-- los avisos no están llegando;
-- los avisos no se están comprobando;
-- el modo bloqueo está activo.
+## Decisión pendiente: conservación de Auditoría
+Hoy son 90 días. La migración no cambia ese valor. Si gerencia confirma 365, lo cambias desde Seguridad, o lo hago yo cuando me lo digas. Con 90, la primera limpieza borrará eventos a partir del 6 de diciembre.
 
 ## Prueba
-1. Cambio un ajuste desde Seguridad y lo devuelvo a su valor. Compruebo que queda un único evento por cada cambio, con IP, que se lee como «ajuste: antes → después», y que llega el aviso.
-2. En Usuarios, activo y desactivo «ver margen» en la cuenta de Bautista. Compruebo que queda un único evento por cada cambio, con IP.
-3. Con un cambio desde el editor SQL compruebo que la IP queda vacía y el origen es «Sistema».
-4. Reviso Auditoría en escritorio y en móvil sin desplazamiento horizontal.
+1. Guardar una visita y cambiar un dato de perfil de un cliente de prueba (y devolverlo). Comprobar que salen «Alta o Cambio de visita» y «Cambio de perfil de cliente» con el nombre del cliente y antes → después.
+2. Interruptor apagado: abrir una ficha no registra nada. Encendido: registra la apertura y las pestañas, y no repite dentro de 5 minutos. Lo enciendo y lo apago yo; solo uso la sesión interna de Bautista para abrir fichas, y al terminar borro sus filas de prueba y lo dejo **apagado**.
+3. Bautista no puede leer la tabla ni llamar a las funciones de administración.
+4. Comprobar las dos vistas de Consultas y que queda el evento `consulta_actividad`.
+5. Medir el tiempo de apertura de la ficha con el registro encendido y apagado; no debe empeorar.
+6. Revisar Auditoría y Seguridad en móvil sin desplazamiento horizontal.
 
 ## Detalles técnicos
-- Archivos que cambian:
-  - Migración: `auditar_cambio_ajustes` y `auditar_cambio_usuario` leen `current_setting('request.headers', true)`.
-  - Página nueva y ruta: `src/pages/AdminSeguridad.tsx`, y su ruta en `App.tsx` con `ProtectedRoute adminOnly`.
-  - Menú: `AppSidebar.tsx`.
-  - Panel: `SeguridadAccesoCard.tsx` (sin el `registrarEvento` del ajuste, con los textos de ayuda) y `AvisosSeguridadBloque.tsx` (textos).
-  - Usuarios y equipos: `AdminUsers.tsx` y `DispositivosUsuarioDialog.tsx`.
-  - Auditoría: `AdminAuditoria.tsx`.
-- Sin cambios en `iniciar-sesion`, `cambiar-password`, `registrar_sesion`, `verificar_sesion`, `avisos-seguridad` ni `registrar-evento`.
+- **Migración única** (`drizzle/migrations/`):
+  - `CREATE OR REPLACE auditar_cambio`: añade `cod_cliente` al detalle y, para `cliente_perfil_datos`, el atributo y los valores antes y después; mantiene la exención sin usuario.
+  - Trigger nuevo `auditar_cliente_perfil_datos`.
+  - Tabla `consultas_cliente` con sus índices, permisos y RLS.
+  - Funciones `registrar_consulta`, `consultas_por_usuario`, `consultas_por_cliente` y `purgar_consultas`.
+  - Ajustes `registro_consultas_activo=false` y `consultas_retencion_dias=180` con `ON CONFLICT DO NOTHING`.
+- **Fuera de la migración:** la tarea programada, que va con la herramienta de datos o la ejecutas tú.
+- **Front:**
+  - `ClienteDetalle.tsx`: llamada sin esperar respuesta.
+  - `AdminAuditoria.tsx`: etiquetas por tabla, nombres de cliente y pestaña Consultas en un componente nuevo.
+  - `SeguridadAccesoCard.tsx`: bloque nuevo.
+  - `avisos-seguridad`: solo si lo apruebas.
+- **No se tocan** las políticas ni los permisos del registro de auditoría, ni cómo se guardan las visitas, los clientes o los perfiles.
