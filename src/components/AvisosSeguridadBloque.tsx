@@ -59,6 +59,10 @@ export default function AvisosSeguridadBloque({ guardar }: { guardar: (key: stri
           />
           <Label htmlFor="avisos-activo">Enviar avisos de seguridad</Label>
         </div>
+        <p className="text-xs text-muted-foreground sm:order-last">
+          Envía un correo cuando hay suspensiones, intentos repetidos desde una conexión, cambios en esta configuración,
+          nuevos administradores, segundos factores restablecidos o bajas. Como mucho uno por tipo cada 30 minutos.
+        </p>
         <div className="space-y-1.5">
           <Label htmlFor="avisos-email">Correo destinatario</Label>
           <div className="flex gap-2">
@@ -78,6 +82,9 @@ export default function AvisosSeguridadBloque({ guardar }: { guardar: (key: stri
               Guardar
             </Button>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Dirección que recibe los avisos. Si la cambias, la anterior recibe también un aviso del cambio.
+          </p>
         </div>
       </div>
       <div className="space-y-1 text-xs">

@@ -27,6 +27,7 @@ const AdminUsers = lazy(() => import("./pages/AdminUsers"));
 const AdminData = lazy(() => import("./pages/AdminData"));
 const AdminFunctions = lazy(() => import("./pages/AdminFunctions"));
 const AdminAuditoria = lazy(() => import("./pages/AdminAuditoria"));
+const AdminSeguridad = lazy(() => import("./pages/AdminSeguridad"));
 const AdminVisitas = lazy(() => import("./pages/AdminVisitas"));
 const RevisionVisitas = lazy(() => import("./pages/RevisionVisitas"));
 const AdminSituaciones = lazy(() => import("./pages/AdminSituaciones"));
@@ -230,6 +231,7 @@ const App = () => (
                 <Route path="/admin/users" element={<ProtectedRoute adminOnly><AdminUsers /></ProtectedRoute>} />
                 <Route path="/admin/data" element={<ProtectedRoute adminOnly><AdminData /></ProtectedRoute>} />
                 <Route path="/admin/functions" element={<ProtectedRoute adminOnly><AdminFunctions /></ProtectedRoute>} />
+                <Route path="/admin/seguridad" element={<ProtectedRoute adminOnly><AdminSeguridad /></ProtectedRoute>} />
                 <Route path="/admin/auditoria" element={<ProtectedRoute adminOnly><AdminAuditoria /></ProtectedRoute>} />
                 <Route path="/admin/visitas" element={<ProtectedRoute adminOnly><AdminVisitas /></ProtectedRoute>} />
                 <Route path="/admin/situaciones" element={<ProtectedRoute adminOnly><AdminSituaciones /></ProtectedRoute>} />

@@ -73,9 +73,6 @@ export default function DispositivosUsuarioDialog({
       toast({ title: "Error", description: error.message, variant: "destructive" });
       return;
     }
-    registrarEvento("cambio_config_seguridad", {
-      entidad: "usuario", entidad_id: userId, detalle: { sesiones_max: s, dispositivos_max: d },
-    });
     toast({ title: "Límites guardados" });
     onGuardado();
   };

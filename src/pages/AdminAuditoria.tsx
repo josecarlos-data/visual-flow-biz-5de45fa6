@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import React, { Fragment, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,18 +33,35 @@ const TIPOS: { value: string; label: string }[] = [
   { value: "login", label: "Inicio de sesión" },
   { value: "logout", label: "Cierre de sesión" },
   { value: "acceso_denegado", label: "Acceso denegado" },
-  { value: "cambio_rol", label: "Cambio de rol" },
-  { value: "aprobacion_usuario", label: "Aprobación de usuario" },
+  { value: "dato_cambio", label: "Cambio de ajuste" },
+  { value: "dato_alta", label: "Alta de ajuste" },
+  { value: "dato_baja", label: "Baja de ajuste" },
+  { value: "usuario_alta", label: "Alta de usuario" },
+  { value: "usuario_cambio", label: "Cambio de usuario" },
+  { value: "usuario_baja", label: "Baja de datos de usuario" },
+  { value: "cambio_estado_usuario", label: "Cambio de estado de usuario" },
+  { value: "cambio_username", label: "Cambio de nombre de usuario" },
   { value: "baja_usuario", label: "Baja de usuario" },
-  { value: "cambio_ver_margen", label: "Cambio de visibilidad de margen" },
+  { value: "suspension_automatica", label: "Suspensión automática" },
+  { value: "fin_suspension", label: "Fin de suspensión" },
+  { value: "cambio_config_seguridad", label: "Cambio de configuración de seguridad" },
+  { value: "dispositivo_alta", label: "Equipo autorizado" },
+  { value: "dispositivo_denegado", label: "Equipo denegado" },
+  { value: "codigo_generado", label: "Código de alta generado" },
+  { value: "codigo_usado", label: "Código de alta usado" },
+  { value: "codigo_invalido", label: "Código de alta no válido" },
+  { value: "sesion_expulsada", label: "Sesión expulsada" },
+  { value: "password_cambiada", label: "Contraseña cambiada" },
+  { value: "password_restablecer_enviado", label: "Enlace de restablecimiento enviado" },
+  { value: "password_cambio_forzado", label: "Cambio de contraseña forzado" },
   { value: "2fa_alta", label: "Alta de segundo factor" },
   { value: "2fa_verificado", label: "Segundo factor verificado" },
   { value: "2fa_fallido", label: "Segundo factor fallido" },
-  { value: "usuario_alta", label: "Usuario: alta" },
-  { value: "usuario_cambio", label: "Usuario: cambio" },
-  { value: "usuario_baja", label: "Usuario: baja" },
   { value: "2fa_reseteado", label: "Segundo factor restablecido" },
   { value: "aviso_seguridad", label: "Aviso de seguridad" },
+  { value: "cambio_rol", label: "Cambio de rol" },
+  { value: "aprobacion_usuario", label: "Aprobación de usuario" },
+  { value: "cambio_ver_margen", label: "Cambio de visibilidad de margen" },
 ];
 
 const RESULTADOS: { value: string; label: string }[] = [
@@ -58,7 +75,48 @@ const TODOS = "__todos__";
 
 const TABLAS_USUARIO = new Set(["usuario", "profiles", "user_roles", "user_dashboard_access"]);
 
-const etiquetaTipo = (t: string) => TIPOS.find((x) => x.value === t)?.label ?? t;
+const etiquetaTipo = (t: string) => TIPOS.find((x) => x.value === t)?.label ?? null;
+
+/** Nombre técnico sin traducción: en gris y monoespaciado, para que se note. */
+const Tecnico = ({ children }: { children: string }) => (
+  <span className="font-mono text-muted-foreground">{children}</span>
+);
+
+const NOMBRES_AJUSTE: Record<string, string> = {
+  control_acceso_modo: "Modo de control de acceso",
+  alta_dispositivo_modo: "Alta de equipos nuevos",
+  control_sesiones_activo: "Sesiones simultáneas",
+  acceso_permite_correo: "Permitir acceso con correo",
+  segundo_factor_modo: "Segundo factor",
+  sesion_duracion_horas: "Duración máxima de sesión (horas)",
+  avisos_seguridad_activo: "Avisos de seguridad",
+  avisos_seguridad_email: "Destinatario de avisos",
+  anios_cliente_activo: "Años para considerar activo a un cliente",
+};
+
+const VALORES: Record<string, Record<string, string>> = {
+  ajuste: {
+    true: "Sí", false: "No", observacion: "Observación", bloqueo: "Bloqueo", auto: "Automática",
+    codigo: "Con código", desactivado: "Desactivado", marcados: "Solo usuarios marcados",
+    activo: "Marcados y todos los administradores",
+  },
+  categoria: {
+    suspension: "Suspensiones", limite_ip: "Límite de intentos por conexión", configuracion: "Configuración de seguridad",
+    nuevo_admin: "Nuevo administrador", segundo_factor: "Segundo factor restablecido", baja: "Bajas de usuario",
+  },
+  via: { "iniciar-sesion": "Pantalla de acceso", "cambiar-password": "Cambio de contraseña" },
+  role: { admin: "Administrador", director_comercial: "Director comercial", jefe_de_zona: "Jefe de zona", comercial: "Comercial" },
+  estado: {
+    activo: "Activo", suspendido_temporal: "Suspendido temporalmente", bloqueado_intentos: "Bloqueado por intentos",
+    bloqueado_admin: "Bloqueado por un administrador", baja: "Baja",
+  },
+  accion: { autorizar: "Autorizar", bloquear: "Bloquear", desbloquear: "Desbloquear", renombrar: "Renombrar", eliminar: "Eliminar" },
+  operacion: { INSERT: "Alta", UPDATE: "Modificación", DELETE: "Baja" },
+  origen: { usuario: "Usuario", sistema: "Sistema" },
+  resultado: { ok: "Correcto", denegado: "Denegado", fallo: "Fallo" },
+  codigo: { sin_destinatario: "Sin destinatario", destinatario_dado_de_baja: "Destinatario dado de baja", error_envio: "Error de envío" },
+  motivo: { error_servicio: "Error del servicio de acceso", invalid_credentials: "Contraseña incorrecta" },
+};
 
 const variantResultado = (r: string): "default" | "secondary" | "destructive" =>
   r === "ok" ? "secondary" : r === "denegado" ? "destructive" : "destructive";
@@ -88,31 +146,36 @@ const NOMBRES_CAMPO: Record<string, string> = {
   dispositivo_id: "Identificador de equipo",
   codigo: "Código",
   factores_borrados: "Factores borrados",
+  via: "Vía",
+  accion: "Acción",
+  dashboard_key: "Panel",
+  estado_motivo: "Motivo del estado",
+  ciclo: "Ciclo",
+  key: "Ajuste",
+  value: "Valor",
+  estado_nuevo: "Estado nuevo",
+  estado_anterior: "Estado anterior",
+  usuario: "Usuario",
+  factor_id: "Identificador del factor",
+  hasta: "Hasta",
+  bloqueado_hasta: "Bloqueado hasta",
+  employee_code: "Vendedor",
+  delegacion: "Delegación",
+  email: "Correo",
+  is_active: "Activo",
 };
 
 const CAMPOS_OCULTOS = new Set(["x_forwarded_for", "cf_connecting_ip", "autenticado"]);
 
-const nombreCampo = (k: string) => NOMBRES_CAMPO[k] ?? k;
 
-const OPERACIONES: Record<string, string> = {
-  INSERT: "Alta",
-  UPDATE: "Modificación",
-  DELETE: "Baja",
-};
-
-const valorLegible = (v: unknown): string => {
-  if (v === null || v === undefined) return "—";
-  if (typeof v === "boolean") return v ? "Sí" : "No";
-  if (typeof v === "object") return JSON.stringify(v);
-  return String(v);
-};
-
+/** Valor legible; null si no hay traducción para un texto técnico conocido. */
 const valorDeClave = (k: string, v: unknown): string => {
-  if (typeof v === "string") {
-    if (k === "operacion") return OPERACIONES[v] ?? v;
-    if (k === "origen") return v.charAt(0).toUpperCase() + v.slice(1);
-  }
-  return valorLegible(v);
+  if (v === null || v === undefined || v === "") return "—";
+  if (typeof v === "boolean") return v ? "Sí" : "No";
+  if (Array.isArray(v)) return v.map((x) => valorDeClave(k, x)).join(", ");
+  if (typeof v === "object") return JSON.stringify(v);
+  const t = String(v);
+  return VALORES[k]?.[t] ?? t;
 };
 
 interface LineaDetalle {
@@ -121,7 +184,12 @@ interface LineaDetalle {
   antes?: unknown;
   despues?: unknown;
   valor?: unknown;
+  /** Clave sin traducción conocida: se muestra en gris con su nombre técnico. */
+  tecnico?: boolean;
 }
+
+const etiqueta = (k: string): { etiqueta: string; tecnico: boolean } =>
+  NOMBRES_CAMPO[k] ? { etiqueta: NOMBRES_CAMPO[k], tecnico: false } : { etiqueta: k, tecnico: true };
 
 const esObjeto = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object" && !Array.isArray(v);
@@ -129,56 +197,77 @@ const esObjeto = (v: unknown): v is Record<string, unknown> =>
 const esPar = (v: unknown): v is { antes: unknown; despues: unknown } =>
   esObjeto(v) && ("antes" in v || "despues" in v);
 
-function lineasDetalle(detalle: Record<string, unknown> | null): LineaDetalle[] {
+function lineasDetalle(r: Pick<EventoRow, "detalle" | "entidad" | "entidad_id">): LineaDetalle[] {
+  const detalle = r.detalle;
   if (!esObjeto(detalle)) return [];
   const cabecera: LineaDetalle[] = [];
   const pares: LineaDetalle[] = [];
   const sueltos: LineaDetalle[] = [];
-  const campos = detalle.campos;
-  if (Array.isArray(campos) && campos.length > 0) {
-    cabecera.push({ clave: "campos", etiqueta: "Campos modificados", valor: campos.map((c) => nombreCampo(String(c))).join(", ") });
+  const esAjuste = r.entidad === "app_settings";
+  const linea = (k: string, extra: Partial<LineaDetalle>): LineaDetalle => ({ clave: k, ...etiqueta(k), ...extra });
+
+  if (esAjuste && ("antes" in detalle || "despues" in detalle) && !esObjeto(detalle.antes) && !esObjeto(detalle.despues)) {
+    // Ajuste: «Nombre del ajuste: antes → después», sin «Campos modificados: value».
+    const k = r.entidad_id ?? "";
+    pares.push({
+      clave: "ajuste",
+      etiqueta: NOMBRES_AJUSTE[k] ?? k,
+      tecnico: !NOMBRES_AJUSTE[k],
+      antes: "antes" in detalle ? detalle.antes : undefined,
+      despues: "despues" in detalle ? detalle.despues : undefined,
+    });
+  } else {
+    const campos = detalle.campos;
+    if (Array.isArray(campos) && campos.length > 0) {
+      cabecera.push({ clave: "campos", etiqueta: "Campos modificados", valor: campos.map((c) => NOMBRES_CAMPO[String(c)] ?? String(c)).join(", ") });
+    }
   }
   const antesSuelto = esObjeto(detalle.antes) ? detalle.antes : null;
   const despuesSuelto = esObjeto(detalle.despues) ? detalle.despues : null;
   for (const [k, v] of Object.entries(detalle)) {
     if (CAMPOS_OCULTOS.has(k) || k === "campos" || k === "antes" || k === "despues") continue;
+    if (k === "key" && typeof v === "string") {
+      sueltos.push({ clave: "key", etiqueta: "Ajuste", valor: NOMBRES_AJUSTE[v] ?? v });
+      continue;
+    }
     if (esPar(v)) {
-      pares.push({ clave: k, etiqueta: nombreCampo(k), antes: v.antes, despues: v.despues });
+      pares.push(linea(k, { antes: v.antes, despues: v.despues }));
     } else if (esObjeto(v)) {
       // Grupo anidado (p. ej. 'seguridad'): se recorren sus entradas sin mostrar el nombre del grupo.
       for (const [k2, v2] of Object.entries(v)) {
         if (CAMPOS_OCULTOS.has(k2)) continue;
-        if (esPar(v2)) pares.push({ clave: k2, etiqueta: nombreCampo(k2), antes: v2.antes, despues: v2.despues });
-        else if (!esObjeto(v2)) sueltos.push({ clave: k2, etiqueta: nombreCampo(k2), valor: v2 });
+        if (esPar(v2)) pares.push(linea(k2, { antes: v2.antes, despues: v2.despues }));
+        else if (!esObjeto(v2)) sueltos.push(linea(k2, { valor: v2 }));
       }
     } else {
-      sueltos.push({ clave: k, etiqueta: nombreCampo(k), valor: v });
+      sueltos.push(linea(k, { valor: v }));
     }
   }
   if (antesSuelto || despuesSuelto) {
     const claves = new Set([...Object.keys(antesSuelto ?? {}), ...Object.keys(despuesSuelto ?? {})]);
     for (const k of claves) {
       if (CAMPOS_OCULTOS.has(k)) continue;
-      pares.push({ clave: k, etiqueta: nombreCampo(k), antes: antesSuelto?.[k], despues: despuesSuelto?.[k] });
+      pares.push(linea(k, { antes: antesSuelto?.[k], despues: despuesSuelto?.[k] }));
     }
   }
   return [...cabecera, ...pares, ...sueltos];
 }
 
-function DetalleEvento({ detalle }: { detalle: Record<string, unknown> | null }) {
-  const lineas = lineasDetalle(detalle);
+function DetalleEvento({ evento }: { evento: EventoRow }) {
+  const lineas = lineasDetalle(evento);
   if (lineas.length === 0) {
     return <p className="text-xs text-muted-foreground">Sin detalle adicional.</p>;
   }
+  const valores = (l: LineaDetalle) => (l.clave === "ajuste" ? "ajuste" : l.clave);
   return (
     <dl className="grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
       {lineas.map((l, i) => (
-        <div key={i} className="flex flex-wrap gap-1">
-          <dt className="font-medium">{l.etiqueta}:</dt>
-          <dd className="break-words text-muted-foreground">
+        <div key={i} className="flex min-w-0 flex-wrap gap-1">
+          <dt className="font-medium">{l.tecnico ? <Tecnico>{l.etiqueta}</Tecnico> : l.etiqueta}:</dt>
+          <dd className="min-w-0 break-words text-muted-foreground">
             {l.antes !== undefined || l.despues !== undefined
-              ? `${valorDeClave(l.clave, l.antes)} → ${valorDeClave(l.clave, l.despues)}`
-              : valorDeClave(l.clave, l.valor)}
+              ? `${valorDeClave(valores(l), l.antes)} → ${valorDeClave(valores(l), l.despues)}`
+              : valorDeClave(valores(l), l.valor)}
           </dd>
         </div>
       ))}
@@ -262,15 +351,25 @@ export default function AdminAuditoria() {
 
   const totalPaginas = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total]);
 
-  const nombreUsuario = (r: EventoRow) => r.full_name || r.email || (r.user_id ? "—" : "Sin sesión");
+  const nombreUsuario = (r: EventoRow) => r.full_name || r.email || (r.user_id ? "—" : "Sistema");
 
-  const nombreEntidad = (r: EventoRow) => {
+  const tipoLegible = (t: string) => etiquetaTipo(t) ?? <Tecnico>{t}</Tecnico>;
+  const resultadoLegible = (x: string) => VALORES.resultado[x] ?? x;
+
+  const nombreEntidad = (r: EventoRow): React.ReactNode => {
     if (!r.entidad) return "—";
     if (r.entidad_id && TABLAS_USUARIO.has(r.entidad)) {
       const u = usuarios.find((x) => x.user_id === r.entidad_id);
       if (u) return u.full_name || u.email || r.entidad_id;
     }
-    return r.entidad_id ? `${r.entidad}: ${r.entidad_id}` : r.entidad;
+    if (r.entidad === "app_settings" || r.entidad === "ajuste") {
+      const k = r.entidad_id ?? "";
+      return NOMBRES_AJUSTE[k] ?? <Tecnico>{k}</Tecnico>;
+    }
+    if (r.entidad === "dispositivo") return "Equipo";
+    if (r.entidad === "aviso") return "Aviso";
+    if (TABLAS_USUARIO.has(r.entidad)) return "Usuario";
+    return <Tecnico>{r.entidad_id ? `${r.entidad}: ${r.entidad_id}` : r.entidad}</Tecnico>;
   };
 
   const alternarExpandido = (id: string) =>
@@ -373,9 +472,9 @@ export default function AdminAuditoria() {
                   onClick={() => alternarExpandido(r.id)}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <span className="font-medium">{etiquetaTipo(r.tipo)}</span>
+                    <span className="font-medium">{tipoLegible(r.tipo)}</span>
                     <span className="flex items-center gap-1">
-                      <Badge variant={variantResultado(r.resultado)}>{r.resultado}</Badge>
+                      <Badge variant={variantResultado(r.resultado)}>{resultadoLegible(r.resultado)}</Badge>
                       <ChevronDown
                         className={`h-4 w-4 text-muted-foreground transition-transform ${expandidos.has(r.id) ? "rotate-180" : ""}`}
                       />
@@ -393,7 +492,7 @@ export default function AdminAuditoria() {
                   {r.ip && <p className="text-xs text-muted-foreground">IP: {r.ip}</p>}
                   {expandidos.has(r.id) && (
                     <div className="mt-2 border-t pt-2">
-                      <DetalleEvento detalle={r.detalle} />
+                      <DetalleEvento evento={r} />
                     </div>
                   )}
                 </div>
@@ -426,8 +525,8 @@ export default function AdminAuditoria() {
                           <div className="truncate">{nombreUsuario(r)}</div>
                           {r.email && <div className="truncate text-xs text-muted-foreground">{r.email}</div>}
                         </TableCell>
-                        <TableCell className="text-sm">{etiquetaTipo(r.tipo)}</TableCell>
-                        <TableCell><Badge variant={variantResultado(r.resultado)}>{r.resultado}</Badge></TableCell>
+                        <TableCell className="text-sm">{tipoLegible(r.tipo)}</TableCell>
+                        <TableCell><Badge variant={variantResultado(r.resultado)}>{resultadoLegible(r.resultado)}</Badge></TableCell>
                         <TableCell className="max-w-[180px] truncate text-xs">{r.ruta ?? "—"}</TableCell>
                         <TableCell className="max-w-[180px] truncate text-xs">{nombreEntidad(r)}</TableCell>
                         <TableCell className="text-xs">{r.ip ?? "—"}</TableCell>
@@ -440,7 +539,7 @@ export default function AdminAuditoria() {
                       {expandidos.has(r.id) && (
                         <TableRow>
                           <TableCell colSpan={8} className="bg-muted/30">
-                            <DetalleEvento detalle={r.detalle} />
+                            <DetalleEvento evento={r} />
                           </TableCell>
                         </TableRow>
                       )}

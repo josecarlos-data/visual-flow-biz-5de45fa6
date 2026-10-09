@@ -11,7 +11,7 @@ import { Check, X, Pencil, Save, MonitorSmartphone } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { Database } from "@/integrations/supabase/types";
 import { registrarEvento } from "@/lib/auditoria";
-import SeguridadAccesoCard from "@/components/SeguridadAccesoCard";
+import AvisoSeguridadUsuarios from "@/components/AvisoSeguridadUsuarios";
 import DispositivosUsuarioDialog from "@/components/DispositivosUsuarioDialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -98,7 +98,6 @@ export default function AdminUsers() {
   const toggleExige2fa = async (u: UserRow) => {
     const { error } = await supabase.from("profiles").update({ exige_2fa: !u.exige_2fa } as any).eq("user_id", u.user_id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
-    registrarEvento("cambio_config_seguridad", { entidad: "usuario", entidad_id: u.user_id, detalle: { exige_2fa: !u.exige_2fa } });
     toast({ title: !u.exige_2fa ? "Segundo factor exigido" : "Segundo factor no exigido" });
     fetchData();
   };
@@ -230,7 +229,6 @@ export default function AdminUsers() {
     const { error } = await supabase.from("profiles").update({ is_approved: true }).eq("user_id", userId);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
     else {
-      registrarEvento("aprobacion_usuario", { entidad: "usuario", entidad_id: userId, detalle: { is_approved: true } });
       toast({ title: "Usuario aprobado" }); fetchData();
     }
   };
@@ -239,19 +237,19 @@ export default function AdminUsers() {
     const { error } = await supabase.from("profiles").update({ is_approved: false }).eq("user_id", userId);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
     else {
-      registrarEvento("baja_usuario", { entidad: "usuario", entidad_id: userId, detalle: { is_approved: false } });
       toast({ title: "Acceso revocado" }); fetchData();
     }
   };
 
   const assignRole = async (userId: string, role: AppRole) => {
-    await supabase.from("user_roles").delete().eq("user_id", userId);
-    const { error } = await supabase.from("user_roles").insert({ user_id: userId, role });
+    // Una sola fila por usuario: si existe se actualiza (un único evento «Rol: antes → después»).
+    const { data: existentes, error: lErr } = await supabase.from("user_roles").select("id").eq("user_id", userId);
+    if (lErr) { toast({ title: "Error", description: lErr.message, variant: "destructive" }); return; }
+    const { error } = existentes && existentes.length
+      ? await supabase.from("user_roles").update({ role }).eq("user_id", userId)
+      : await supabase.from("user_roles").insert({ user_id: userId, role });
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-    else {
-      registrarEvento("cambio_rol", { entidad: "usuario", entidad_id: userId, detalle: { role } });
-      toast({ title: "Rol asignado" }); fetchData();
-    }
+    else { toast({ title: "Rol asignado" }); fetchData(); }
   };
 
   const assignVendedor = async (userId: string, vendedor: string) => {
@@ -272,7 +270,6 @@ export default function AdminUsers() {
     const { error } = await supabase.from("profiles").update({ ver_margen: !current } as any).eq("user_id", userId);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
     else {
-      registrarEvento("cambio_ver_margen", { entidad: "usuario", entidad_id: userId, detalle: { ver_margen: !current } });
       toast({ title: !current ? "Margen visible" : "Margen oculto" }); fetchData();
     }
   };
@@ -621,10 +618,7 @@ export default function AdminUsers() {
         <p className="text-muted-foreground">Aprueba usuarios y asigna roles, vendedores y delegaciones</p>
       </div>
 
-      <SeguridadAccesoCard
-        activosSinUsuario={users.filter((u) => u.is_approved && u.estado === "activo" && !u.username).length}
-        onModo2fa={setModo2fa}
-      />
+      <AvisoSeguridadUsuarios onModo2fa={setModo2fa} />
 
       <AlertDialog open={!!resetear2faDe} onOpenChange={(o) => { if (!o) setResetear2faDe(null); }}>
         <AlertDialogContent>
