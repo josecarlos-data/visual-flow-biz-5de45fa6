@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { ChevronDown, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ConsultasAuditoria from "@/components/ConsultasAuditoria";
 
 interface EventoRow {
   id: string;
@@ -478,6 +480,12 @@ export default function AdminAuditoria() {
         </p>
       </div>
 
+      <Tabs defaultValue="eventos" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="eventos">Eventos</TabsTrigger>
+          <TabsTrigger value="consultas">Consultas</TabsTrigger>
+        </TabsList>
+        <TabsContent value="eventos" className="space-y-4">
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Filtros</CardTitle>
@@ -659,6 +667,11 @@ export default function AdminAuditoria() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+        <TabsContent value="consultas">
+          <ConsultasAuditoria usuarios={usuarios} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
