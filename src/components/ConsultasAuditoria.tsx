@@ -26,6 +26,7 @@ interface FilaCliente {
 }
 interface ResUsuario {
   primera_consulta: string | null; historial_suficiente: boolean; clientes_dia: number; clientes_dia_media: number;
+  clientes_periodo?: number; clientes_base?: number;
   clientes: FilaCliente[];
 }
 interface FilaUsuario {
@@ -158,8 +159,7 @@ export default function ConsultasAuditoria({ usuarios }: { usuarios: { user_id: 
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Clientes consultados ({resU.clientes.length})</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Clientes distintos al día: {num(resU.clientes_dia)} en el periodo, frente a {num(resU.clientes_dia_media)} de media en
-              los 90 días anteriores.
+              Clientes distintos en el periodo: {resU.clientes_periodo ?? 0} · En los 90 días anteriores: {resU.clientes_base ?? 0}
             </p>
             {resU.historial_suficiente ? (
               <p className="text-xs text-muted-foreground">
