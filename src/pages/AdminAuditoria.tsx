@@ -129,7 +129,7 @@ const VALORES: Record<string, Record<string, string>> = {
   estado: {
     activo: "Activo", suspendido_temporal: "Suspendido temporalmente", bloqueado_intentos: "Bloqueado por intentos",
     bloqueado_admin: "Bloqueado por un administrador", baja: "Baja",
-    pendiente: "Pendiente", confirmado: "Confirmado", descartado: "Descartado",
+    pendiente: "Pendiente", confirmado: "Confirmado", descartado: "Descartado", sin_confirmar: "Sin confirmar",
   },
   vista: { por_usuario: "Por usuario", por_cliente: "Por cliente" },
   accion: { autorizar: "Autorizar", bloquear: "Bloquear", desbloquear: "Desbloquear", renombrar: "Renombrar", eliminar: "Eliminar" },
@@ -284,7 +284,10 @@ function lineasDetalle(r: Pick<EventoRow, "detalle" | "entidad" | "entidad_id">)
 }
 
 function DetalleEvento({ evento }: { evento: EventoRow }) {
-  const lineas = lineasDetalle(evento);
+  const vacio = (v: unknown) => v === null || v === undefined || v === "";
+  const lineas = lineasDetalle(evento).filter(
+    (l) => !(("antes" in l || "despues" in l) && vacio(l.antes) && vacio(l.despues) && l.valor === undefined),
+  );
   if (lineas.length === 0) {
     return <p className="text-xs text-muted-foreground">Sin detalle adicional.</p>;
   }
