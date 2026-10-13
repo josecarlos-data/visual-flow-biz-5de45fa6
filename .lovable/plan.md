@@ -1,28 +1,32 @@
-# Ajustes pequeños en Auditoría y Consultas
+# Exigir aprobación en las reglas de acceso que hoy no la comprueban
 
-Una sola migración nueva: `drizzle/migrations/0013_auditoria_ip_y_consultas_ajustes.sql`. Todo con `CREATE OR REPLACE`, mismas firmas y tipo de retorno, sin DROP ni cambios de permisos.
+## Comprobado antes de proponer
+He consultado las reglas de acceso de la base (esquemas public y storage) y las funciones con privilegios.
 
-## 1. Margen de historial
-En `consultas_por_usuario`, la comprobación pasa a `v_primera <= v_base_desde + interval '2 days'`. El resto de la función, igual.
+**Mi lista coincide con la tuya.** Estas reglas dan acceso por rol o por ser dueño, sin is_approved en todas sus ramas:
+- visita_bloques: las 4 políticas (ver, crear, editar, borrar)
+- visitas: «Users update own visitas» y «Users delete own visitas»
+- objetivos: «Direccion gestiona objetivos» (FOR ALL)
+- situaciones_cliente: situaciones_insert, situaciones_update y situaciones_delete
+- profiles: «Directors can view all profiles» y «Jefes can view zone profiles»
+- storage.objects: «Adjuntos visita: ver propios o revisores», «actualizar propios» y «borrar propios o admin»
+- visitas_planificadas: «Update own planificadas» y «Delete own planificadas»
+- perfil_atributos: perfil_atributos_select_auth (USING true)
+- Funciones: objetivos_propuesta y refrescar_documentos_resumen
 
-## 2. IP y navegador
-- `auditar_cambio`: añade `ip` y `user_agent` desde `request.headers`, con el mismo bloque que la 0011 (cf-connecting-ip o primer valor de x-forwarded-for, dentro de BEGIN/EXCEPTION). Sigue ignorando los cambios sin usuario, así que siempre hay usuario cuando se guarda.
-- `consultas_por_usuario` y `consultas_por_cliente`: el evento `consulta_actividad` guarda también `ip` y `user_agent` con ese mismo bloque.
-- Copio la definición vigente de cada función (de la base) y solo añado esto.
+Además salen las cinco excepciones de «NO tocar» (perfil propio, rol propio, acceso propio a paneles). dispositivos y sesiones_activas no aparecen porque no tienen políticas de lectura que cumplan el criterio.
 
-## 3. Resumen de la pestaña Consultas
-- `consultas_por_usuario` devuelve además `clientes_periodo` (clientes distintos en el periodo) y `clientes_base` (en los 90 días anteriores). Las claves actuales se mantienen, así que el tipo de retorno no cambia.
-- En pantalla: «Clientes distintos en el periodo: N» y «En los 90 días anteriores: M», en lugar de la frase de clientes al día.
+**Única diferencia:** la consulta de funciones también devuelve `puede_ver_bloque`, que usa has_role sin is_approved. Es la función de apoyo de las reglas de visita_bloques. Como pides, no la toco: la guarda va en las políticas, y eso basta para cerrar el acceso por la API. Quien la llamara directamente solo sabría si puede ver una visita concreta (sí o no); no recibiría datos.
 
-## 4. Detalle de Auditoría
-- `sin_confirmar` se muestra como «Sin confirmar».
-- Se ocultan las líneas antes → después en las que ambos valores están vacíos.
+## Cambio (una migración: `drizzle/migrations/0014_rls_exigir_aprobacion.sql`)
+- Para cada política de la lista: DROP POLICY IF EXISTS y CREATE POLICY con el mismo nombre, tabla, comando y rol. La condición se copia literal de pg_policies con `(SELECT public.is_approved(auth.uid())) AND ( … )` delante, en USING y en WITH CHECK (en WITH CHECK solo si ya lo tenía).
+- perfil_atributos_select_auth: `USING ((SELECT public.is_approved(auth.uid())))`.
+- objetivos_propuesta y refrescar_documentos_resumen: CREATE OR REPLACE, misma firma y tipo de retorno, mismo cuerpo. Solo cambia la guarda: `is_admin(auth.uid()) OR (is_approved(auth.uid()) AND has_role(auth.uid(), 'director_comercial'))`.
+- No se tocan las excepciones, has_role, puede_ver_bloque, puede_editar_bloque ni los permisos de ejecución de ninguna función.
 
-## Prueba (sin tocar datos de clientes)
-- Comparar definición antes/después y permisos de las tres funciones.
-- Con la sesión de Bautista, comprobar que no puede llamar a las funciones de administración (sigue igual).
-- Revisar la pantalla compilada. Las pruebas que generen eventos con cambios de clientes, y la consulta como administrador, las haces tú.
+## Pruebas
+- Antes y después: condiciones de cada política afectada y número de políticas por tabla, que no debe cambiar. Repetir la consulta del punto 1: solo deben quedar las excepciones.
+- Comparar el cuerpo de las dos funciones antes y después: solo cambia la guarda.
+- Con la sesión de Bautista, solo lectura: abrir fichas y ver visitas, bloques, perfil y adjuntos. Medir el tiempo de la pestaña Visitas antes y después. Sin crear, cambiar ni borrar nada.
 
-## Detalles técnicos
-- Front: `ConsultasAuditoria.tsx` (resumen) y `AdminAuditoria.tsx` (traducción y filtro de líneas vacías).
-- Si al aplicar algo no coincide con esto (por ejemplo, una firma distinta), me detengo y te lo explico.
+Si al aplicar algo no sale como aquí, me detengo y te lo explico.
