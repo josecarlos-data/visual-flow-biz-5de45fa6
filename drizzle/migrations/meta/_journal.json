@@ -92,6 +92,13 @@
       "when": 1791545071395,
       "tag": "0012_consultas_cliente_y_auditoria_por_tabla",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791887799245,
+      "tag": "0013_auditoria_ip_y_consultas_ajustes",
+      "breakpoints": true
     }
   ]
 }
