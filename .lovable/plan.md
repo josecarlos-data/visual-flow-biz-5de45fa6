@@ -1,200 +1,195 @@
-# Ofertas y Comunicaciones (revisado)
+# Ofertas y Comunicaciones (revisión 3)
 
-Marketing crea las ofertas. El comercial las envía por su propio WhatsApp desde la ficha del cliente, y el envío queda en el historial del cliente. Las visitas, la revisión de visitas y los incentivos no cambian.
+Marketing crea las ofertas. El comercial las envía por su WhatsApp desde la ficha del cliente y el envío queda en el historial del cliente. No cambian ni las visitas, ni la revisión de visitas, ni los incentivos.
 
-## Datos pedidos (consultados hoy)
+## Decisiones cerradas
 
-**Valores de `clientes.prohibicion_venta`** (11.604 clientes):
+- **Bloqueo por `prohibicion_venta`:** se usa una lista de patrones editable en Datos.
+  - Un cliente queda bloqueado si su valor contiene alguno de los patrones. No distingue mayúsculas ni tildes.
+  - Patrones iniciales: PROHIBICION, PERDIDAS, GIRO DEVUELTO, CERRAD, LIQUIDACION, CONCURSO, FALLECID, PASA AL, CAMBIA DE CODIGO.
+  - La pantalla muestra qué valores y cuántos clientes quedan bloqueados con los patrones actuales.
+  - El resto de valores solo genera un aviso, sin bloquear.
+- **Teléfonos:** opción (a). El comercial escribe el móvil y se guarda en la ficha. No se revisa la importación: el Excel no trae teléfonos.
 
-| Valor | Clientes |
+## Datos consultados para esta revisión
+
+**Orden de los paneles.** Ventas y Clientes tienen los dos el orden 10, así que hay empate. Los demás:
+
+| Panel | Orden |
 |---|---|
-| CLIENTE DESACTUALIZADO | 5.998 |
-| (vacío) | 3.181 |
-| PROHIBICION DE VENTA | 1.408 |
-| AVISAR A ADMINISTRACION | 795 |
-| GIRO DEVUELTO | 61 |
-| MOROSO A PERDIDAS | 12 |
-| CAMBIA DE CODIGO DE CLIENTE | 10 |
-| CLIENTE DATOS ERRONEOS | 6 |
-| CLIENTE A PERDIDAS (NO ABRIR) | 5 |
-| Unos 120 valores sueltos de 1–3 clientes cada uno: «PASA AL nnnn» (unos 100), FRAS. PTES, HA CERRADO LA EMPRESA, EMPRESA EN LIQUIDACION, CONCURSO, DUEÑO FALLECIDO… | — |
+| Objetivos | 15 |
+| Agenda | 20 |
+| Visitas | 30 |
+| Documentos | 40 |
+| Rutas | 45 |
+| Actividad interna | 90 |
 
-**Clientes con móvil por delegación:**
+Hoy todos los usuarios que no son admin tienen asignados los mismos 7 paneles, Ventas incluido.
 
-| Delegación | Clientes | Con móvil | Con algún teléfono |
-|---|---|---|---|
-| GRANADA | 3.857 | 0 | 0 |
-| ALMERIA | 2.731 | 0 | 0 |
-| GUARROMAN | 2.305 | 0 | 0 |
-| MALAGA | 2.139 | 0 | 0 |
-| MANZANARES | 531 | 0 | 0 |
-| (sin delegación) | 29 | 0 | 0 |
+**Tipo de cliente.** La columna `tipo_cliente` está vacía. El código está en `cod_tipo_cliente` y el nombre en `extra->>'Tipo de cliente'`:
 
-Además, ningún cliente tiene `persona_contacto` y ninguno tiene un móvil en `extra`. La importación actual no trae ni teléfonos ni contactos.
+| Código | Nombre | Clientes |
+|---|---|---|
+| C | TC C | 10.692 |
+| A | TC A | 452 |
+| B | TC B | 429 |
+| D | SIN CATEGORIA | 8 |
+| AA | TC AA | 3 |
+| (sin código) | — | 8 |
 
-## Dos puntos que cambio respecto a tu propuesta (necesito tu decisión)
+**Baja en ISI.**
 
-**1. Bloqueo por `prohibicion_venta`.** Con «no vacía = bloqueado» quedaría bloqueado el 73 % de los clientes. Casi todos son «CLIENTE DESACTUALIZADO» y «AVISAR A ADMINISTRACION», que no parecen motivos para no mandar una oferta.
-- Propuesta: un ajuste `ofertas_prohibiciones_bloqueantes` (lista de valores), editable desde Seguridad o Datos.
-- Valores iniciales propuestos: PROHIBICION DE VENTA, GIRO DEVUELTO, MOROSO A PERDIDAS, CLIENTE A PERDIDAS (NO ABRIR), HA CERRADO LA EMPRESA, EMPRESA EN LIQUIDACION, CONCURSO, DUEÑO FALLECIDO y cualquier valor que empiece por «PASA AL» (cliente que ha cambiado de código).
-- El resto se muestra como aviso, sin bloquear.
-- Si prefieres «no vacía = bloqueado» tal cual, se hace así.
+| `extra->>'Estado'` | Clientes | Con motivo de baja |
+|---|---|---|
+| Activo | 11.584 | — |
+| Baja | 8 | 8 |
 
-**2. Teléfonos.** Hoy no hay ningún teléfono en el CRM, así que el móvil se pedirá en el 100 % de los envíos al principio. Opciones:
-- (a) Seguir así: el comercial lo escribe una vez y se guarda en la ficha (`telefono_whatsapp`).
-- (b) Revisar antes la importación del maestro por si el Excel sí trae las columnas de teléfono y se pierden al cargar. Lo compruebo como primer paso de la Fase 3, sin cambiar nada.
+- Ningún cliente tiene «Fecha de baja», aunque la importación sí la lee.
+- Regla propuesta para la Fase 3: bloquear si `extra->>'Estado'` no es «Activo» (sin distinguir mayúsculas) o si «Fecha de baja» tiene fecha. El motivo visible será «Cliente de baja en ISI», con el motivo de baja si lo hay.
+- Un cliente sin «Estado» no se bloquea.
 
-{contacto} seguirá saliendo «Hola» hasta que haya contactos.
+**`vendedores_objetivos()`.** Solo la usa la pantalla de administración de Objetivos, que es para admin y director comercial.
 
-## Paso 0 — Valor nuevo del rol
+## Paso 0 — Valor nuevo del rol (todavía no aplicado)
 
-Una migración sola, en `drizzle/migrations/`, con únicamente:
+Una migración sola, en `drizzle/migrations/`, que solo contiene:
 
 ```sql
 ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'marketing';
 ```
 
-Nada más en esa migración ni en la misma ejecución.
+Se aplica antes y por separado de la migración de la Fase 1.
 
-## Fase 1 — Rol Marketing
+## Fase 1 — Rol Marketing (lo que se construye al aprobar)
 
-- Añadir «Marketing» al selector de rol de Usuarios y a las etiquetas de Auditoría.
-- Usuario sin ningún panel asignado: mostrar «Sin secciones asignadas» en lugar de la pantalla en blanco.
-- Tras iniciar sesión, llevar a cada usuario a su primer panel permitido, no siempre a Ventas. Así no se registra un `acceso_denegado` falso en cada inicio de sesión.
-- Marketing no lee clientes, ventas ni visitas.
+**Pantallas**
+- **Usuarios:** «Marketing» aparece en el selector de rol, con su etiqueta legible en listas y filtros.
+- **Auditoría:** etiqueta «Marketing» en los detalles de cambio de rol.
+- **Sin paneles asignados:** en lugar de redirigir a «/» y dejar la pantalla en blanco, se muestra «Sin secciones asignadas. Contacta con el administrador.», con botón de cerrar sesión. No se registra ningún `acceso_denegado`.
+- **Destino tras el login:** quien tiene Ventas entra en Ventas, como hoy. El resto va a su primer panel permitido, ordenado por orden y después por nombre. Así no se registra un `acceso_denegado` falso en cada inicio de sesión.
+  - Las demás redirecciones de inicio (`/auth`, `/pending`, fallback de `ProtectedRoute`) usan ese mismo destino.
 
-Funciones SECURITY DEFINER que solo comprueban `is_approved`, y qué hacer con cada una:
+**Base de datos (una migración, después del Paso 0)**
+- **Desempate de paneles:** Clientes pasa a orden 11, para que Ventas quede delante de forma fija.
+- **`vendedores_objetivos()`:** `CREATE OR REPLACE`, misma firma. Mantiene `is_approved` y añade una lista blanca: `has_role(admin)` o `has_role(director_comercial)`. Cualquier otro rol, incluido uno nuevo, recibe cero filas.
+- **`situaciones_activas()`:** `CREATE OR REPLACE`, misma firma. Mantiene `is_approved` y añade `public.can_view_cliente(auth.uid(), s.cod_cliente)`. Marketing no ve situaciones; cada rol ve solo las de sus clientes.
+  - Antes y después de aplicarla, se mide `panel_alertas` con la cuenta de Bautista, solo leyendo.
+  - Si va más de un 20 % más lenta, me detengo y te lo explico.
+- **Lo que no se toca:** `get_distinct_vendedores`, `get_distinct_delegaciones` y `buscar_productos`. Marketing necesita las delegaciones y el catálogo, y no son datos de cliente.
+- **Comprobaciones antes de aplicar:**
+  - Se vuelve a sacar la lista de funciones SECURITY DEFINER que solo comprueban `is_approved`, por si ha cambiado.
+  - Se comprueba que ninguna política de clientes, ventas, visitas o resúmenes deja pasar a un rol que no esté en su lista. Si alguna lo deja pasar, me detengo y te lo explico.
+- **Permisos:** las firmas no cambian, así que los permisos de ejecución tampoco. Se comparan antes y después.
 
-| Función | Qué devuelve | Propuesta |
-|---|---|---|
-| `situaciones_activas()` | Situaciones de todos los clientes | Filtrar por `can_view_cliente(auth.uid(), cod_cliente)` dentro de la función. Así queda acotada por rol, también para marketing. Sus llamantes (`panel_alertas`, `panel_dormidos`, `ruta_clientes`) ya filtran por clientes visibles, así que no cambia lo que ven hoy. Antes de cambiarla, mido el coste con la cuenta de Bautista. |
-| `vendedores_objetivos()` | Lista de vendedores con objetivos | Exigir rol distinto de marketing. |
-| `get_distinct_vendedores()` / `get_distinct_delegaciones()` | Nombres de vendedores y delegaciones | Se dejan: marketing necesita las delegaciones para dirigir ofertas y no son datos de cliente. |
-| `buscar_productos()` | Catálogo de productos | Se deja: marketing lo necesita para elegir referencias. |
-| `auditar_cambio_usuario` | — | Es un trigger, no aplica. |
+**Pruebas (sin crear ni cambiar datos de clientes)**
+- Con Bautista: entra en Ventas y `vendedores_objetivos` le devuelve 0 filas.
+- `situaciones_activas` devuelve solo situaciones de clientes que Bautista puede ver.
+- La prueba con una cuenta de marketing real la haces tú cuando crees el usuario.
 
-Antes de construir la fase vuelvo a sacar esta lista, por si ha cambiado.
+## Fase 2 — Ofertas (pendiente de aprobación)
 
-## Fase 2 — Ofertas
+**Qué promociona la oferta**
+- `marcas text[]`: código de `productos.marca`; en pantalla se ve `marca_nombre`.
+- `referencias text[]`.
+- `familias text[]`, opcional.
+- Los selectores tienen búsqueda y se sirven por RPC.
 
-**Contenido de la oferta:**
-- Título y texto.
-- Lo que promociona:
-  - `marcas` (código de `productos.marca`; en pantalla se muestra `marca_nombre`);
-  - `referencias`;
-  - `familias` (opcional).
-- Selectores de marca y referencia con búsqueda, servidos por RPC.
-- Fechas de inicio y de vencimiento.
-- Adjuntos: imagen y/o PDF.
+**Bloqueos por marca:** cuentan las marcas de la oferta más la marca de cada referencia ofertada.
 
-**A quién va dirigida:** delegaciones (por defecto todas), tipos de cliente y requisitos opcionales de perfil.
+**A quién va dirigida**
+- Delegaciones.
+- Tipos de cliente, con un selector que muestra código y nombre (por ejemplo, «A · TC A»).
+- Requisitos de perfil.
 
-**Marcas que bloquean la oferta:** las marcas de la oferta más la marca de cada referencia ofertada.
+**Estados y borrado**
+- Estados guardados: borrador, publicada y archivada. «Vencida» se calcula al leer.
+- Solo se eliminan borradores sin envíos. Al eliminarlos se borran también sus archivos.
+- Archivar no borra archivos.
 
-**Estados:**
-- Guardados: borrador, publicada, archivada.
-- «Vencida» se calcula al leer, sin tareas programadas.
-- Solo se pueden eliminar los borradores sin envíos. Una oferta con envíos solo se puede archivar.
+**Mensaje**
+- Admite `{contacto}`.
+- Termina con un pie fijo no editable: RIMOSA + «Responde BAJA si no quieres recibir más ofertas». Texto provisional, pendiente de la asesoría.
 
-**Mensaje:**
-- Admite `{contacto}`, que se sustituye por `persona_contacto` o por «Hola» si no hay.
-- Termina con un pie fijo que el comercial no puede editar: identifica a RIMOSA e indica «Responde BAJA si no quieres recibir más ofertas». Texto provisional hasta que lo valide la asesoría.
+**Página pública `/o/<token>`**
+- Token aleatorio, URL base en `app_settings.ofertas_url_base`.
+- Oferta vencida: «Esta oferta ha vencido».
+- Oferta archivada o en borrador: «Oferta no disponible».
 
-**Página pública `/o/<token>`:**
-- Sin login. Muestra el texto, la imagen y el PDF.
-- Token aleatorio de al menos 128 bits, no el id.
-- Si la oferta ha vencido, la página lo indica.
-- La URL base sale de `app_settings.ofertas_url_base`; si está vacía, se usa el origen actual.
+**Adjuntos:** bucket público `ofertas-publicas`, con rutas aleatorias. Solo pueden subir archivos admin, director y marketing.
 
-**Adjuntos:** bucket **público** `ofertas-publicas`, con rutas aleatorias (`<uuid>/<uuid>.<ext>`).
-- Riesgos:
-  - (1) Quien tenga el enlace puede reenviarlo. Es lo buscado, porque es material para clientes.
-  - (2) Un archivo no se puede «retirar» por caducidad. Al eliminar o archivar la oferta, se borran sus archivos.
-  - (3) No se puede listar el bucket: solo se puede leer quien conoce la ruta.
-- Solo admin, director y marketing pueden subir archivos.
-- Nunca se guardan ahí datos de clientes.
+**Fuera de alcance:** la miniatura de WhatsApp.
 
-**Fuera de alcance:** la miniatura de la oferta en WhatsApp.
+**Preferencias del cliente:** tabla propia `cliente_preferencias_ofertas`, con `no_quiere_ofertas`, `marcas_excluidas` y `telefono_whatsapp`.
+- Se ve y se edita en la pestaña Perfil, y los cambios se auditan.
+- Marcar `no_quiere_ofertas`: cualquiera que vea al cliente, salvo marketing.
+- Desmarcarlo: solo admin o director, con motivo obligatorio. La regla se aplica en la base de datos.
 
-**Preferencias del cliente:** tabla nueva `cliente_preferencias_ofertas`, una fila por cliente:
-- Campos: `no_quiere_ofertas`, `marcas_excluidas text[]` y `telefono_whatsapp`.
-- Se ven y se editan en la pestaña Perfil, y los cambios se auditan con `auditar_cambio`.
-- Pueden editarla quienes pueden ver el cliente. Marketing no puede.
+**Patrones de prohibición:** ajuste `ofertas_patrones_prohibicion` en Datos.
+- La pantalla tiene una vista previa de valores y clientes afectados, servida por RPC.
+- La comparación se hace sin mayúsculas ni tildes (`unaccent`/`upper`).
 
-**Panel `ofertas`** en `dashboards`:
-- Filas de `user_dashboard_access` para los usuarios actuales de marketing y director.
-- Prueba con una cuenta que no sea admin.
+**Panel `ofertas`:** con filas de acceso para marketing y director. Se prueba con una cuenta que no sea admin.
 
-## Fase 3 — Envío
+## Fase 3 — Envío (pendiente)
 
-**Teléfono:**
-- Se usa el primer móvil español (6 o 7 y 9 dígitos) que aparezca en `telefono_whatsapp`, `telefono` o `telefono2`.
-- Se tolera que el campo traiga espacios, prefijo o dos números.
-- El enlace de WhatsApp lleva `34XXXXXXXXX`, sin «+».
-- Si no hay móvil, se pide, con la casilla «Guardar en la ficha» marcada por defecto.
+**Teléfono**
+- Se usa el primer móvil español que haya en `telefono_whatsapp`, `telefono` o `telefono2`.
+- En el enlace de WhatsApp va `34XXXXXXXXX`.
+- Si no hay móvil, se pide, con la casilla «Guardar en la ficha» marcada.
 
-**Bloqueos** (los mismos en pantalla y en servidor, cada uno con su motivo visible):
-1. oferta no vigente;
-2. delegación;
-3. tipo de cliente;
-4. requisitos de perfil;
-5. marca excluida;
-6. `no_quiere_ofertas`;
-7. `prohibicion_venta`, según la decisión 1;
-8. situación activa con efecto «ocultar».
+**Bloqueos**
+1. Oferta no vigente.
+2. Delegación.
+3. Tipo de cliente.
+4. Requisitos de perfil.
+5. Marca excluida.
+6. `no_quiere_ofertas`.
+7. `prohibicion_venta`, según los patrones.
+8. Situación activa con efecto «ocultar».
+9. **Baja en ISI**, con la regla de arriba.
 
 «Ya enviada el …» es un aviso, no un bloqueo.
 
-**Funciones `ofertas_para_cliente` y `registrar_envio_oferta`:**
-- Son SECURITY DEFINER.
-- Exigen `is_approved`, `can_view_cliente(auth.uid(), cod)` y rol admin, director, jefe de zona o comercial.
-- Marketing no envía.
+**Permisos:** `ofertas_para_cliente` y `registrar_envio_oferta` son SECURITY DEFINER. Exigen `is_approved`, `can_view_cliente` y rol admin, director, jefe de zona o comercial.
 
-**Seguimiento del envío:**
-- `comunicaciones.estado` pasa de `abierto` a `enviado` o `no_enviado`.
-- Al volver al CRM (`visibilitychange`), se pregunta «¿Se envió?».
-- En el envío a varios clientes, la misma pregunta y luego «Siguiente», con un toque por cliente. La lista de clientes sale por RPC.
-- El envío se muestra en la pestaña Visitas de la ficha, mezclado por fecha y con estilo propio (WhatsApp, oferta, quién, estado). No suma al contador de visitas.
-- No se crean filas en `visitas` ni en `visita_bloques` ni el motivo `envio_oferta`.
+**Estados del envío**
+- `abierto` pasa a `enviado` o `no_enviado`.
+- Al volver al CRM, se pregunta «¿Se envió?».
+- En el envío múltiple, «Siguiente» va de cliente en cliente.
 
-**Acceso y teléfono del comercial:**
-- Acceso al panel `ofertas` para jefes de zona y comerciales.
-- Sin teléfono del comercial ni «Mi cuenta». `prevent_profile_self_escalation` no se toca.
+**Historial:** los envíos aparecen en la pestaña Visitas de la ficha con estilo propio. No crean visitas ni bloques y no cuentan como visita.
 
-## Fase 4 — Comunicaciones
+**Acceso:** el panel `ofertas` se da a jefes de zona y comerciales.
 
-**Quién ve qué:**
-- Comercial: lo de sus clientes (`can_view_cliente`).
+## Fase 4 — Comunicaciones (pendiente)
+
+**Quién ve qué**
+- Comercial: lo de sus clientes.
 - Jefe de zona: su delegación.
 - Admin, director y marketing: todo.
 
-**Listado y resúmenes:**
-- Por RPC paginada, que devuelve el nombre del cliente.
-- Medición por envío: ventas del cliente en lo ofertado 30 días antes y 30 días después. Solo se calcula cuando `fecha_corte_datos()` ya cubre esos 30 días; mientras tanto se muestra «pendiente».
-- Por oferta: clientes alcanzados, cuántos compraron después e importe, con la etiqueta «asociación, no causa».
+**Contenido**
+- RPC paginada que devuelve el nombre del cliente.
+- Ventas en lo ofertado 30 días antes y 30 días después del envío, solo cuando `fecha_corte_datos()` ya cubre esos 30 días.
+- Resumen por oferta, con la etiqueta «asociación, no causa».
+- Cada envío muestra la oferta tal como se envió, también si está archivada.
+- Panel `comunicaciones` y sus filas de acceso.
 
-**Panel `comunicaciones`** y sus filas de acceso.
+## Fase 5 — Recomendaciones (pendiente)
 
-## Fase 5 — Recomendaciones
+Orden de los clientes recomendados:
+1. Compraron lo ofertado en los últimos 12 meses.
+2. Lo compraban y lo han dejado.
+3. El resto, por días sin comprar.
 
-Pares oferta–cliente sin bloqueos y que no han recibido esa oferta. Orden:
-1. clientes que compraron lo ofertado en los últimos 12 meses;
-2. clientes que lo compraban y lo han dejado;
-3. el resto, por días sin comprar.
+Se aplican los mismos bloqueos que en el envío, y lo descartado no vuelve a salir.
 
-El comercial elige «Enviar» o «Descartar»; lo descartado no vuelve a salir para esa oferta. Usa los mismos bloqueos que el envío.
+## Reglas comunes
 
-## Migraciones
-
-```text
-Paso 0 (enum, sola) -> F1 -> F2 -> F3 -> F4 -> F5
-```
-
-- Una migración por fase, en `drizzle/migrations/`.
+- Una migración por fase, en `drizzle/migrations/`. El Paso 0 va solo.
 - `GRANT EXECUTE` explícito en cada función nueva o cambiada.
-- `anon` solo puede ejecutar la función de la página pública (`oferta_publica(token)`), que devuelve solo campos públicos de ofertas publicadas.
-- Tablas nuevas con GRANT, RLS y `is_approved`; las de negocio, auditadas.
+- `anon` solo tiene acceso a la función de la página pública.
 
 ## Al aprobar
 
-Solo se construye el **Paso 0**. Las fases 1 a 5 esperan a tu decisión sobre los puntos 1 y 2, y cada una se aprueba por separado.
+Se construyen el **Paso 0** (migración sola) y después la **Fase 1**. Las fases 2 a 5 esperan a que las apruebes una a una.
