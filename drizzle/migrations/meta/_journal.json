@@ -106,6 +106,13 @@
       "when": 1791896743200,
       "tag": "0014_rls_exigir_aprobacion",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1792439212213,
+      "tag": "0015_app_role_marketing",
+      "breakpoints": true
     }
   ]
 }
