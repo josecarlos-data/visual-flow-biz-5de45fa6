@@ -2733,7 +2733,12 @@ export type Database = {
       verificar_sesion: { Args: { _sesion_id: string }; Returns: Json }
     }
     Enums: {
-      app_role: "admin" | "director_comercial" | "jefe_de_zona" | "comercial"
+      app_role:
+        | "admin"
+        | "director_comercial"
+        | "jefe_de_zona"
+        | "comercial"
+        | "marketing"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2861,7 +2866,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "director_comercial", "jefe_de_zona", "comercial"],
+      app_role: [
+        "admin",
+        "director_comercial",
+        "jefe_de_zona",
+        "comercial",
+        "marketing",
+      ],
     },
   },
 } as const
