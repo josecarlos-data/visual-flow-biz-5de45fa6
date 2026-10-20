@@ -144,7 +144,8 @@ async function cargarDatosUsuario(userId: string): Promise<DatosUsuario> {
         .from("dashboards" as any)
         .select("key, name, description, icon, route, sort_order, is_active")
         .eq("is_active", true)
-        .order("sort_order", { ascending: true }),
+        .order("sort_order", { ascending: true })
+        .order("name", { ascending: true }),
       role === "admin"
         ? Promise.resolve({ data: null, error: null })
         : supabase.from("user_dashboard_access" as any).select("dashboard_key").eq("user_id", userId),

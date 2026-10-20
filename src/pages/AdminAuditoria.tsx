@@ -125,7 +125,7 @@ const VALORES: Record<string, Record<string, string>> = {
     nuevo_admin: "Nuevo administrador", segundo_factor: "Segundo factor restablecido", baja: "Bajas de usuario",
   },
   via: { "iniciar-sesion": "Pantalla de acceso", "cambiar-password": "Cambio de contraseña" },
-  role: { admin: "Administrador", director_comercial: "Director comercial", jefe_de_zona: "Jefe de zona", comercial: "Comercial" },
+  role: { admin: "Administrador", director_comercial: "Director comercial", jefe_de_zona: "Jefe de zona", comercial: "Comercial", marketing: "Marketing" },
   estado: {
     activo: "Activo", suspendido_temporal: "Suspendido temporalmente", bloqueado_intentos: "Bloqueado por intentos",
     bloqueado_admin: "Bloqueado por un administrador", baja: "Baja",

@@ -491,6 +491,7 @@ export default function AdminUsers() {
                           <SelectItem value="comercial">Comercial</SelectItem>
                           <SelectItem value="jefe_de_zona">Jefe de Zona</SelectItem>
                           <SelectItem value="director_comercial">Director Comercial</SelectItem>
+                          <SelectItem value="marketing">Marketing</SelectItem>
                           <SelectItem value="admin">Admin</SelectItem>
                         </SelectContent>
                       </Select>
