@@ -2,3 +2,4 @@
 - User state (profiles.estado) is enforced in the database via is_approved and is_admin; state changes go only through the admin_cambiar_estado / admin_dar_baja RPCs so sessions and audit stay consistent.
 - Second factor (TOTP) is enforced in the database: is_approved/is_admin require public.sesion_cumple_2fa() when evaluating the caller; resetting factors goes only through the admin-segundo-factor function. Why: the client gate alone can be bypassed.
 - User/role/dashboard-access changes are audited by the auditar_cambio_usuario trigger (also for service-role writes); session max age is enforced in verificar_sesion from the oldest amr timestamp. Why: changes and expiry must hold regardless of which client or tool acts.
+- Landing route after login comes from src/lib/destinoInicio.ts (Ventas if assigned, else first permitted dashboard); ProtectedRoute redirects "/" silently. Why: roles without Ventas must not log a false acceso_denegado.

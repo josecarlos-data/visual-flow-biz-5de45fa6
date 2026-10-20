@@ -10,6 +10,7 @@ import { AppLayout } from "@/components/AppLayout";
 import LoadingScreen from "@/components/LoadingScreen";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { registrarEvento } from "@/lib/auditoria";
+import { destinoInicio } from "@/lib/destinoInicio";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -91,10 +92,14 @@ function ProtectedRoute({
   const location = useLocation();
   const denegadoRef = useRef<string | null>(null);
 
+  const destino = destinoInicio(dashboards);
+  // Entrar por "/" sin el panel Ventas no es una denegación: se lleva al usuario a su inicio.
+  const esInicio = location.pathname === "/";
+
   const denegadoAdmin =
     !isLoading && !!user && !authError && isApproved && adminOnly && role !== "admin" && !(allowedRoles ?? []).includes(role ?? "");
   const denegadoDashboard =
-    !isLoading && !!user && !authError && isApproved && !denegadoAdmin && !!dashboardKey && !hasDashboard(dashboardKey);
+    !isLoading && !!user && !authError && isApproved && !denegadoAdmin && !!dashboardKey && !hasDashboard(dashboardKey) && !esInicio && destino !== null;
 
   useEffect(() => {
     if (!denegadoAdmin && !denegadoDashboard) return;
@@ -115,15 +120,28 @@ function ProtectedRoute({
   if (authError) return <AuthErrorScreen message={authError} onSignOut={signOut} />;
   if (!isApproved) return <Navigate to="/pending" replace />;
   if (adminOnly && role !== "admin" && !(allowedRoles ?? []).includes(role ?? "")) {
-    return <Navigate to="/" replace />;
+    return destino ? <Navigate to={destino} replace /> : <SinSecciones onSignOut={signOut} />;
   }
   if (dashboardKey && !hasDashboard(dashboardKey)) {
-    // Fallback to first available dashboard, or pending if none
-    const fallback = dashboards[0]?.route;
-    return <Navigate to={fallback && fallback !== `/${dashboardKey}` ? fallback : "/"} replace />;
+    if (!destino) return <SinSecciones onSignOut={signOut} />;
+    return <Navigate to={destino} replace />;
   }
 
   return <AppLayout>{children}</AppLayout>;
+}
+
+function SinSecciones({ onSignOut }: { onSignOut: () => void }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center px-4">
+      <div className="w-full max-w-md rounded-lg border p-6 text-center">
+        <h1 className="mb-2 text-lg font-semibold">Sin secciones asignadas</h1>
+        <p className="mb-4 text-sm text-muted-foreground">Contacta con el administrador.</p>
+        <button className="rounded-md border px-3 py-2 text-sm" onClick={onSignOut}>
+          Cerrar sesión
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
