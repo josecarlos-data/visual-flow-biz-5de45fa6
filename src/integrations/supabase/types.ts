@@ -2365,6 +2365,7 @@ export type Database = {
         Args: { _accion: string; _id: string; _nombre?: string }
         Returns: Json
       }
+      archivo_oferta_visible: { Args: { _path: string }; Returns: boolean }
       auditoria_listado: {
         Args: {
           _desde?: string

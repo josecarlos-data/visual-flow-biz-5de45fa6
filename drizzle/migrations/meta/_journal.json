@@ -127,6 +127,13 @@
       "when": 1793220061152,
       "tag": "0017_fase2_ofertas",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793220081711,
+      "tag": "0018_ofertas_archivos_lectura",
+      "breakpoints": true
     }
   ]
 }
