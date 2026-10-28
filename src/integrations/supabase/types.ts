@@ -411,6 +411,47 @@ export type Database = {
           },
         ]
       }
+      cliente_preferencias_ofertas: {
+        Row: {
+          cod_cliente: number
+          created_at: string
+          marcas_excluidas: string[]
+          motivo_desmarcado: string | null
+          no_quiere_ofertas: boolean
+          telefono_whatsapp: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          cod_cliente: number
+          created_at?: string
+          marcas_excluidas?: string[]
+          motivo_desmarcado?: string | null
+          no_quiere_ofertas?: boolean
+          telefono_whatsapp?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          cod_cliente?: number
+          created_at?: string
+          marcas_excluidas?: string[]
+          motivo_desmarcado?: string | null
+          no_quiere_ofertas?: boolean
+          telefono_whatsapp?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_preferencias_ofertas_cod_cliente_fkey"
+            columns: ["cod_cliente"]
+            isOneToOne: true
+            referencedRelation: "clientes"
+            referencedColumns: ["cod_cliente"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           cif: string | null
@@ -858,6 +899,72 @@ export type Database = {
           tipo?: string
           updated_at?: string
           vendedor?: string
+        }
+        Relationships: []
+      }
+      ofertas: {
+        Row: {
+          adjuntos: Json
+          created_at: string
+          created_by: string | null
+          delegaciones: string[]
+          descripcion: string | null
+          estado: string
+          familias: string[]
+          id: string
+          marcas: string[]
+          mensaje: string
+          publicada_en: string | null
+          referencias: string[]
+          requisitos: Json
+          tipos_cliente: string[]
+          titulo: string
+          token: string
+          updated_at: string
+          vigente_desde: string | null
+          vigente_hasta: string | null
+        }
+        Insert: {
+          adjuntos?: Json
+          created_at?: string
+          created_by?: string | null
+          delegaciones?: string[]
+          descripcion?: string | null
+          estado?: string
+          familias?: string[]
+          id?: string
+          marcas?: string[]
+          mensaje?: string
+          publicada_en?: string | null
+          referencias?: string[]
+          requisitos?: Json
+          tipos_cliente?: string[]
+          titulo: string
+          token?: string
+          updated_at?: string
+          vigente_desde?: string | null
+          vigente_hasta?: string | null
+        }
+        Update: {
+          adjuntos?: Json
+          created_at?: string
+          created_by?: string | null
+          delegaciones?: string[]
+          descripcion?: string | null
+          estado?: string
+          familias?: string[]
+          id?: string
+          marcas?: string[]
+          mensaje?: string
+          publicada_en?: string | null
+          referencias?: string[]
+          requisitos?: Json
+          tipos_cliente?: string[]
+          titulo?: string
+          token?: string
+          updated_at?: string
+          vigente_desde?: string | null
+          vigente_hasta?: string | null
         }
         Relationships: []
       }
@@ -2258,6 +2365,7 @@ export type Database = {
         Args: { _accion: string; _id: string; _nombre?: string }
         Returns: Json
       }
+      archivo_oferta_visible: { Args: { _path: string }; Returns: boolean }
       auditoria_listado: {
         Args: {
           _desde?: string
@@ -2497,6 +2605,7 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_approved: { Args: { _user_id: string }; Returns: boolean }
+      normalizar_texto: { Args: { _t: string }; Returns: string }
       objetivos_propuesta: {
         Args: { _anio: number; _pct?: number }
         Returns: {
@@ -2525,6 +2634,35 @@ export type Database = {
           vendedor: string
           vendido: number
           vendido_anterior_ytd: number
+        }[]
+      }
+      oferta_marcas_efectivas: {
+        Args: { _oferta_id: string }
+        Returns: string[]
+      }
+      oferta_publica: { Args: { _token: string }; Returns: Json }
+      ofertas_buscar_referencias: {
+        Args: { _q: string }
+        Returns: {
+          descripcion: string
+          marca: string
+          marca_nombre: string
+          referencia: string
+        }[]
+      }
+      ofertas_opciones: {
+        Args: { _q?: string; _tipo: string }
+        Returns: {
+          codigo: string
+          nombre: string
+        }[]
+      }
+      ofertas_patrones_vista_previa: {
+        Args: { _patrones: string[] }
+        Returns: {
+          bloqueado: boolean
+          clientes: number
+          valor: string
         }[]
       }
       panel_alertas: {
@@ -2629,6 +2767,7 @@ export type Database = {
         }[]
       }
       puede_editar_bloque: { Args: { _visita_id: string }; Returns: boolean }
+      puede_gestionar_ofertas: { Args: { _user_id: string }; Returns: boolean }
       puede_revisar_visitas: { Args: { _user_id: string }; Returns: boolean }
       puede_ver_bloque: { Args: { _visita_id: string }; Returns: boolean }
       puede_ver_margen: { Args: { _user_id: string }; Returns: boolean }

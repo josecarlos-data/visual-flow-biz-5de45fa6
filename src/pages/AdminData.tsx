@@ -11,6 +11,7 @@ import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { DATASETS, type DatasetModule, type UploadResult } from "@/lib/datasets";
 import RechazosImportacion from "@/components/RechazosImportacion";
+import PatronesProhibicionCard from "@/components/PatronesProhibicionCard";
 
 export default function AdminData() {
   const [activeKey, setActiveKey] = useState<string>(DATASETS[0]?.key ?? "");
@@ -327,6 +328,8 @@ export default function AdminData() {
           </CardContent>
         </Card>
       )}
+
+      <PatronesProhibicionCard />
     </div>
   );
 }

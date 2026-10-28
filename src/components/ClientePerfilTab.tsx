@@ -17,6 +17,7 @@ import {
   type PerfilAtributo, type PerfilHecho,
 } from "@/hooks/useCrm";
 import { parseMulti, resolverOpciones, serializeMulti } from "@/lib/motivoCampos";
+import { PreferenciasOfertas } from "@/components/PreferenciasOfertas";
 
 const diaMes = (iso: string) => {
   const d = new Date(`${iso}T00:00:00`);
@@ -242,6 +243,7 @@ export function ClientePerfilTab({ cod }: { cod: number }) {
 
   return (
     <div className="space-y-4">
+      <PreferenciasOfertas cod={cod} />
       {sinConfirmar > 0 && (
         <div className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
           <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />

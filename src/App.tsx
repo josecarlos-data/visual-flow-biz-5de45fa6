@@ -40,6 +40,8 @@ const CodigoAlta = lazy(() => import("./pages/CodigoAlta"));
 const SegundoFactor = lazy(() => import("./pages/SegundoFactor"));
 const EstablecerPassword = lazy(() => import("./components/EstablecerPassword"));
 const CambiarPassword = lazy(() => import("./pages/CambiarPassword"));
+const Ofertas = lazy(() => import("./pages/Ofertas"));
+const OfertaPublica = lazy(() => import("./pages/OfertaPublica"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -228,9 +230,13 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <ErrorBoundary>
+            <Routes>
+              <Route path="/o/:token" element={<Suspense fallback={<LoadingScreen />}><OfertaPublica /></Suspense>} />
+              <Route path="*" element={
             <ControlAcceso>
             <Suspense fallback={<LoadingScreen />}>
               <Routes>
+                <Route path="/ofertas" element={<ProtectedRoute dashboardKey="ofertas"><Ofertas /></ProtectedRoute>} />
                 <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
                 <Route path="/register" element={<Navigate to="/auth" replace />} />
                 <Route path="/auth/register" element={<Navigate to="/auth" replace />} />
@@ -263,6 +269,8 @@ const App = () => (
               </Routes>
             </Suspense>
             </ControlAcceso>
+              } />
+            </Routes>
           </ErrorBoundary>
         </AuthProvider>
       </BrowserRouter>
