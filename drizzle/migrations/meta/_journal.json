@@ -120,6 +120,13 @@
       "when": 1792477229552,
       "tag": "0016_fase1_rol_marketing",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793220061152,
+      "tag": "0017_fase2_ofertas",
+      "breakpoints": true
     }
   ]
 }
