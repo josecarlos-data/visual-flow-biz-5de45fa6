@@ -4,7 +4,7 @@ import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, Phone, Mail, MapPin, Route as RouteIcon, Sparkles, Loader2,
   TrendingUp, TrendingDown, Package, Plus, AlertTriangle, Target, MessageSquareQuote,
-  Truck, User, Info, ChevronDown, ChevronUp, CalendarPlus, CalendarCheck, Search,
+  Truck, User, Info, ChevronDown, ChevronUp, CalendarPlus, CalendarCheck, Search, MessageCircle,
 } from "lucide-react";
 import { useQuery, useMutation, useMutationState, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
