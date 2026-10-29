@@ -16,6 +16,7 @@ import { usePerfilAtributos } from "@/hooks/useCrm";
 import { useAuth } from "@/hooks/useAuth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EnvioMultiple } from "@/components/ofertas/EnvioMultiple";
+import { Recomendados } from "@/components/ofertas/Recomendados";
 import {
   componerMensaje, enlaceOferta, estadoVisible, PIE_OFERTA,
   type AdjuntoOferta, type EstadoOferta, type RequisitoPerfil,
@@ -407,7 +408,14 @@ function EnviarOfertas() {
   return (
     <div className="space-y-4 p-4 sm:p-6">
       <h1 className="flex items-center gap-2 text-2xl font-bold"><Megaphone className="h-6 w-6 text-primary" />Enviar ofertas</h1>
-      <EnvioMultiple />
+      <Tabs defaultValue="recomendados">
+        <TabsList>
+          <TabsTrigger value="recomendados">Recomendados</TabsTrigger>
+          <TabsTrigger value="tandas">Todos los clientes</TabsTrigger>
+        </TabsList>
+        <TabsContent value="recomendados"><Recomendados /></TabsContent>
+        <TabsContent value="tandas"><EnvioMultiple /></TabsContent>
+      </Tabs>
     </div>
   );
 }
