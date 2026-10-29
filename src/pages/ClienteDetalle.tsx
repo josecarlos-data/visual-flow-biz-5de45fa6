@@ -9,6 +9,8 @@ import {
 import { useQuery, useMutation, useMutationState, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { EnviarOfertaDialog } from "@/components/ofertas/EnviarOfertaDialog";
+import { ETIQUETA_ENVIO, estadoEnvioVisible } from "@/lib/ofertasEnvio";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -147,6 +149,19 @@ const [periodoProd, setPeriodoProd] = useState<string>("12m");
   // --- Agendar visita ---
   const { user, role } = useAuth();
   const { add: addPlanificada } = useAgendaMutations();
+  const [ofertaOpen, setOfertaOpen] = useState(false);
+  const puedeEnviarOferta = role === "admin" || role === "director_comercial" || role === "jefe_de_zona" || role === "comercial";
+  const { data: enviosOfertas } = useQuery({
+    queryKey: ["ofertas_envios", "cliente", codNum],
+    enabled: codNum != null,
+    queryFn: async () => {
+      const { data } = await supabase.from("ofertas_envios")
+        .select("id, estado, abierto_en, comercial_nombre, ofertas(titulo)")
+        .eq("cod_cliente", codNum!).in("estado", ["enviado", "abierto", "sin_confirmar"])
+        .order("abierto_en", { ascending: false }).limit(50);
+      return (data ?? []) as unknown as { id: string; estado: string; abierto_en: string; comercial_nombre: string | null; ofertas: { titulo: string } | null }[];
+    },
+  });
   const { data: proxima } = useProximaPlanificada(codNum, user?.id ?? null);
   const [agendarOpen, setAgendarOpen] = useState(false);
   const [modoFecha, setModoFecha] = useState<"hoy" | "manana" | "otra">("hoy");
@@ -513,6 +528,11 @@ const { campo, dir } = ordenProductos;
             <Button variant="outline" className="flex-1" onClick={() => setAgendarOpen(true)}>
               <CalendarPlus className="mr-2 h-4 w-4" /> Agendar
             </Button>
+            {puedeEnviarOferta && (
+              <Button variant="outline" className="flex-1" onClick={() => setOfertaOpen(true)}>
+                <MessageCircle className="mr-2 h-4 w-4" /> Oferta
+              </Button>
+            )}
           </div>
           {situacion && (
             <div className="mt-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3">
@@ -548,8 +568,17 @@ const { campo, dir } = ordenProductos;
           <Button variant="outline" className="sm:flex-none" onClick={() => setAgendarOpen(true)}>
             <CalendarPlus className="mr-2 h-4 w-4" /> Agendar
           </Button>
+          {puedeEnviarOferta && (
+            <Button variant="outline" className="sm:flex-none" onClick={() => setOfertaOpen(true)}>
+              <MessageCircle className="mr-2 h-4 w-4" /> Enviar oferta
+            </Button>
+          )}
         </div>
       </div>
+
+      {puedeEnviarOferta && cliente && (
+        <EnviarOfertaDialog open={ofertaOpen} onOpenChange={setOfertaOpen} cliente={cliente} />
+      )}
 
       <Dialog open={agendarOpen} onOpenChange={setAgendarOpen}>
         <DialogContent className="sm:max-w-md">
@@ -863,6 +892,24 @@ const { campo, dir } = ordenProductos;
         </TabsContent>
 
         <TabsContent value="visitas" className="space-y-3">
+          {enviosOfertas && enviosOfertas.length > 0 && (
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="space-y-1.5 p-4">
+                <p className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-primary">
+                  <MessageCircle className="h-3.5 w-3.5" /> Ofertas enviadas
+                </p>
+                {enviosOfertas.map((e) => (
+                  <div key={e.id} className="flex flex-wrap items-baseline justify-between gap-x-2 text-sm">
+                    <span className="min-w-0 truncate">{e.ofertas?.titulo ?? "Oferta"}{e.comercial_nombre ? ` · ${e.comercial_nombre}` : ""}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {fechaCorta(e.abierto_en.slice(0, 10))}
+                      {e.estado !== "enviado" ? ` · ${ETIQUETA_ENVIO[estadoEnvioVisible(e.estado, e.abierto_en)]}` : ""}
+                    </span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
 
           {!visitas || visitas.length === 0 ? (
             <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Sin visitas registradas.</CardContent></Card>
