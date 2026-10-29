@@ -968,6 +968,60 @@ export type Database = {
         }
         Relationships: []
       }
+      ofertas_descartes: {
+        Row: {
+          alcance: string
+          cod_cliente: number
+          created_at: string
+          familias: string[]
+          hasta: string | null
+          id: string
+          motivo: string
+          nota: string | null
+          oferta_id: string
+          user_id: string
+        }
+        Insert: {
+          alcance?: string
+          cod_cliente: number
+          created_at?: string
+          familias?: string[]
+          hasta?: string | null
+          id?: string
+          motivo: string
+          nota?: string | null
+          oferta_id: string
+          user_id?: string
+        }
+        Update: {
+          alcance?: string
+          cod_cliente?: number
+          created_at?: string
+          familias?: string[]
+          hasta?: string | null
+          id?: string
+          motivo?: string
+          nota?: string | null
+          oferta_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ofertas_descartes_cod_cliente_fkey"
+            columns: ["cod_cliente"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["cod_cliente"]
+          },
+          {
+            foreignKeyName: "ofertas_descartes_oferta_id_fkey"
+            columns: ["oferta_id"]
+            isOneToOne: false
+            referencedRelation: "ofertas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ofertas_envios: {
         Row: {
           abierto_en: string
@@ -979,6 +1033,7 @@ export type Database = {
           id: string
           mensaje: string
           oferta_id: string
+          origen: string
           tanda_id: string | null
           telefono: string
           user_id: string
@@ -993,6 +1048,7 @@ export type Database = {
           id?: string
           mensaje: string
           oferta_id: string
+          origen?: string
           tanda_id?: string | null
           telefono: string
           user_id: string
@@ -1007,6 +1063,7 @@ export type Database = {
           id?: string
           mensaje?: string
           oferta_id?: string
+          origen?: string
           tanda_id?: string | null
           telefono?: string
           user_id?: string
@@ -2634,6 +2691,16 @@ export type Database = {
         Args: { _desde: string; _hasta: string; _user_id: string }
         Returns: Json
       }
+      descartar_recomendacion: {
+        Args: {
+          _cod_cliente: number
+          _motivo: string
+          _nota?: string
+          _oferta_id: string
+          _toda_familia?: boolean
+        }
+        Returns: string
+      }
       dispositivos_usuario: {
         Args: { _user_id: string }
         Returns: {
@@ -2736,6 +2803,10 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_approved: { Args: { _user_id: string }; Returns: boolean }
+      marcar_envio_recomendado: {
+        Args: { _envio_id: string }
+        Returns: undefined
+      }
       normalizar_texto: { Args: { _t: string }; Returns: string }
       objetivos_propuesta: {
         Args: { _anio: number; _pct?: number }
@@ -2838,6 +2909,27 @@ export type Database = {
           bloqueado: boolean
           clientes: number
           valor: string
+        }[]
+      }
+      ofertas_recomendados: {
+        Args: { _limite?: number; _oferta_id: string; _vendedor?: string }
+        Returns: {
+          avisos: Json
+          cliente: string
+          cod_cliente: number
+          excluidos: number
+          grupo: string
+          importe_12m: number
+          localidad: string
+          motivo: string
+          persona_contacto: string
+          ruta: string
+          saturado_dias: number
+          telefono: string
+          telefono_whatsapp: string
+          telefono2: string
+          ultima_compra: string
+          vendedor: string
         }[]
       }
       ofertas_vigentes_envio: {
