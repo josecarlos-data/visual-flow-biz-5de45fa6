@@ -134,6 +134,13 @@
       "when": 1793220081711,
       "tag": "0018_ofertas_archivos_lectura",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793285453320,
+      "tag": "0019_fase3_envio_ofertas",
+      "breakpoints": true
     }
   ]
 }

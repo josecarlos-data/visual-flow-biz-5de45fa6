@@ -968,6 +968,66 @@ export type Database = {
         }
         Relationships: []
       }
+      ofertas_envios: {
+        Row: {
+          abierto_en: string
+          cod_cliente: number
+          comercial_nombre: string | null
+          confirmado_en: string | null
+          created_at: string
+          estado: string
+          id: string
+          mensaje: string
+          oferta_id: string
+          tanda_id: string | null
+          telefono: string
+          user_id: string
+        }
+        Insert: {
+          abierto_en?: string
+          cod_cliente: number
+          comercial_nombre?: string | null
+          confirmado_en?: string | null
+          created_at?: string
+          estado?: string
+          id?: string
+          mensaje: string
+          oferta_id: string
+          tanda_id?: string | null
+          telefono: string
+          user_id: string
+        }
+        Update: {
+          abierto_en?: string
+          cod_cliente?: number
+          comercial_nombre?: string | null
+          confirmado_en?: string | null
+          created_at?: string
+          estado?: string
+          id?: string
+          mensaje?: string
+          oferta_id?: string
+          tanda_id?: string | null
+          telefono?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ofertas_envios_cod_cliente_fkey"
+            columns: ["cod_cliente"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["cod_cliente"]
+          },
+          {
+            foreignKeyName: "ofertas_envios_oferta_id_fkey"
+            columns: ["oferta_id"]
+            isOneToOne: false
+            referencedRelation: "ofertas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       perfil_atributos: {
         Row: {
           caduca_dias: number | null
@@ -2405,6 +2465,7 @@ export type Database = {
           referencia: string
         }[]
       }
+      caducar_envios_ofertas: { Args: never; Returns: number }
       can_view_cliente: {
         Args: { _cod: number; _user_id: string }
         Returns: boolean
@@ -2494,6 +2555,10 @@ export type Database = {
           ultima_compra: string
           vendedor: string
         }[]
+      }
+      confirmar_envio_oferta: {
+        Args: { _enviado: boolean; _envio_id: string }
+        Returns: undefined
       }
       consultas_por_cliente: {
         Args: { _cod: number; _desde: string; _hasta: string }
@@ -2636,6 +2701,10 @@ export type Database = {
           vendido_anterior_ytd: number
         }[]
       }
+      oferta_evaluar_cliente: {
+        Args: { _cod: number; _oferta_id: string }
+        Returns: Json
+      }
       oferta_marcas_efectivas: {
         Args: { _oferta_id: string }
         Returns: string[]
@@ -2650,11 +2719,42 @@ export type Database = {
           referencia: string
         }[]
       }
+      ofertas_destinatarios: {
+        Args: { _oferta_id: string }
+        Returns: {
+          avisos: Json
+          bloqueos: Json
+          cliente: string
+          cod_cliente: number
+          localidad: string
+          persona_contacto: string
+          ruta: string
+          telefono: string
+          telefono_whatsapp: string
+          telefono2: string
+          ultimo_envio: string
+        }[]
+      }
       ofertas_opciones: {
         Args: { _q?: string; _tipo: string }
         Returns: {
           codigo: string
           nombre: string
+        }[]
+      }
+      ofertas_para_cliente: {
+        Args: { _cod_cliente: number }
+        Returns: {
+          avisos: Json
+          bloqueos: Json
+          descripcion: string
+          mensaje: string
+          oferta_id: string
+          titulo: string
+          token: string
+          ultimo_envio: string
+          ultimo_envio_por: string
+          vigente_hasta: string
         }[]
       }
       ofertas_patrones_vista_previa: {
@@ -2663,6 +2763,14 @@ export type Database = {
           bloqueado: boolean
           clientes: number
           valor: string
+        }[]
+      }
+      ofertas_vigentes_envio: {
+        Args: never
+        Returns: {
+          oferta_id: string
+          titulo: string
+          vigente_hasta: string
         }[]
       }
       panel_alertas: {
@@ -2767,6 +2875,7 @@ export type Database = {
         }[]
       }
       puede_editar_bloque: { Args: { _visita_id: string }; Returns: boolean }
+      puede_enviar_ofertas: { Args: { _uid: string }; Returns: boolean }
       puede_gestionar_ofertas: { Args: { _user_id: string }; Returns: boolean }
       puede_revisar_visitas: { Args: { _user_id: string }; Returns: boolean }
       puede_ver_bloque: { Args: { _visita_id: string }; Returns: boolean }
@@ -2781,6 +2890,17 @@ export type Database = {
       registrar_consulta: {
         Args: { _cod: number; _pestana: string }
         Returns: undefined
+      }
+      registrar_envio_oferta: {
+        Args: {
+          _cod_cliente: number
+          _guardar_telefono?: boolean
+          _mensaje: string
+          _oferta_id: string
+          _tanda_id?: string
+          _telefono: string
+        }
+        Returns: string
       }
       registrar_exito_acceso: { Args: { _user_id: string }; Returns: undefined }
       registrar_fallo_acceso: {
