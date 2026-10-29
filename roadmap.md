@@ -30,3 +30,4 @@
 
 - [x] Ofertas Fase 3: envío por WhatsApp desde ficha y en tandas, confirmación, historial (pendiente: prueba real de envío por el usuario)
 - [ ] Ofertas Fases 4–5 (pendientes de aprobación)
+- [ ] Ofertas Fase 4: Comunicaciones (listado, resúmenes, ventas ±30 días, exportar)
