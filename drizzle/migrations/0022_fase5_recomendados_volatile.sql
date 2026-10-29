@@ -1,0 +1,1 @@
+ALTER FUNCTION public.ofertas_recomendados(uuid, text, integer) VOLATILE;
