@@ -46,8 +46,8 @@ const fecha = (d: string) => new Date(d).toLocaleDateString("es-ES");
 
 /** Paso de envío de una oferta a un cliente (vista previa, teléfono y apertura de WhatsApp). */
 export function PasoEnvio({
-  cliente, oferta, tandaId, onEnviado,
-}: { cliente: ClienteEnvio; oferta: OfertaEnvio; tandaId?: string; onEnviado: () => void }) {
+  cliente, oferta, tandaId, onEnviado, origen,
+}: { cliente: ClienteEnvio; oferta: OfertaEnvio; tandaId?: string; onEnviado: () => void; origen?: "recomendacion" }) {
   const qc = useQueryClient();
   const { data: urlBase } = useUrlBaseOfertas();
   const detectado = primerMovil(cliente.telefono_whatsapp, cliente.telefono, cliente.telefono2);
@@ -80,6 +80,9 @@ export function PasoEnvio({
       return;
     }
     guardarPendiente({ id: data as string, cliente: cliente.cliente, titulo: oferta.titulo });
+    if (origen === "recomendacion") {
+      await supabase.rpc("marcar_envio_recomendado", { _envio_id: data as string });
+    }
     const url = enlaceWhatsApp(movil, mensaje);
     if (ventana) ventana.location.href = url; else window.location.href = url;
     qc.invalidateQueries({ queryKey: ["ofertas_envios"] });
