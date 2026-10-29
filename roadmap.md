@@ -27,3 +27,6 @@
 - [x] Auditar cambios de app_settings sin usuario (función aparte) + título «CRM Rimosa»; prueba leyendo y restaurando el valor real
 - [x] Auditoría legible + página Seguridad
 - [x] Auditoría por tabla + perfil de cliente + registro de consultas + limpieza programada (pendiente: probar vistas de Consultas con sesión de administrador)
+
+- [x] Ofertas Fase 3: envío por WhatsApp desde ficha y en tandas, confirmación, historial (pendiente: prueba real de envío por el usuario)
+- [ ] Ofertas Fases 4–5 (pendientes de aprobación)
