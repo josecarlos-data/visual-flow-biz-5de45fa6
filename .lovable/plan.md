@@ -1,68 +1,63 @@
-# Fase 3 — Envío de ofertas por WhatsApp desde la ficha
+# Fase 4: Comunicaciones (seguimiento de envíos)
 
-Reanálisis del plan aprobado el 19-10 con los datos actuales. Cambios respecto al original marcados con **[Mejora]**.
+## Respuesta sobre WhatsApp
 
-## Lo que dicen los datos hoy
-- 0 clientes con móvil en `telefono`/`telefono2`: en la práctica casi todos los envíos pedirán el número la primera vez.
-- Las situaciones de cliente solo usan el efecto «justificada»; no existe «ocultar». **[Mejora]** El bloqueo 8 se aplica a cualquier situación activa marcada como «no contactar» si se crea en el futuro; con los datos actuales no bloquea a nadie. Se deja configurable, no codificado.
-- Solo 41 datos de perfil confirmados en total. **[Mejora]** Si un cliente no tiene el dato que pide un requisito, se muestra como **aviso** («Sin dato: tamaño de taller»), no como bloqueo; solo bloquea si el dato existe y no cumple. Si no, casi ninguna oferta con requisitos se podría enviar.
+Sí, funciona como pensabas. Cuando el comercial pulsa «Abrir WhatsApp», se abre el WhatsApp del aparato donde lo pulsa, con el mensaje ya escrito. El mensaje sale desde **su propio número**, y la respuesta del cliente le llega a él.
+- En el móvil sale del número que tenga en WhatsApp o WhatsApp Business.
+- En el ordenador sale de su WhatsApp Web o de escritorio, si lo tiene enlazado.
+- La app no ve el chat. Por eso pregunta «¿Se envió?» al volver.
 
-## Qué ve el comercial
+**La otra opción: un número central de RIMOSA con envío automático (WhatsApp Business oficial)**
 
-**En la ficha del cliente: botón «Enviar oferta»**
-- Lista de ofertas publicadas y vigentes, cada una con su estado para este cliente:
-  - Disponible.
-  - Bloqueada, con el motivo en lenguaje claro (p. ej. «El cliente no quiere ofertas», «Cliente de baja en ISI», «Marca excluida: XXX»).
-  - Aviso «Ya enviada el 12/10 por Ana», que no impide reenviar.
-- Al elegir una: vista previa del mensaje final (con `{contacto}` ya sustituido y el pie fijo) y el teléfono que se usará.
-- Sin móvil: se pide, con «Guardar en la ficha» marcado. **[Mejora]** Se valida que sea móvil español (6/7, 9 cifras) antes de abrir WhatsApp.
-- Botón «Abrir WhatsApp» → abre `wa.me/34XXXXXXXXX?text=...` y registra el envío como `abierto`.
-- Al volver a la app, se pregunta «¿Se envió?» → Sí / No. **[Mejora]** Si se cierra sin responder, queda `abierto` y aparece en una lista «Pendientes de confirmar» del propio comercial; a los 7 días pasa solo a `sin_confirmar` (sin contarse como enviado).
+| | Número propio (actual) | Número central oficial |
+|---|---|---|
+| Quién envía | El comercial, uno a uno | La app, sola y en bloque |
+| Respuestas | Al móvil del comercial | Al número central. Esta app aún no puede leerlas: haría falta un cambio técnico grande |
+| Coste | Gratis | Meta cobra cada mensaje de promoción |
+| Aprobación | Ninguna | Alta de empresa en Meta, y cada plantilla de mensaje aprobada (hasta 48 h) |
+| Confirmación | Manual («¿Se envió?») | Automática (entregado o leído, cuando se pueda recibir) |
+| Riesgo | Si un comercial abusa, WhatsApp puede bloquear su número | Lo controla RIMOSA. La calidad del número baja si hay quejas |
 
-**En la pantalla de Ofertas (para comerciales y jefes de zona): «Enviar a varios»**
-- Elegir oferta → lista de sus clientes visibles que la pueden recibir, con filtros por ruta y localidad. Los bloqueados salen aparte con su motivo.
-- Recorrido cliente a cliente con «Siguiente», misma confirmación «¿Se envió?».
-- **[Mejora]** Tope de 50 clientes por tanda, para no generar envíos masivos desde un móvil personal (riesgo de que WhatsApp bloquee el número).
+Recomendación: seguir con el número propio. La relación comercial-cliente pesa más, y no hay coste ni aprobaciones. La opción central tiene sentido para campañas masivas desde marketing. Se puede añadir más adelante sin rehacer nada.
 
-**Historial**
-- En la pestaña Visitas de la ficha, los envíos aparecen con estilo propio («Oferta enviada: título»). No crean visitas ni bloques, no cuentan para revisión ni incentivos.
+## Qué cambia respecto al plan original
+- **Fecha de corte:** las ventas de 30 días antes y 30 días después solo se muestran cuando los datos ya llegan a esos 30 días. Mientras tanto aparece «Pendiente (datos hasta dd/mm)», en vez de esconder la fila.
+- **Comparación con quien no la recibió:** el resumen de cada oferta compara a los clientes que la recibieron con otros clientes elegibles a los que no se envió, en el mismo periodo. Así la mejora no se confunde con la temporada. Sigue con la etiqueta «asociación, no causa».
+- **Solo cuentan los envíos confirmados:** las ventas solo se miden en los «Enviada». Los pendientes y los «Sin confirmar» se cuentan aparte.
+- **Actividad por comercial:** envíos, confirmados y clientes distintos. Sirve para seguir el uso, no para incentivos.
+- **Bajas:** si después de un envío alguien marca «No quiere ofertas» en la ficha, se registra como «Baja tras envío». Es la señal más fiable de que el cliente contestó BAJA.
+- **Exportar** el listado a Excel, con los mismos filtros.
 
-## Reglas de bloqueo (en este orden; se muestra el primero y el resto al desplegar)
-1. Oferta no publicada o fuera de fechas.
-2. Delegación fuera de la oferta.
-3. Tipo de cliente fuera de la oferta.
-4. Requisito de perfil con dato que no cumple (sin dato = aviso).
-5. Marca excluida por el cliente (marcas de la oferta + marca de cada referencia).
-6. «No quiere ofertas».
-7. Prohibición de venta según los patrones de Datos.
-8. Situación activa con efecto de no contactar (hoy ninguna).
-9. Baja en ISI: «Estado» distinto de Activo o «Fecha de baja» con valor. Sin «Estado» no bloquea.
+## Qué se verá: nueva sección «Comunicaciones»
+- **Listado de envíos:** fecha, cliente, oferta, comercial y estado.
+  - Filtros: fechas, oferta, comercial, delegación y estado. Va paginado.
+  - Al abrir un envío se ve el mensaje exacto que se mandó, aunque la oferta esté archivada.
+  - Cada envío muestra las ventas de lo ofertado (sus marcas, referencias y familias) en los 30 días antes y los 30 días después.
+- **Resumen por oferta:**
+  - Enviados, confirmados, no enviados y sin confirmar.
+  - Clientes que compraron lo ofertado después del envío.
+  - Variación frente a quien no la recibió.
+  - Bajas tras el envío.
+- **Resumen por comercial:** sus envíos y su tasa de confirmación.
 
-Las reglas se comprueban **otra vez en la base de datos al registrar**, no solo en pantalla.
-
-## Accesos
-- El panel Ofertas se asigna a jefes de zona y comerciales; ellos ven solo la vista de envío (no crean ni editan).
-- Cada uno envía solo a clientes que ya puede ver. Marketing no envía.
-
-## Fuera de esta fase
-- Listado global de comunicaciones y estadísticas (Fase 4).
-- Recomendaciones (Fase 5).
-- Envío automático por WhatsApp oficial.
-
-## Pruebas
-- Pruebas automáticas de las reglas: normalización del teléfono (`+34 6xx…`, `0034…`, fijo rechazado), sustitución de `{contacto}`, requisito sin dato = aviso, y paso `abierto` → `sin_confirmar` a los 7 días.
-- Con la cuenta de Bautista, solo lectura de `ofertas_para_cliente` sobre un cliente suyo y uno ajeno (debe dar error). No registro envíos reales; esa prueba la haces tú con una oferta de prueba.
+**Quién ve qué**
+- Comercial: lo de sus clientes.
+- Jefe de zona: su delegación.
+- Admin, director y marketing: todo. Marketing ve los resultados, pero no puede enviar.
 
 ## Detalles técnicos
-- Una migración en `drizzle/migrations/`:
-  - Tabla `ofertas_envios` (oferta_id, cod_cliente, user_id, comercial_nombre, telefono, mensaje final, estado `abierto|enviado|no_enviado|sin_confirmar`, abierto_en, confirmado_en, tanda_id). GRANT SELECT a authenticated, ALL a service_role; RLS permisiva: ver propios o de clientes visibles (`can_view_cliente`) + gestores de ofertas; sin INSERT/UPDATE directos.
-  - `ofertas_para_cliente(_cod_cliente)` y `ofertas_destinatarios(_oferta_id)` SECURITY DEFINER, `search_path` fijo: exigen `is_approved`, `can_view_cliente` y rol admin/director/jefe_de_zona/comercial; devuelven motivos y avisos.
-  - `registrar_envio_oferta(...)` y `confirmar_envio_oferta(_id, _enviado)`: revalidan bloqueos; el guardado del teléfono actualiza `cliente_preferencias_ofertas.telefono_whatsapp` (auditado por el trigger existente).
-  - Ajuste `ofertas_efectos_bloqueo` en `app_settings` (lista de efectos de situación que bloquean, vacía por defecto) y cron diario que pasa a `sin_confirmar` los `abierto` de más de 7 días.
-  - Filas de `user_dashboard_access` del panel `ofertas` para jefes de zona y comerciales existentes.
-  - Auditoría: evento `oferta_envio` en `auditoria_eventos` al registrar y confirmar.
-- Frontend: `EnviarOfertaDialog` en ClienteDetalle, vista de envío en `Ofertas.tsx` según rol, historial combinado en la pestaña Visitas, helper `src/lib/ofertasEnvio.ts` (teléfono, mensaje, enlace) con sus tests.
-- La confirmación al volver usa `visibilitychange` + envío pendiente guardado en `sessionStorage`.
+- Una migración en `drizzle/migrations/` con:
+  - Funciones `comunicaciones_listado` (paginada, con filtros), `comunicaciones_resumen_oferta`, `comunicaciones_resumen_comercial` y `comunicaciones_ventas_envio`. Todas `SECURITY DEFINER`, con `search_path` fijo, `is_approved` y alcance por rol. Para comercial y jefe de zona se usa `can_view_cliente`; admin, director y marketing ven todo. Cada una con `GRANT EXECUTE` explícito.
+  - Ventas desde `ventas_diarias`, por las marcas, referencias y familias efectivas de la oferta. El corte se calcula con `fecha_corte_datos()`. El grupo de control son los clientes elegibles, sin bloqueos, en el alcance del usuario y sin envío de esa oferta.
+  - «Baja tras envío»: un `no_quiere_ofertas` pasa a verdadero en `auditoria_eventos`, para ese cliente, después de un envío confirmado.
+  - Panel `comunicaciones` (`dashboards`) y acceso para los usuarios que ya tienen el panel `ofertas`.
+- Antes de aplicarla, se mide `EXPLAIN ANALYZE` del cálculo de ventas con la cuenta de Bautista. Si una página tarda más de 2 s, se precalcula por envío en lugar de calcularlo al vuelo.
+- Pantalla nueva `src/pages/Comunicaciones.tsx`, con ruta y enlace en el menú, y exportación con SheetJS (ya está en el proyecto).
+- Pruebas de las reglas:
+  - la ventana de ±30 días frente a la fecha de corte (pendiente o calculada),
+  - solo cuentan los «Enviada»,
+  - el alcance de cada rol.
 
-## Preguntas abiertas (no bloquean la construcción)
-- Texto del pie legal: sigue provisional hasta que responda la asesoría.
+## Fuera de esta fase
+- Recomendaciones (Fase 5).
+- Número central oficial de WhatsApp (opcional, más adelante).
