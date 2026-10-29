@@ -141,6 +141,13 @@
       "when": 1793285453320,
       "tag": "0019_fase3_envio_ofertas",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793285930179,
+      "tag": "0020_fase4_comunicaciones",
+      "breakpoints": true
     }
   ]
 }

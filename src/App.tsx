@@ -42,6 +42,7 @@ const SegundoFactor = lazy(() => import("./pages/SegundoFactor"));
 const EstablecerPassword = lazy(() => import("./components/EstablecerPassword"));
 const CambiarPassword = lazy(() => import("./pages/CambiarPassword"));
 const Ofertas = lazy(() => import("./pages/Ofertas"));
+const Comunicaciones = lazy(() => import("./pages/Comunicaciones"));
 const OfertaPublica = lazy(() => import("./pages/OfertaPublica"));
 
 const queryClient = new QueryClient({
@@ -239,6 +240,7 @@ const App = () => (
             <Suspense fallback={<LoadingScreen />}>
               <Routes>
                 <Route path="/ofertas" element={<ProtectedRoute dashboardKey="ofertas"><Ofertas /></ProtectedRoute>} />
+                <Route path="/comunicaciones" element={<ProtectedRoute dashboardKey="comunicaciones"><Comunicaciones /></ProtectedRoute>} />
                 <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
                 <Route path="/register" element={<Navigate to="/auth" replace />} />
                 <Route path="/auth/register" element={<Navigate to="/auth" replace />} />

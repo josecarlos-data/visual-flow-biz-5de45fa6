@@ -2556,6 +2556,72 @@ export type Database = {
           vendedor: string
         }[]
       }
+      comunicaciones_listado: {
+        Args: {
+          _delegacion?: string
+          _desde?: string
+          _estado?: string
+          _hasta?: string
+          _limit?: number
+          _oferta_id?: string
+          _offset?: number
+          _user_id?: string
+        }
+        Returns: {
+          abierto_en: string
+          cliente: string
+          cod_cliente: number
+          comercial_nombre: string
+          delegacion: string
+          estado: string
+          fecha_corte: string
+          id: string
+          mensaje: string
+          oferta_id: string
+          oferta_titulo: string
+          pendiente_datos: boolean
+          telefono: string
+          total: number
+          ventas_antes: number
+          ventas_despues: number
+        }[]
+      }
+      comunicaciones_resumen_comercial: {
+        Args: { _desde?: string; _hasta?: string }
+        Returns: {
+          clientes: number
+          comercial_nombre: string
+          enviados: number
+          envios: number
+          no_enviados: number
+          pendientes: number
+          user_id: string
+        }[]
+      }
+      comunicaciones_resumen_oferta: {
+        Args: { _desde?: string; _hasta?: string }
+        Returns: {
+          bajas_tras_envio: number
+          clientes: number
+          compradores_despues: number
+          control_antes: number
+          control_clientes: number
+          control_despues: number
+          enviados: number
+          fecha_corte: string
+          medibles: number
+          no_enviados: number
+          oferta_id: string
+          pendientes: number
+          titulo: string
+          ventas_antes: number
+          ventas_despues: number
+        }[]
+      }
+      comunicaciones_ve: {
+        Args: { _cod: number; _uid: string }
+        Returns: boolean
+      }
       confirmar_envio_oferta: {
         Args: { _enviado: boolean; _envio_id: string }
         Returns: undefined
@@ -2710,6 +2776,15 @@ export type Database = {
         Returns: string[]
       }
       oferta_publica: { Args: { _token: string }; Returns: Json }
+      oferta_ventas_cliente: {
+        Args: {
+          _cod: number
+          _desde: string
+          _hasta: string
+          _oferta_id: string
+        }
+        Returns: number
+      }
       ofertas_buscar_referencias: {
         Args: { _q: string }
         Returns: {
