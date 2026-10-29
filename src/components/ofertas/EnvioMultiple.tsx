@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ interface Destinatario {
 interface OfertaVigente { oferta_id: string; titulo: string; vigente_hasta: string | null }
 
 function PendientesConfirmar() {
+  const qc = useQueryClient();
   const { data } = useQuery({
     queryKey: ["ofertas_envios", "pendientes"],
     queryFn: async () => {
@@ -37,7 +38,7 @@ function PendientesConfirmar() {
   const responder = async (id: string, enviado: boolean) => {
     const { error } = await supabase.rpc("confirmar_envio_oferta", { _envio_id: id, _enviado: enviado });
     if (error) toast({ title: "No se ha podido guardar", description: error.message, variant: "destructive" });
-    window.dispatchEvent(new CustomEvent(EVENTO_ENVIO_CONFIRMADO));
+    qc.invalidateQueries({ queryKey: ["ofertas_envios"] });
   };
   return (
     <Card>
