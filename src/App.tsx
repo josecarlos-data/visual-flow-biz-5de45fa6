@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { ConfirmarEnvioOferta } from "@/components/ofertas/ConfirmarEnvioOferta";
 import { AppLayout } from "@/components/AppLayout";
 import LoadingScreen from "@/components/LoadingScreen";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -230,6 +231,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <ErrorBoundary>
+            <ConfirmarEnvioOferta />
             <Routes>
               <Route path="/o/:token" element={<Suspense fallback={<LoadingScreen />}><OfertaPublica /></Suspense>} />
               <Route path="*" element={

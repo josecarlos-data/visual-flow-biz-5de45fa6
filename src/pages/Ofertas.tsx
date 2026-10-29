@@ -13,6 +13,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Archive, Copy, Loader2, Megaphone, Paperclip, Plus, Trash2, X, Send, Pencil } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { usePerfilAtributos } from "@/hooks/useCrm";
+import { useAuth } from "@/hooks/useAuth";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EnvioMultiple } from "@/components/ofertas/EnvioMultiple";
 import {
   componerMensaje, enlaceOferta, estadoVisible, PIE_OFERTA,
   type AdjuntoOferta, type EstadoOferta, type RequisitoPerfil,
@@ -287,7 +290,7 @@ function EditorOferta({ oferta, onClose }: { oferta: Oferta | null; onClose: () 
   );
 }
 
-export default function Ofertas() {
+function GestionOfertas() {
   const qc = useQueryClient();
   const { data: urlBase } = useUrlBase();
   const [editando, setEditando] = useState<Oferta | null | "nueva">(null);
@@ -397,5 +400,34 @@ export default function Ofertas() {
 
       {editando && <EditorOferta oferta={editando === "nueva" ? null : editando} onClose={() => setEditando(null)} />}
     </div>
+  );
+}
+
+function EnviarOfertas() {
+  return (
+    <div className="space-y-4 p-4 sm:p-6">
+      <h1 className="flex items-center gap-2 text-2xl font-bold"><Megaphone className="h-6 w-6 text-primary" />Enviar ofertas</h1>
+      <EnvioMultiple />
+    </div>
+  );
+}
+
+export default function Ofertas() {
+  const { role } = useAuth();
+  const gestiona = role === "admin" || role === "director_comercial" || role === "marketing";
+  const envia = role === "admin" || role === "director_comercial" || role === "jefe_de_zona" || role === "comercial";
+  if (gestiona && !envia) return <GestionOfertas />;
+  if (!gestiona) return <EnviarOfertas />;
+  return (
+    <Tabs defaultValue="gestion">
+      <div className="px-4 pt-4 sm:px-6">
+        <TabsList>
+          <TabsTrigger value="gestion">Gestionar</TabsTrigger>
+          <TabsTrigger value="enviar">Enviar</TabsTrigger>
+        </TabsList>
+      </div>
+      <TabsContent value="gestion"><GestionOfertas /></TabsContent>
+      <TabsContent value="enviar"><EnviarOfertas /></TabsContent>
+    </Tabs>
   );
 }
