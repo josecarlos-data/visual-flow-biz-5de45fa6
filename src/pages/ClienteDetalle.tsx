@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EnviarOfertaDialog } from "@/components/ofertas/EnviarOfertaDialog";
 import { ETIQUETA_ENVIO, estadoEnvioVisible } from "@/lib/ofertasEnvio";
+import { useOfertasActivo } from "@/hooks/useOfertasActivo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -150,10 +151,11 @@ const [periodoProd, setPeriodoProd] = useState<string>("12m");
   const { user, role } = useAuth();
   const { add: addPlanificada } = useAgendaMutations();
   const [ofertaOpen, setOfertaOpen] = useState(false);
-  const puedeEnviarOferta = role === "admin" || role === "director_comercial" || role === "jefe_de_zona" || role === "comercial";
+  const ofertasActivo = useOfertasActivo();
+  const puedeEnviarOferta = ofertasActivo && (role === "admin" || role === "director_comercial" || role === "jefe_de_zona" || role === "comercial");
   const { data: enviosOfertas } = useQuery({
     queryKey: ["ofertas_envios", "cliente", codNum],
-    enabled: codNum != null,
+    enabled: codNum != null && ofertasActivo,
     queryFn: async () => {
       const { data } = await supabase.from("ofertas_envios")
         .select("id, estado, abierto_en, comercial_nombre, ofertas(titulo)")
@@ -892,7 +894,7 @@ const { campo, dir } = ordenProductos;
         </TabsContent>
 
         <TabsContent value="visitas" className="space-y-3">
-          {enviosOfertas && enviosOfertas.length > 0 && (
+          {ofertasActivo && enviosOfertas && enviosOfertas.length > 0 && (
             <Card className="border-primary/30 bg-primary/5">
               <CardContent className="space-y-1.5 p-4">
                 <p className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-primary">

@@ -12,8 +12,11 @@ import { cn } from "@/lib/utils";
 import { DATASETS, type DatasetModule, type UploadResult } from "@/lib/datasets";
 import RechazosImportacion from "@/components/RechazosImportacion";
 import PatronesProhibicionCard from "@/components/PatronesProhibicionCard";
+import { useOfertasActivo } from "@/hooks/useOfertasActivo";
+import OfertasActivoCard from "@/components/OfertasActivoCard";
 
 export default function AdminData() {
+  const ofertasActivo = useOfertasActivo();
   const [activeKey, setActiveKey] = useState<string>(DATASETS[0]?.key ?? "");
   const [parsedData, setParsedData] = useState<unknown>(null);
   const [fileName, setFileName] = useState<string>("");
@@ -329,7 +332,8 @@ export default function AdminData() {
         </Card>
       )}
 
-      <PatronesProhibicionCard />
+      <OfertasActivoCard />
+      {ofertasActivo && <PatronesProhibicionCard />}
     </div>
   );
 }

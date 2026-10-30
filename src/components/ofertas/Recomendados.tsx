@@ -68,6 +68,25 @@ export function Recomendados() {
     },
   });
 
+  const { data: resumen } = useQuery({
+    queryKey: ["ofertas_recomendados_resumen", ofertaId],
+    enabled: !!ofertaId && verTodos,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("ofertas_recomendados_resumen", { _oferta_id: ofertaId });
+      if (error) throw error;
+      return (data ?? []) as { vendedor: string; grupo: string; clientes: number }[];
+    },
+  });
+  const resumenPorComercial = useMemo(() => {
+    const m = new Map<string, Record<string, number>>();
+    (resumen ?? []).forEach((r) => {
+      const fila = m.get(r.vendedor) ?? {};
+      fila[r.grupo] = Number(r.clientes);
+      m.set(r.vendedor, fila);
+    });
+    return [...m.entries()];
+  }, [resumen]);
+
   const refrescar = () => qc.invalidateQueries({ queryKey: ["ofertas_recomendados", ofertaId] });
 
   return (
@@ -98,8 +117,24 @@ export function Recomendados() {
         <p className="text-sm text-destructive">No se han podido calcular las recomendaciones.</p>
       ) : (
         <>
+          {verTodos && resumenPorComercial.length > 0 && (
+            <Card><CardContent className="overflow-x-auto p-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recomendados por comercial</p>
+              <table className="w-full text-xs">
+                <thead><tr className="text-muted-foreground">
+                  <th className="text-left font-normal">Comercial</th>
+                  {GRUPOS.map((g) => <th key={g.key} className="text-right font-normal">{g.titulo}</th>)}
+                </tr></thead>
+                <tbody>
+                  {resumenPorComercial.map(([v, f]) => (
+                    <tr key={v}><td>{v}</td>{GRUPOS.map((g) => <td key={g.key} className="text-right">{f[g.key] ?? 0}</td>)}</tr>
+                  ))}
+                </tbody>
+              </table>
+            </CardContent></Card>
+          )}
           {excluidos > 0 && (
-            <p className="text-xs text-muted-foreground">{excluidos} {excluidos === 1 ? "cliente excluido" : "clientes excluidos"} por bloqueos (baja, prohibición de venta o no quiere ofertas).</p>
+            <p className="text-xs text-muted-foreground">Al menos {excluidos} {excluidos === 1 ? "cliente excluido" : "clientes excluidos"} por bloqueos (baja, prohibición de venta o no quiere ofertas).</p>
           )}
           {!visibles.length && <p className="text-sm text-muted-foreground">No hay clientes recomendados para esta oferta.</p>}
           {GRUPOS.map((g) => grupos[g.key].length > 0 && (
