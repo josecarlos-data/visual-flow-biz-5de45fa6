@@ -1,35 +1,44 @@
-# Fase 5 — Recomendaciones de clientes para cada oferta
+# Cierre de Ofertas y Comunicaciones: construida pero oculta
 
-## Qué consigue
-Al abrir una oferta publicada, cada comercial ve **a quién le conviene enviarla**, con el motivo explicado en una frase ("Compró esta familia hace 2 meses", "Dejó de comprar esta marca hace 5 meses"). Puede enviar desde ahí (flujo de Fase 3) o descartar.
+## Aviso previo: un punto no se puede hacer como está escrito
+La herramienta de migraciones **rechaza cualquier escritura en `storage.buckets`** (INSERT/UPDATE), así que el `INSERT ... ON CONFLICT` del bucket no puede ir en la migración. Propuesta:
+- Configurar el bucket `ofertas-publicas` (ya existe, privado) con la herramienta de almacenamiento: límite 10 MB y tipos `image/jpeg`, `image/png`, `image/webp`, `application/pdf`. El límite se aplica en el servidor igual.
+- Para reconstruir en servidor propio: dejar el SQL del bucket en un fichero aparte `docs/reconstruccion/ofertas_bucket.sql` (no ejecutado aquí) y anotarlo en roadmap.md.
+Todo lo demás va en una sola migración.
 
-## Mejoras sobre el plan original
-1. **Motivo visible y puntuación**, no solo un orden: cada cliente muestra por qué aparece.
-2. **"Lo ha dejado" definido con números**: compró lo ofertado en los 12–24 meses anteriores y nada en los últimos 6 meses (umbral editable).
-3. **Tercer grupo acotado**: "el resto" se limita a clientes activos que compran productos parecidos (misma familia o marca) en los últimos 24 meses; ordenados por días sin comprar. Evita listas de 10.000 clientes.
-4. **Descartes con motivo y caducidad**: "No le interesa", "Ya lo tiene", "Otro". El descarte vale para esa oferta; opcionalmente para todas las ofertas de esa familia durante 90 días.
-5. **Respeto a la saturación**: si el cliente recibió otra oferta en los últimos 7 días (editable), baja al final con aviso "Recibió una oferta hace X días".
-6. **Excluye ya enviados** de esa oferta (salvo `sin_confirmar` / `no_enviado`, que se pueden reintentar).
-7. **Mismos bloqueos que el envío** (baja ISI, patrones de prohibición, no quiere ofertas), calculados en el servidor; los bloqueados no se listan, solo se cuentan ("12 clientes excluidos por bloqueos").
-8. **Por rol**: el comercial ve sus clientes; jefe de zona su delegación; dirección/marketing todo, con filtro por comercial y un resumen "recomendados por comercial" para detectar quién tiene más oportunidad.
-9. **Medición**: en Comunicaciones se añade "enviado desde recomendación" para comparar resultado frente a envíos elegidos a mano.
-10. **Sin IA en esta fase**: reglas claras y explicables. La IA queda como posible mejora posterior.
+## 1. Interruptor único `ofertas_activo`
+- Ajuste en `app_settings`, valor `'false'` (`ON CONFLICT DO NOTHING`). Lo auditan los triggers de ajustes ya existentes.
+- Helper `public.ofertas_activo()` (STABLE, SECURITY DEFINER, search_path fijo).
+- Trigger sobre `app_settings`: al cambiar `ofertas_activo`, pone `dashboards.is_active` de `ofertas` y `comunicaciones` al mismo valor. La migración los deja en `false`. No se tocan las filas de `user_dashboard_access`.
+- Las seis RPC (`registrar_envio_oferta`, `confirmar_envio_oferta`, `ofertas_para_cliente`, `ofertas_destinatarios`, `ofertas_recomendados`, `descartar_recomendacion`) lanzan «Ofertas desactivado» al empezar si el ajuste está apagado. `CREATE OR REPLACE`, mismas firmas, mismos permisos.
+- `oferta_publica` devuelve vacío cuando está apagado, y la política de lectura anónima de adjuntos exige además `ofertas_activo()` → la página `/o/<token>` muestra «Oferta no disponible».
+- Pantallas (con un hook `useOfertasActivo` que lee el ajuste):
+  - Ficha de cliente: se ocultan el botón «Enviar oferta», el recuadro «Ofertas enviadas» y el apartado de ofertas del Perfil.
+  - Datos: se oculta la tarjeta de patrones de prohibición.
+  - App: `ConfirmarEnvioOferta` no se monta.
+  - Seguridad: interruptor «Ofertas y Comunicaciones activas», solo admin.
+- El admin puede seguir entrando a `/ofertas` y `/comunicaciones` por URL (la guarda deja pasar al admin aunque el panel esté inactivo); el envío sigue bloqueado.
+- El cron diario se deja como está.
 
-## Pantallas
-- En la ficha de oferta: pestaña **"Recomendados"** con grupos (Clientes habituales / Recuperar / Potenciales), motivo, última compra, importe 12 meses, botones Enviar / Descartar, y selección múltiple hacia el envío en tandas existente (máx. 50).
-- En Ajustes de ofertas: umbrales (meses de abandono, días de saturación, máximo de resultados).
-- Admin/dirección pueden ver y deshacer descartes.
+## 2. Ajustes de cierre
+- Comunicaciones: columna Origen (Manual / Recomendación), filtro por origen, y en el resumen por oferta envíos, confirmados y compradores separados por origen (incluido en el Excel).
+- Nueva `ofertas_recomendados_resumen(_oferta_id)`: recomendados por comercial y grupo; admin y director todo, jefe de zona solo su delegación. REVOKE de PUBLIC/anon, GRANT a authenticated. Tabla en la pestaña Recomendados para esos roles.
+- Texto: «Al menos N clientes excluidos por bloqueos».
 
-## Qué no cambia
-No crea visitas, no toca incentivos ni revisiones, no envía nada automáticamente.
+## 3. Comprobaciones (solo lectura)
+- Antes: listar usuarios cuyo único panel sea ofertas o comunicaciones.
+- Bautista con ajuste apagado: sin Ofertas/Comunicaciones en el menú; ficha de un cliente suyo sin botón, recuadro ni apartado, sin errores en consola; `ofertas_para_cliente` → «Ofertas desactivado».
+- Admin por URL con 0 ofertas: `/ofertas`, `/comunicaciones` y Recomendados cargan vacías sin errores.
+- Sin sesión: `/o/token-inventado` → «Oferta no disponible».
+- Nadie cae en «Sin secciones asignadas».
+- Typecheck y tests.
 
-## Detalles técnicos
-- Migración única `drizzle/migrations/0021_fase5_recomendaciones.sql`.
-- Tabla `ofertas_descartes` (oferta_id, cod_cliente, user_id, motivo, alcance `oferta|familia`, familia, hasta, created_at); GRANT a authenticated/service_role; RLS permisiva con `is_approved` + `can_view_cliente`; borrado solo admin/director.
-- Columna `ofertas_envios.origen text DEFAULT 'manual'` (`manual|recomendacion`), aditiva.
-- RPC `SECURITY DEFINER` `ofertas_recomendados(_oferta uuid, _vendedor text default null, _limite int default 200)`: valida aprobado + acceso a Ofertas, filtra por `can_view_cliente`, coincidencia por `referencias`/`marcas`/`familias` de la oferta contra detalle de ventas + `productos`, aplica segmentación (delegaciones, tipos), bloqueos reutilizando la función de Fase 3, saturación y descartes; devuelve grupo, puntuación, motivo, última compra e importe. `search_path` fijado, `GRANT EXECUTE` solo a authenticated.
-- RPC `ofertas_recomendados_resumen(_oferta)` para conteos por comercial (dirección/marketing).
-- Ajustes nuevos en `app_settings` con `ON CONFLICT DO NOTHING`; se añaden a la vigilancia de avisos si procede.
-- Antes de construir: medir con `EXPLAIN ANALYZE` con la sesión de Bautista sobre una oferta de prueba; si supera ~2 s, añadir índice sobre detalle de ventas (cliente, referencia, fecha) en la misma migración.
-- Front: `src/components/ofertas/RecomendadosTab.tsx`, helper puro `src/lib/recomendaciones.ts` (textos de motivo, agrupación) con tests de umbrales.
-- Roadmap: marcar Fase 5.
+## 4. roadmap.md
+Sección «Ofertas y Comunicaciones — construida, oculta (ofertas_activo = false), pendiente de revisión» con los seis pendientes indicados, más: aplicar el SQL del bucket al reconstruir en el servidor propio.
+
+## Ficheros previstos
+- Migración nueva en `drizzle/migrations/`
+- `src/hooks/useOfertasActivo.ts` (nuevo), `src/App.tsx`, `src/components/ProtectedRoute.tsx` (si hace falta para el acceso del admin por URL)
+- `src/pages/ClienteDetalle.tsx`, `src/components/ClientePerfilTab.tsx`, `src/pages/AdminData.tsx`, página de Seguridad
+- `src/pages/Comunicaciones.tsx`, `src/components/ofertas/Recomendados.tsx`
+- `docs/reconstruccion/ofertas_bucket.sql`, `roadmap.md`
