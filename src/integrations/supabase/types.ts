@@ -2622,6 +2622,7 @@ export type Database = {
           _limit?: number
           _oferta_id?: string
           _offset?: number
+          _origen?: string
           _user_id?: string
         }
         Returns: {
@@ -2636,6 +2637,7 @@ export type Database = {
           mensaje: string
           oferta_id: string
           oferta_titulo: string
+          origen: string
           pendiente_datos: boolean
           telefono: string
           total: number
@@ -2661,10 +2663,16 @@ export type Database = {
           bajas_tras_envio: number
           clientes: number
           compradores_despues: number
+          compradores_manual: number
+          compradores_recomendacion: number
+          confirmados_manual: number
+          confirmados_recomendacion: number
           control_antes: number
           control_clientes: number
           control_despues: number
           enviados: number
+          enviados_manual: number
+          enviados_recomendacion: number
           fecha_corte: string
           medibles: number
           no_enviados: number
@@ -2856,6 +2864,7 @@ export type Database = {
         }
         Returns: number
       }
+      ofertas_activo: { Args: never; Returns: boolean }
       ofertas_buscar_referencias: {
         Args: { _q: string }
         Returns: {
@@ -2929,6 +2938,14 @@ export type Database = {
           telefono_whatsapp: string
           telefono2: string
           ultima_compra: string
+          vendedor: string
+        }[]
+      }
+      ofertas_recomendados_resumen: {
+        Args: { _oferta_id: string }
+        Returns: {
+          clientes: number
+          grupo: string
           vendedor: string
         }[]
       }

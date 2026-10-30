@@ -169,6 +169,13 @@
       "when": 1793287526847,
       "tag": "0023_fase5_recomendados_rapido",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793396954062,
+      "tag": "0024_cierre_ofertas_interruptor",
+      "breakpoints": true
     }
   ]
 }
