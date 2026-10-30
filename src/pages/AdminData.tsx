@@ -329,7 +329,7 @@ export default function AdminData() {
         </Card>
       )}
 
-      <PatronesProhibicionCard />
+      {ofertasActivo && <PatronesProhibicionCard />}
     </div>
   );
 }

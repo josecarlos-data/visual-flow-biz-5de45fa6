@@ -232,7 +232,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <ErrorBoundary>
-            <ConfirmarEnvioOferta />
+            <ConfirmarEnvioOfertaSiActivo />
             <Routes>
               <Route path="/o/:token" element={<Suspense fallback={<LoadingScreen />}><OfertaPublica /></Suspense>} />
               <Route path="*" element={
