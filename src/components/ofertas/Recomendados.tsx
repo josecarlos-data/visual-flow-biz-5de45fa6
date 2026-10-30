@@ -68,6 +68,25 @@ export function Recomendados() {
     },
   });
 
+  const { data: resumen } = useQuery({
+    queryKey: ["ofertas_recomendados_resumen", ofertaId],
+    enabled: !!ofertaId && verTodos,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("ofertas_recomendados_resumen", { _oferta_id: ofertaId });
+      if (error) throw error;
+      return (data ?? []) as { vendedor: string; grupo: string; clientes: number }[];
+    },
+  });
+  const resumenPorComercial = useMemo(() => {
+    const m = new Map<string, Record<string, number>>();
+    (resumen ?? []).forEach((r) => {
+      const fila = m.get(r.vendedor) ?? {};
+      fila[r.grupo] = Number(r.clientes);
+      m.set(r.vendedor, fila);
+    });
+    return [...m.entries()];
+  }, [resumen]);
+
   const refrescar = () => qc.invalidateQueries({ queryKey: ["ofertas_recomendados", ofertaId] });
 
   return (
@@ -99,7 +118,7 @@ export function Recomendados() {
       ) : (
         <>
           {excluidos > 0 && (
-            <p className="text-xs text-muted-foreground">{excluidos} {excluidos === 1 ? "cliente excluido" : "clientes excluidos"} por bloqueos (baja, prohibición de venta o no quiere ofertas).</p>
+            <p className="text-xs text-muted-foreground">Al menos {excluidos} {excluidos === 1 ? "cliente excluido" : "clientes excluidos"} por bloqueos (baja, prohibición de venta o no quiere ofertas).</p>
           )}
           {!visibles.length && <p className="text-sm text-muted-foreground">No hay clientes recomendados para esta oferta.</p>}
           {GRUPOS.map((g) => grupos[g.key].length > 0 && (

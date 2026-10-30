@@ -19,10 +19,11 @@ const eur = (n: number | null | undefined) =>
 const pct = (n: number | null) => (n == null ? "—" : `${n > 0 ? "+" : ""}${n.toLocaleString("es-ES", { maximumFractionDigits: 0 })} %`);
 const fecha = (d: string) => new Date(d.length === 10 ? `${d}T00:00:00` : d).toLocaleDateString("es-ES");
 const POR_PAGINA = 50;
+const ORIGEN: Record<string, string> = { manual: "Manual", recomendacion: "Recomendación" };
 
 interface Fila {
   id: string; abierto_en: string; estado: string; cod_cliente: number; cliente: string; delegacion: string | null;
-  oferta_id: string; oferta_titulo: string; comercial_nombre: string | null; telefono: string; mensaje: string;
+  oferta_id: string; oferta_titulo: string; comercial_nombre: string | null; telefono: string; mensaje: string; origen: string;
   ventas_antes: number; ventas_despues: number | null; pendiente_datos: boolean; fecha_corte: string; total: number;
 }
 
@@ -36,6 +37,7 @@ export default function Comunicaciones() {
   const [hasta, setHasta] = useState("");
   const [oferta, setOferta] = useState("todas");
   const [estado, setEstado] = useState("todos");
+  const [origen, setOrigen] = useState("todos");
   const [pagina, setPagina] = useState(0);
   const [abierta, setAbierta] = useState<Fila | null>(null);
   const [exportando, setExportando] = useState(false);
@@ -43,6 +45,7 @@ export default function Comunicaciones() {
   const filtros = {
     _desde: desde || null, _hasta: hasta || null,
     _oferta_id: oferta === "todas" ? null : oferta, _estado: estado === "todos" ? null : estado,
+    _origen: origen === "todos" ? null : origen,
   };
 
   const listado = useQuery({
@@ -79,7 +82,7 @@ export default function Comunicaciones() {
     const { data } = await supabase.rpc("comunicaciones_listado", { ...filtros, _limit: 5000, _offset: 0 } as never);
     const filas = ((data ?? []) as unknown as Fila[]).map((f) => ({
       Fecha: fecha(f.abierto_en), Cliente: f.cliente, Código: f.cod_cliente, Delegación: f.delegacion ?? "",
-      Oferta: f.oferta_titulo, Comercial: f.comercial_nombre ?? "", Estado: ETIQUETA_ENVIO[estadoEnvioVisible(f.estado, f.abierto_en)],
+      Oferta: f.oferta_titulo, Comercial: f.comercial_nombre ?? "", Origen: ORIGEN[f.origen] ?? f.origen, Estado: ETIQUETA_ENVIO[estadoEnvioVisible(f.estado, f.abierto_en)],
       "Ventas 30 días antes": Number(f.ventas_antes), "Ventas 30 días después": f.ventas_despues == null ? "Pendiente" : Number(f.ventas_despues),
     }));
     const wb = XLSX.utils.book_new();
@@ -94,7 +97,7 @@ export default function Comunicaciones() {
     <div className="space-y-4 p-4 sm:p-6">
       <h1 className="flex items-center gap-2 text-2xl font-bold"><MessagesSquare className="h-6 w-6 text-primary" />Comunicaciones</h1>
 
-      <Card><CardContent className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
+      <Card><CardContent className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-5">
         <div><Label className="text-xs">Desde</Label><Input type="date" value={desde} onChange={(e) => cambiar(() => setDesde(e.target.value))} /></div>
         <div><Label className="text-xs">Hasta</Label><Input type="date" value={hasta} onChange={(e) => cambiar(() => setHasta(e.target.value))} /></div>
         <div><Label className="text-xs">Oferta</Label>
@@ -112,6 +115,15 @@ export default function Comunicaciones() {
             <SelectContent>
               <SelectItem value="todos">Todos</SelectItem>
               {Object.entries(ETIQUETA_ENVIO).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div><Label className="text-xs">Origen</Label>
+          <Select value={origen} onValueChange={(v) => cambiar(() => setOrigen(v))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              {Object.entries(ORIGEN).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -145,7 +157,7 @@ export default function Comunicaciones() {
                         <span className="min-w-0 truncate font-medium">{f.cliente}</span>
                         <Badge variant={ev === "enviado" ? "default" : ev === "no_enviado" ? "secondary" : "outline"} className="shrink-0">{ETIQUETA_ENVIO[ev]}</Badge>
                       </div>
-                      <p className="truncate text-xs text-muted-foreground">{fecha(f.abierto_en)} · {f.oferta_titulo}{f.comercial_nombre ? ` · ${f.comercial_nombre}` : ""}</p>
+                      <p className="truncate text-xs text-muted-foreground">{fecha(f.abierto_en)} · {f.oferta_titulo}{f.comercial_nombre ? ` · ${f.comercial_nombre}` : ""} · {ORIGEN[f.origen] ?? f.origen}</p>
                       {f.estado === "enviado" && (
                         <p className="text-xs text-muted-foreground">
                           Lo ofertado: {eur(f.ventas_antes)} antes → {f.pendiente_datos ? "pendiente" : eur(f.ventas_despues)} después
@@ -189,7 +201,15 @@ export default function Comunicaciones() {
                       <div><p className="text-xs text-muted-foreground">Variación</p><p className="font-medium">{pct(vEnv)}</p></div>
                       <div><p className="text-xs text-muted-foreground">Frente a no receptores ({r.control_clientes})</p><p className="font-medium">{dif == null ? "—" : `${dif > 0 ? "+" : ""}${dif.toLocaleString("es-ES", { maximumFractionDigits: 0 })} puntos`}</p></div>
                     </div>
-                  ) : r.enviados ? <p className="text-xs text-muted-foreground">Ventas pendientes: aún no hay 30 días de datos tras los envíos.</p> : null}
+                  ) : null}
+                  <div className="overflow-x-auto"><table className="w-full text-xs">
+                    <thead><tr className="text-muted-foreground"><th className="text-left font-normal">Origen</th><th className="text-right font-normal">Envíos</th><th className="text-right font-normal">Confirmados</th><th className="text-right font-normal">Compradores</th></tr></thead>
+                    <tbody>
+                      <tr><td>Manual</td><td className="text-right">{r.enviados_manual}</td><td className="text-right">{r.confirmados_manual}</td><td className="text-right">{r.compradores_manual}</td></tr>
+                      <tr><td>Recomendación</td><td className="text-right">{r.enviados_recomendacion}</td><td className="text-right">{r.confirmados_recomendacion}</td><td className="text-right">{r.compradores_recomendacion}</td></tr>
+                    </tbody>
+                  </table></div>
+                  {r.medibles ? null : r.enviados ? <p className="text-xs text-muted-foreground">Ventas pendientes: aún no hay 30 días de datos tras los envíos.</p> : null}
                 </CardContent></Card>
               );
             })}
