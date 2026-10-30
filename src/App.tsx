@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ConfirmarEnvioOferta } from "@/components/ofertas/ConfirmarEnvioOferta";
+import { useOfertasActivo } from "@/hooks/useOfertasActivo";
 import { AppLayout } from "@/components/AppLayout";
 import LoadingScreen from "@/components/LoadingScreen";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -222,6 +223,10 @@ function ControlAcceso({ children }: { children: React.ReactNode }) {
     );
   }
   return <>{children}</>;
+}
+
+function ConfirmarEnvioOfertaSiActivo() {
+  return useOfertasActivo() ? <ConfirmarEnvioOferta /> : null;
 }
 
 const App = () => (

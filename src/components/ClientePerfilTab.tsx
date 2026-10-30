@@ -18,6 +18,7 @@ import {
 } from "@/hooks/useCrm";
 import { parseMulti, resolverOpciones, serializeMulti } from "@/lib/motivoCampos";
 import { PreferenciasOfertas } from "@/components/PreferenciasOfertas";
+import { useOfertasActivo } from "@/hooks/useOfertasActivo";
 
 const diaMes = (iso: string) => {
   const d = new Date(`${iso}T00:00:00`);
@@ -202,6 +203,7 @@ function FilaAtributo({
 
 /** Perfil comercial del cliente: valor vigente de cada atributo del catálogo. */
 export function ClientePerfilTab({ cod }: { cod: number }) {
+  const ofertasActivo = useOfertasActivo();
   const { data: atributos, isLoading } = usePerfilAtributos();
   const { data: hechos } = useClientePerfil(cod);
   const { data: historico } = useClientePerfilHistorico(cod);
