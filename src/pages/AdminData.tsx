@@ -13,6 +13,7 @@ import { DATASETS, type DatasetModule, type UploadResult } from "@/lib/datasets"
 import RechazosImportacion from "@/components/RechazosImportacion";
 import PatronesProhibicionCard from "@/components/PatronesProhibicionCard";
 import { useOfertasActivo } from "@/hooks/useOfertasActivo";
+import OfertasActivoCard from "@/components/OfertasActivoCard";
 
 export default function AdminData() {
   const ofertasActivo = useOfertasActivo();
@@ -331,6 +332,7 @@ export default function AdminData() {
         </Card>
       )}
 
+      <OfertasActivoCard />
       {ofertasActivo && <PatronesProhibicionCard />}
     </div>
   );
