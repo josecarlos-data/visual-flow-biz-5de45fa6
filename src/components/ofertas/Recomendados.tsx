@@ -117,6 +117,22 @@ export function Recomendados() {
         <p className="text-sm text-destructive">No se han podido calcular las recomendaciones.</p>
       ) : (
         <>
+          {verTodos && resumenPorComercial.length > 0 && (
+            <Card><CardContent className="overflow-x-auto p-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recomendados por comercial</p>
+              <table className="w-full text-xs">
+                <thead><tr className="text-muted-foreground">
+                  <th className="text-left font-normal">Comercial</th>
+                  {GRUPOS.map((g) => <th key={g.key} className="text-right font-normal">{g.titulo}</th>)}
+                </tr></thead>
+                <tbody>
+                  {resumenPorComercial.map(([v, f]) => (
+                    <tr key={v}><td>{v}</td>{GRUPOS.map((g) => <td key={g.key} className="text-right">{f[g.key] ?? 0}</td>)}</tr>
+                  ))}
+                </tbody>
+              </table>
+            </CardContent></Card>
+          )}
           {excluidos > 0 && (
             <p className="text-xs text-muted-foreground">Al menos {excluidos} {excluidos === 1 ? "cliente excluido" : "clientes excluidos"} por bloqueos (baja, prohibición de venta o no quiere ofertas).</p>
           )}
