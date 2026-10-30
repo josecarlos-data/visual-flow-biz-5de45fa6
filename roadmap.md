@@ -31,3 +31,13 @@
 - [x] Ofertas Fase 3: envío por WhatsApp desde ficha y en tandas, confirmación, historial (pendiente: prueba real de envío por el usuario)
 - [x] Ofertas Fase 5: recomendaciones (pendiente: prueba en pantalla con sesión real)
 - [x] Ofertas Fase 4: Comunicaciones (listado, resúmenes, ventas ±30 días, exportar)
+
+## Ofertas y Comunicaciones — construida, oculta (ofertas_activo = false), pendiente de revisión
+- [x] Interruptor único ofertas_activo (Datos → tarjeta «Ofertas y Comunicaciones»), origen en Comunicaciones, resumen de recomendados por comercial
+- [ ] Prueba completa en el móvil: crear, publicar con imagen, enviar al propio número, confirmar, verla en Comunicaciones y abrir el enlace sin sesión
+- [ ] Texto legal del pie, pendiente de la asesoría
+- [ ] Grupo de comparación de la Fase 4: hoy son todos los no receptores, no solo los que podían recibirla
+- [ ] Asignar los paneles al usuario de marketing cuando exista
+- [ ] Ningún cliente tiene móvil en el ERP: se escribirá a mano la primera vez
+- [ ] Revisar con dirección el tope de 50 por tanda y los umbrales (6 meses, 7 días, 90 días)
+- [ ] Al reconstruir en servidor propio: ejecutar docs/reconstruccion/ofertas_bucket.sql (tipos de archivo permitidos del bucket)
