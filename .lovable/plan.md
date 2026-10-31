@@ -1,44 +1,41 @@
-# Cierre de Ofertas y Comunicaciones: construida pero oculta
+# Fase 6 — Seguimiento de compras tras ofertas
 
-## Aviso previo: un punto no se puede hacer como está escrito
-La herramienta de migraciones **rechaza cualquier escritura en `storage.buckets`** (INSERT/UPDATE), así que el `INSERT ... ON CONFLICT` del bucket no puede ir en la migración. Propuesta:
-- Configurar el bucket `ofertas-publicas` (ya existe, privado) con la herramienta de almacenamiento: límite 10 MB y tipos `image/jpeg`, `image/png`, `image/webp`, `application/pdf`. El límite se aplica en el servidor igual.
-- Para reconstruir en servidor propio: dejar el SQL del bucket en un fichero aparte `docs/reconstruccion/ofertas_bucket.sql` (no ejecutado aquí) y anotarlo en roadmap.md.
-Todo lo demás va en una sola migración.
+## Punto de partida
+Comunicaciones ya compara ventas de los productos de la oferta 30 días antes y 30 días después de cada envío confirmado. Falta ver **qué compró cada cliente**, comparar ofertas entre sí de forma justa y separar el efecto de la oferta de la tendencia normal del cliente.
 
-## 1. Interruptor único `ofertas_activo`
-- Ajuste en `app_settings`, valor `'false'` (`ON CONFLICT DO NOTHING`). Lo auditan los triggers de ajustes ya existentes.
-- Helper `public.ofertas_activo()` (STABLE, SECURITY DEFINER, search_path fijo).
-- Trigger sobre `app_settings`: al cambiar `ofertas_activo`, pone `dashboards.is_active` de `ofertas` y `comunicaciones` al mismo valor. La migración los deja en `false`. No se tocan las filas de `user_dashboard_access`.
-- Las seis RPC (`registrar_envio_oferta`, `confirmar_envio_oferta`, `ofertas_para_cliente`, `ofertas_destinatarios`, `ofertas_recomendados`, `descartar_recomendacion`) lanzan «Ofertas desactivado» al empezar si el ajuste está apagado. `CREATE OR REPLACE`, mismas firmas, mismos permisos.
-- `oferta_publica` devuelve vacío cuando está apagado, y la política de lectura anónima de adjuntos exige además `ofertas_activo()` → la página `/o/<token>` muestra «Oferta no disponible».
-- Pantallas (con un hook `useOfertasActivo` que lee el ajuste):
-  - Ficha de cliente: se ocultan el botón «Enviar oferta», el recuadro «Ofertas enviadas» y el apartado de ofertas del Perfil.
-  - Datos: se oculta la tarjeta de patrones de prohibición.
-  - App: `ConfirmarEnvioOferta` no se monta.
-  - Seguridad: interruptor «Ofertas y Comunicaciones activas», solo admin.
-- El admin puede seguir entrando a `/ofertas` y `/comunicaciones` por URL (la guarda deja pasar al admin aunque el panel esté inactivo); el envío sigue bloqueado.
-- El cron diario se deja como está.
+## Qué se construye
 
-## 2. Ajustes de cierre
-- Comunicaciones: columna Origen (Manual / Recomendación), filtro por origen, y en el resumen por oferta envíos, confirmados y compradores separados por origen (incluido en el Excel).
-- Nueva `ofertas_recomendados_resumen(_oferta_id)`: recomendados por comercial y grupo; admin y director todo, jefe de zona solo su delegación. REVOKE de PUBLIC/anon, GRANT a authenticated. Tabla en la pestaña Recomendados para esos roles.
-- Texto: «Al menos N clientes excluidos por bloqueos».
+1. **Ficha de seguimiento por envío** (desde Comunicaciones y desde la ficha del cliente)
+   - Líneas compradas después del envío que encajan con la oferta (referencia, marca o familia), con fecha, documento, unidades e importe.
+   - Días hasta la primera compra y si fue dentro de la vigencia de la oferta.
+   - Estado: «Compró», «Sin compra aún», «Pendiente de datos» (si la ventana supera la fecha de corte).
 
-## 3. Comprobaciones (solo lectura)
-- Antes: listar usuarios cuyo único panel sea ofertas o comunicaciones.
-- Bautista con ajuste apagado: sin Ofertas/Comunicaciones en el menú; ficha de un cliente suyo sin botón, recuadro ni apartado, sin errores en consola; `ofertas_para_cliente` → «Ofertas desactivado».
-- Admin por URL con 0 ofertas: `/ofertas`, `/comunicaciones` y Recomendados cargan vacías sin errores.
-- Sin sesión: `/o/token-inventado` → «Oferta no disponible».
-- Nadie cae en «Sin secciones asignadas».
-- Typecheck y tests.
+2. **Comparativa de ofertas** (nueva pestaña «Resultados» en Comunicaciones)
+   - Por oferta: enviados, confirmados, clientes que compraron, tasa de conversión, importe y margen (margen solo si el usuario puede verlo), ticket medio, días medios hasta compra.
+   - **Grupo de comparación**: clientes del mismo segmento que no recibieron la oferta en ese periodo, para mostrar «incremento sobre lo habitual» en vez de solo antes/después.
+   - Ventana elegible: 15 / 30 / 60 días. Ranking ordenable y exportable a Excel.
+   - Desglose por comercial, delegación y origen (manual / recomendación).
 
-## 4. roadmap.md
-Sección «Ofertas y Comunicaciones — construida, oculta (ofertas_activo = false), pendiente de revisión» con los seis pendientes indicados, más: aplicar el SQL del bucket al reconstruir en el servidor propio.
+3. **Seguimiento en la ficha del cliente**
+   - Bloque «Ofertas recibidas»: cada oferta enviada y si generó compra, con enlace al detalle.
 
-## Ficheros previstos
-- Migración nueva en `drizzle/migrations/`
-- `src/hooks/useOfertasActivo.ts` (nuevo), `src/App.tsx`, `src/components/ProtectedRoute.tsx` (si hace falta para el acceso del admin por URL)
-- `src/pages/ClienteDetalle.tsx`, `src/components/ClientePerfilTab.tsx`, `src/pages/AdminData.tsx`, página de Seguridad
-- `src/pages/Comunicaciones.tsx`, `src/components/ofertas/Recomendados.tsx`
-- `docs/reconstruccion/ofertas_bucket.sql`, `roadmap.md`
+4. **Reglas de atribución (explicables, sin IA)**
+   - Una compra cuenta para la oferta si coincide con sus productos y ocurre entre el envío y el fin de ventana.
+   - Si dos ofertas coinciden en la misma compra, se atribuye a la más reciente (marcado como «compartida»).
+   - Abonos restan. Envíos «sin confirmar» o descartados no cuentan.
+   - Aviso visible: asociación no implica causalidad.
+
+## Permisos
+- Mismos que Comunicaciones: comercial ve los suyos, jefe de zona su delegación, dirección/marketing/admin todo.
+- Margen solo con permiso de ver margen.
+- Todo bloqueado si el interruptor de Ofertas está apagado.
+
+## Detalles técnicos
+- Una migración `fase6_seguimiento_compras`: RPCs `SECURITY DEFINER` con `search_path` fijo, guardas `ofertas_guard` + `is_approved` + `comunicaciones_ve`, `REVOKE` de PUBLIC/anon y `GRANT` a authenticated:
+  - `oferta_envio_compras(_envio_id, _dias)` — líneas atribuidas.
+  - `ofertas_resultados(_desde, _hasta, _dias, _agrupar)` — métricas y grupo de comparación.
+  - `cliente_ofertas_historial(_cod)`.
+- Reutiliza `ventas_diarias` y `oferta_marcas_efectivas`; índice nuevo solo si `EXPLAIN ANALYZE` lo justifica (objetivo < 2 s con Bautista).
+- Front: pestaña en `Comunicaciones.tsx`, diálogo de detalle, bloque en `ClienteDetalle.tsx`; helper puro de atribución con tests (ventana, abonos, compra compartida, pendiente de datos).
+- Sin tocar visitas, incentivos ni tablas existentes; actualizar `roadmap.md`.
+- Verificación: tests, typecheck, prueba RPC con Bautista y con interruptor apagado.
