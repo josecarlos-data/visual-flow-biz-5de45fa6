@@ -2557,6 +2557,21 @@ export type Database = {
           vendedor_linea: string
         }[]
       }
+      cliente_ofertas_historial: {
+        Args: { _cod: number }
+        Returns: {
+          comercial_nombre: string
+          compra_en_vigencia: boolean
+          envio_id: string
+          fecha_envio: string
+          importe: number
+          medible: boolean
+          oferta_id: string
+          origen: string
+          primera_compra: string
+          titulo: string
+        }[]
+      }
       cliente_top_productos:
         | {
             Args: { _anio?: number; _cod: number }
@@ -2846,9 +2861,35 @@ export type Database = {
           vendido_anterior_ytd: number
         }[]
       }
+      oferta_envio_compras: {
+        Args: { _dias?: number; _envio_id: string }
+        Returns: {
+          atribuida_a_otra: string
+          descripcion: string
+          familia: string
+          fecha: string
+          id_documento: string
+          importe: number
+          marca: string
+          margen: number
+          referencia: string
+          unidades: number
+        }[]
+      }
       oferta_evaluar_cliente: {
         Args: { _cod: number; _oferta_id: string }
         Returns: Json
+      }
+      oferta_linea_encaja: {
+        Args: {
+          _familia: string
+          _familias: string[]
+          _marca: string
+          _marcas: string[]
+          _ref: string
+          _refs: string[]
+        }
+        Returns: boolean
       }
       oferta_marcas_efectivas: {
         Args: { _oferta_id: string }
@@ -2947,6 +2988,54 @@ export type Database = {
           clientes: number
           grupo: string
           vendedor: string
+        }[]
+      }
+      ofertas_resultados: {
+        Args: {
+          _agrupar?: string
+          _desde?: string
+          _dias?: number
+          _hasta?: string
+        }
+        Returns: {
+          clave: string
+          compradores: number
+          compradores_vigencia: number
+          confirmados: number
+          dias_medios: number
+          etiqueta: string
+          fecha_corte: string
+          importe: number
+          margen: number
+          medibles: number
+        }[]
+      }
+      ofertas_seguimiento_base: {
+        Args: {
+          _cod: number
+          _desde: string
+          _dias: number
+          _hasta: string
+          _uid: string
+        }
+        Returns: {
+          cliente: string
+          cod_cliente: number
+          comercial_nombre: string
+          compra_en_vigencia: boolean
+          delegacion: string
+          envio_id: string
+          fecha_envio: string
+          importe: number
+          lineas: number
+          margen: number
+          medible: boolean
+          oferta_id: string
+          origen: string
+          primera_compra: string
+          titulo: string
+          user_id: string
+          vigente_hasta: string
         }[]
       }
       ofertas_vigentes_envio: {
