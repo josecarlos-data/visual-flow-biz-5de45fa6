@@ -10,6 +10,7 @@ import { useQuery, useMutation, useMutationState, useQueryClient } from "@tansta
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EnviarOfertaDialog } from "@/components/ofertas/EnviarOfertaDialog";
+import { ETIQUETA_SEGUIMIENTO, estadoSeguimiento } from "@/lib/comunicaciones";
 import { ETIQUETA_ENVIO, estadoEnvioVisible } from "@/lib/ofertasEnvio";
 import { useOfertasActivo } from "@/hooks/useOfertasActivo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -153,6 +154,15 @@ const [periodoProd, setPeriodoProd] = useState<string>("12m");
   const [ofertaOpen, setOfertaOpen] = useState(false);
   const ofertasActivo = useOfertasActivo();
   const puedeEnviarOferta = ofertasActivo && (role === "admin" || role === "director_comercial" || role === "jefe_de_zona" || role === "comercial");
+  const { data: seguimientoOfertas } = useQuery({
+    queryKey: ["cliente_ofertas_historial", codNum],
+    enabled: codNum != null && ofertasActivo,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("cliente_ofertas_historial", { _cod: codNum } as never);
+      if (error) return new Map<string, { medible: boolean; importe: number }>();
+      return new Map(((data ?? []) as unknown as { envio_id: string; medible: boolean; importe: number }[]).map((r) => [r.envio_id, r]));
+    },
+  });
   const { data: enviosOfertas } = useQuery({
     queryKey: ["ofertas_envios", "cliente", codNum],
     enabled: codNum != null && ofertasActivo,
@@ -906,6 +916,11 @@ const { campo, dir } = ordenProductos;
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {fechaCorta(e.abierto_en.slice(0, 10))}
                       {e.estado !== "enviado" ? ` · ${ETIQUETA_ENVIO[estadoEnvioVisible(e.estado, e.abierto_en)]}` : ""}
+                      {e.estado === "enviado" && seguimientoOfertas?.get(e.id) && (() => {
+                        const r = seguimientoOfertas.get(e.id)!;
+                        const st = estadoSeguimiento(r.medible, r.importe);
+                        return <span className={st === "compro" ? " font-medium text-primary" : ""}>{` · ${ETIQUETA_SEGUIMIENTO[st]}${st === "compro" ? ` ${new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(Number(r.importe))}` : ""}`}</span>;
+                      })()}
                     </span>
                   </div>
                 ))}

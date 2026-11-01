@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ChevronLeft, ChevronRight, Download, Loader2, MessagesSquare } from "lucide-react";
 import { ETIQUETA_ENVIO, estadoEnvioVisible } from "@/lib/ofertasEnvio";
 import { diferenciaFrenteControl, variacionPct } from "@/lib/comunicaciones";
+import { ComprasEnvio, ResultadosOfertas } from "@/components/ofertas/ResultadosOfertas";
 
 const eur = (n: number | null | undefined) =>
   n == null ? "—" : new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(Number(n));
@@ -131,8 +132,9 @@ export default function Comunicaciones() {
       {corte && <p className="text-xs text-muted-foreground">Datos de ventas hasta el {fecha(corte)}. Las ventas posteriores se muestran cuando los datos cubren los 30 días siguientes al envío.</p>}
 
       <Tabs defaultValue="envios">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="envios">Envíos</TabsTrigger>
+          <TabsTrigger value="resultados">Resultados</TabsTrigger>
           <TabsTrigger value="ofertas">Por oferta</TabsTrigger>
           <TabsTrigger value="comerciales">Por comercial</TabsTrigger>
         </TabsList>
@@ -176,6 +178,8 @@ export default function Comunicaciones() {
             </div>
           )}
         </TabsContent>
+
+        <TabsContent value="resultados"><ResultadosOfertas desde={desde} hasta={hasta} /></TabsContent>
 
         <TabsContent value="ofertas" className="space-y-3">
           <p className="text-xs text-muted-foreground">Compara las ventas de lo ofertado 30 días antes y después del envío confirmado, frente a clientes que no la recibieron. Es una asociación, no prueba que la oferta cause la venta.</p>
@@ -242,6 +246,7 @@ export default function Comunicaciones() {
               <p>{abierta.cliente} · {fecha(abierta.abierto_en)}{abierta.comercial_nombre ? ` · ${abierta.comercial_nombre}` : ""}</p>
               <p className="text-xs text-muted-foreground">Enviado al +{abierta.telefono}</p>
               <pre className="whitespace-pre-wrap break-words rounded-md border bg-muted/40 p-3 font-sans">{abierta.mensaje}</pre>
+              {abierta.estado === "enviado" && <ComprasEnvio envioId={abierta.id} />}
             </div>
           )}
         </DialogContent>
