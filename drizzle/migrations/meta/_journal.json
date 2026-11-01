@@ -176,6 +176,13 @@
       "when": 1793396954062,
       "tag": "0024_cierre_ofertas_interruptor",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793491292464,
+      "tag": "0025_fase6_seguimiento_compras",
+      "breakpoints": true
     }
   ]
 }

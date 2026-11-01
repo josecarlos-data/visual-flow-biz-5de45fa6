@@ -41,3 +41,4 @@
 - [ ] Ningún cliente tiene móvil en el ERP: se escribirá a mano la primera vez
 - [ ] Revisar con dirección el tope de 50 por tanda y los umbrales (6 meses, 7 días, 90 días)
 - [ ] Al reconstruir en servidor propio: ejecutar docs/reconstruccion/ofertas_bucket.sql (tipos de archivo permitidos del bucket)
+- [x] Ofertas Fase 6: seguimiento de compras por cliente (pestaña Resultados, compras por envío, estado en ficha). Pendiente: prueba con envíos reales y el interruptor encendido

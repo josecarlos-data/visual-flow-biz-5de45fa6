@@ -14,3 +14,26 @@ describe("comunicaciones", () => {
     expect(diferenciaFrenteControl(100, 150, 1000, 1100)).toBe(40);
   });
 });
+
+import { estadoSeguimiento, importePorComprador, tasaConversion } from "./comunicaciones";
+
+describe("seguimiento de compras", () => {
+  it("una compra cuenta aunque la ventana no esté completa", () => {
+    expect(estadoSeguimiento(false, 120)).toBe("compro");
+  });
+  it("sin compra solo cuando la ventana está cubierta", () => {
+    expect(estadoSeguimiento(true, 0)).toBe("sin_compra");
+    expect(estadoSeguimiento(false, 0)).toBe("pendiente");
+  });
+  it("los abonos que dejan el importe en negativo no cuentan como compra", () => {
+    expect(estadoSeguimiento(true, -50)).toBe("sin_compra");
+  });
+  it("conversión sobre clientes medibles", () => {
+    expect(tasaConversion(3, 12)).toBe(25);
+    expect(tasaConversion(0, 0)).toBeNull();
+  });
+  it("importe por comprador", () => {
+    expect(importePorComprador(900, 3)).toBe(300);
+    expect(importePorComprador(900, 0)).toBeNull();
+  });
+});
