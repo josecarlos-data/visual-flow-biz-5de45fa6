@@ -42,3 +42,8 @@
 - [ ] Revisar con dirección el tope de 50 por tanda y los umbrales (6 meses, 7 días, 90 días)
 - [ ] Al reconstruir en servidor propio: ejecutar docs/reconstruccion/ofertas_bucket.sql (tipos de archivo permitidos del bucket)
 - [x] Ofertas Fase 6: seguimiento de compras por cliente (pestaña Resultados, compras por envío, estado en ficha). Pendiente: prueba con envíos reales y el interruptor encendido
+
+## Visitas y Rutas
+- [x] Fase A: listado de rutas, coordenadas propuestas, cierre automático de planificadas, revisión de visitas
+- [ ] Fase B: «Mi día» y mejoras móviles del comercial (pendiente de aprobación)
+- [ ] Fase C: panel «Análisis de rutas» y parámetros (pendiente de aprobación)

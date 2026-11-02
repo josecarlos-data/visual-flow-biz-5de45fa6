@@ -183,6 +183,13 @@
       "when": 1793491292464,
       "tag": "0025_fase6_seguimiento_compras",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1793658237136,
+      "tag": "0026_visitas_rutas_fase_a",
+      "breakpoints": true
     }
   ]
 }
