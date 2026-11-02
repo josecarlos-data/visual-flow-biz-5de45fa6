@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "@/hooks/use-toast";
 import { CatalogosAdmin } from "@/components/CatalogosAdmin";
+import { RevisionDatosVisitas } from "@/components/RevisionDatosVisitas";
 
 import { useMotivos, useMotivosAdmin, useCatalogos, type Motivo, type MotivoCampo } from "@/hooks/useCrm";
 import {
@@ -386,6 +387,8 @@ export default function AdminVisitas() {
           ))}
         </Accordion>
       )}
+
+      <RevisionDatosVisitas />
 
       <CatalogosAdmin />
     </div>
