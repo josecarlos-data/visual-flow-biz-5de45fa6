@@ -463,6 +463,7 @@ export type Database = {
           cod_rappel: string | null
           cod_tipo_cliente: string | null
           cod_vendedor: string | null
+          coords_propuestas_visitas: number | null
           created_at: string
           crecimiento_previsto: number | null
           delegacion: string | null
@@ -476,8 +477,10 @@ export type Database = {
           gsmart_delegacion: string | null
           id: string
           latitud: number | null
+          latitud_propuesta: number | null
           localidad: string | null
           longitud: number | null
+          longitud_propuesta: number | null
           num_empleados_taller: number | null
           observaciones_almacen: string | null
           persona_contacto: string | null
@@ -508,6 +511,7 @@ export type Database = {
           cod_rappel?: string | null
           cod_tipo_cliente?: string | null
           cod_vendedor?: string | null
+          coords_propuestas_visitas?: number | null
           created_at?: string
           crecimiento_previsto?: number | null
           delegacion?: string | null
@@ -521,8 +525,10 @@ export type Database = {
           gsmart_delegacion?: string | null
           id?: string
           latitud?: number | null
+          latitud_propuesta?: number | null
           localidad?: string | null
           longitud?: number | null
+          longitud_propuesta?: number | null
           num_empleados_taller?: number | null
           observaciones_almacen?: string | null
           persona_contacto?: string | null
@@ -553,6 +559,7 @@ export type Database = {
           cod_rappel?: string | null
           cod_tipo_cliente?: string | null
           cod_vendedor?: string | null
+          coords_propuestas_visitas?: number | null
           created_at?: string
           crecimiento_previsto?: number | null
           delegacion?: string | null
@@ -566,8 +573,10 @@ export type Database = {
           gsmart_delegacion?: string | null
           id?: string
           latitud?: number | null
+          latitud_propuesta?: number | null
           localidad?: string | null
           longitud?: number | null
+          longitud_propuesta?: number | null
           num_empleados_taller?: number | null
           observaciones_almacen?: string | null
           persona_contacto?: string | null
@@ -2402,6 +2411,10 @@ export type Database = {
       }
     }
     Functions: {
+      aceptar_coordenadas_propuestas: {
+        Args: { _cods: number[] }
+        Returns: number
+      }
       actividad_interna_almacenes: {
         Args: { _anio: number }
         Returns: {
@@ -3263,6 +3276,17 @@ export type Database = {
         }[]
       }
       verificar_sesion: { Args: { _sesion_id: string }; Returns: Json }
+      visitas_revision_datos: {
+        Args: never
+        Returns: {
+          cliente_externo: string
+          comercial: string
+          fecha: string
+          id: string
+          problema: string
+          titulo: string
+        }[]
+      }
     }
     Enums: {
       app_role:
