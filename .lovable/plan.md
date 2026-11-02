@@ -1,41 +1,49 @@
-# Fase 6 — Seguimiento de compras tras ofertas
+# Visitas y Rutas: diagnóstico y mejoras
 
-## Punto de partida
-Comunicaciones ya compara ventas de los productos de la oferta 30 días antes y 30 días después de cada envío confirmado. Falta ver **qué compró cada cliente**, comparar ofertas entre sí de forma justa y separar el efecto de la oferta de la tendencia normal del cliente.
+## Situación actual (datos reales)
+- 21.506 visitas en total; 14.623 en el último año sobre 1.202 clientes distintos. 488 visitas no tienen cliente asociado.
+- 63 % de las visitas tienen GPS, pero solo 1.366 de 11.592 clientes (12 %) tienen coordenadas.
+- 6.572 clientes tienen ruta asignada, repartidos en 262 rutas (unos 25 clientes por ruta). La tabla de rutas está vacía: las rutas solo existen como texto en la ficha del cliente.
+- 947 visitas planificadas, de las que solo 14 aparecen como realizadas: la planificación casi no se cierra con una visita real.
+- Hay una visita fechada el 03/12/2026, en el futuro: hay que revisarla.
 
-## Qué se construye
+## Fase A: arreglar la base de datos de rutas (rápido)
+1. Rellenar la tabla de rutas a partir de las 262 rutas de los clientes (código, comercial, delegación).
+2. Rellenar las coordenadas que faltan en los clientes usando la posición media de sus visitas con GPS (solo cuando las visitas estén agrupadas, a menos de 300 m entre sí). Lo propuesto queda pendiente hasta que se valide.
+3. Enlazar de forma automática la planificación con la visita: al guardar una visita de un cliente planificado ese día, se marca como realizada.
+4. Lista para revisar: visitas sin cliente o con fecha futura.
 
-1. **Ficha de seguimiento por envío** (desde Comunicaciones y desde la ficha del cliente)
-   - Líneas compradas después del envío que encajan con la oferta (referencia, marca o familia), con fecha, documento, unidades e importe.
-   - Días hasta la primera compra y si fue dentro de la vigencia de la oferta.
-   - Estado: «Compró», «Sin compra aún», «Pendiente de datos» (si la ventana supera la fecha de corte).
+## Fase B: el comercial en el día a día (móvil)
+- «Mi día»: la agenda de hoy ordenada por cercanía (GPS), con botones para navegar, llamar y empezar la visita con el cliente ya rellenado.
+- Visita rápida: el último motivo usado y el borrador se guardan automáticamente si se pierde la cobertura.
+- Ficha previa a la visita: días sin comprar, última visita, alertas, ofertas recomendadas y situaciones activas, todo en una tarjeta.
+- Sugerencias al planificar: clientes de la ruta pendientes («hace X días sin visita», «compra a la baja», «potencial sin explotar»).
+- Rendimiento: carga por páginas en Visitas, consultas solo de las columnas necesarias y caché de la ficha del cliente.
 
-2. **Comparativa de ofertas** (nueva pestaña «Resultados» en Comunicaciones)
-   - Por oferta: enviados, confirmados, clientes que compraron, tasa de conversión, importe y margen (margen solo si el usuario puede verlo), ticket medio, días medios hasta compra.
-   - **Grupo de comparación**: clientes del mismo segmento que no recibieron la oferta en ese periodo, para mostrar «incremento sobre lo habitual» en vez de solo antes/después.
-   - Ventana elegible: 15 / 30 / 60 días. Ranking ordenable y exportable a Excel.
-   - Desglose por comercial, delegación y origen (manual / recomendación).
+## Fase C: panel aparte «Análisis de rutas» (dirección / jefe de zona)
+Indicadores por ruta y por comercial:
+- Cobertura: % de clientes de la ruta visitados en 30, 90 y 365 días.
+- Frecuencia real frente a frecuencia objetivo por tipo de cliente (AA, A, B, C, D).
+- Ventas, margen y evolución anual de la ruta; ventas por visita.
+- Clientes con buenas compras pero pocas visitas, y al revés (visitas sin retorno).
+- Distancia y dispersión de la ruta (cuando haya coordenadas).
 
-3. **Seguimiento en la ficha del cliente**
-   - Bloque «Ofertas recibidas»: cada oferta enviada y si generó compra, con enlace al detalle.
+Propuestas de ruta, explicadas con reglas y sin IA:
+- Prioridad de cada cliente = potencial (tipo + ventas) × días sin visita / frecuencia objetivo × tendencia.
+- Proponer que un cliente cambie de ruta cuando su posición está más cerca del centro de otra ruta del mismo comercial.
+- Señalar rutas sobrecargadas o infrautilizadas frente a la capacidad semanal de visitas.
+- Las propuestas son solo sugerencias: dirección las acepta o descarta y nada cambia de forma automática.
 
-4. **Reglas de atribución (explicables, sin IA)**
-   - Una compra cuenta para la oferta si coincide con sus productos y ocurre entre el envío y el fin de ventana.
-   - Si dos ofertas coinciden en la misma compra, se atribuye a la más reciente (marcado como «compartida»).
-   - Abonos restan. Envíos «sin confirmar» o descartados no cuentan.
-   - Aviso visible: asociación no implica causalidad.
-
-## Permisos
-- Mismos que Comunicaciones: comercial ve los suyos, jefe de zona su delegación, dirección/marketing/admin todo.
-- Margen solo con permiso de ver margen.
-- Todo bloqueado si el interruptor de Ofertas está apagado.
+## Parámetros que hay que decidir (editables por el administrador)
+- Frecuencia objetivo de visitas por tipo de cliente (propuesta: AA cada 7 días, A cada 14, B cada 30, C cada 60, D cada 90).
+- Capacidad de visitas al día por comercial (propuesta: 8).
+- Pesos de la puntuación (potencial, recencia, tendencia).
+- Distancia máxima para dar por buena una coordenada.
 
 ## Detalles técnicos
-- Una migración `fase6_seguimiento_compras`: RPCs `SECURITY DEFINER` con `search_path` fijo, guardas `ofertas_guard` + `is_approved` + `comunicaciones_ve`, `REVOKE` de PUBLIC/anon y `GRANT` a authenticated:
-  - `oferta_envio_compras(_envio_id, _dias)` — líneas atribuidas.
-  - `ofertas_resultados(_desde, _hasta, _dias, _agrupar)` — métricas y grupo de comparación.
-  - `cliente_ofertas_historial(_cod)`.
-- Reutiliza `ventas_diarias` y `oferta_marcas_efectivas`; índice nuevo solo si `EXPLAIN ANALYZE` lo justifica (objetivo < 2 s con Bautista).
-- Front: pestaña en `Comunicaciones.tsx`, diálogo de detalle, bloque en `ClienteDetalle.tsx`; helper puro de atribución con tests (ventana, abonos, compra compartida, pendiente de datos).
-- Sin tocar visitas, incentivos ni tablas existentes; actualizar `roadmap.md`.
-- Verificación: tests, typecheck, prueba RPC con Bautista y con interruptor apagado.
+- Una migración por fase con funciones del servidor que filtran por los permisos de clientes ya existentes. La función que propone coordenadas escribe en una columna aparte hasta que se validan.
+- Nueva tabla de parámetros de rutas en los ajustes de la aplicación y un panel nuevo, asignable desde la gestión de usuarios.
+- Se mide la velocidad con la sesión de Bautista antes y después de los cambios; el objetivo es menos de 2 s por pantalla.
+
+## Orden propuesto
+Fase A, después B y después C, cada una con su propia aprobación.
