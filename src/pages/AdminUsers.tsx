@@ -7,7 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
-import { Check, X, Pencil, Save, MonitorSmartphone } from "lucide-react";
+import { Check, X, Pencil, Save, MonitorSmartphone, UserPlus } from "lucide-react";
+import CrearUsuarioDialog from "@/components/CrearUsuarioDialog";
 import { Switch } from "@/components/ui/switch";
 import type { Database } from "@/integrations/supabase/types";
 import { registrarEvento } from "@/lib/auditoria";
@@ -85,6 +86,7 @@ export default function AdminUsers() {
   const [bajaDe, setBajaDe] = useState<{ u: UserRow; motivo: string } | null>(null);
   const [usernameEdit, setUsernameEdit] = useState<{ userId: string; valor: string } | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [crearAbierto, setCrearAbierto] = useState(false);
   const [modo2fa, setModo2fa] = useState("desactivado");
   const [estado2fa, setEstado2fa] = useState<Record<string, boolean>>({});
   const [resetear2faDe, setResetear2faDe] = useState<UserRow | null>(null);
@@ -614,10 +616,22 @@ export default function AdminUsers() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Gestión de Usuarios</h1>
-        <p className="text-muted-foreground">Aprueba usuarios y asigna roles, vendedores y delegaciones</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Gestión de Usuarios</h1>
+          <p className="text-muted-foreground">Crea usuarios y asigna roles, vendedores y delegaciones</p>
+        </div>
+        <Button onClick={() => setCrearAbierto(true)} className="gap-1"><UserPlus className="h-4 w-4" />Nuevo usuario</Button>
       </div>
+
+      <CrearUsuarioDialog
+        open={crearAbierto}
+        onOpenChange={setCrearAbierto}
+        vendedores={vendedores}
+        delegaciones={delegaciones}
+        dashboards={dashboardCatalog}
+        onCreado={fetchData}
+      />
 
       <AvisoSeguridadUsuarios onModo2fa={setModo2fa} />
 
