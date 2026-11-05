@@ -41,7 +41,7 @@ export function AppSidebar() {
         { title: "Funciones", url: "/admin/functions", icon: Settings },
       ]
     : esDireccion
-      ? [objetivosItem]
+      ? [{ title: "Plantillas de visita", url: "/admin/visitas", icon: Icons.ClipboardList }, objetivosItem]
       : [];
 
 
