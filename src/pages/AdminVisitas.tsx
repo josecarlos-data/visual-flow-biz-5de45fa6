@@ -430,7 +430,7 @@ export default function AdminVisitas() {
         </Accordion>
       )}
 
-      <RevisionDatosVisitas />
+      {role === "admin" && <RevisionDatosVisitas />}
 
       <CatalogosAdmin />
     </div>
