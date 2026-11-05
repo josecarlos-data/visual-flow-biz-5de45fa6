@@ -344,6 +344,7 @@ export default function AdminVisitas() {
   const { data: motivos, isLoading } = useMotivos();
   const { data: catalogos } = useCatalogos();
   const { guardarMotivo } = useMotivosAdmin();
+  const { role } = useAuth();
   const [nuevo, setNuevo] = useState("");
   const [verRetirados, setVerRetirados] = useState(false);
 
