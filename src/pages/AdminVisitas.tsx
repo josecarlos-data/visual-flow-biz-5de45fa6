@@ -13,6 +13,40 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { toast } from "@/hooks/use-toast";
 import { CatalogosAdmin } from "@/components/CatalogosAdmin";
 import { RevisionDatosVisitas } from "@/components/RevisionDatosVisitas";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
+function ConfirmarEliminar({ etiqueta, titulo, retirar, onConfirm, disabled }: {
+  etiqueta: string; titulo: string; retirar: string; onConfirm: () => void; disabled?: boolean;
+}) {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button variant="ghost" size="sm" disabled={disabled}>
+          <Trash2 className="mr-2 h-4 w-4" />{etiqueta}
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{titulo}</AlertDialogTitle>
+          <AlertDialogDescription>
+            Los datos ya registrados en visitas se quedarán sin etiqueta y no se podrán interpretar bien.
+            Para retirarlo sin perder información, desactiva «{retirar}».
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            Eliminar
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
 
 import { useMotivos, useMotivosAdmin, useCatalogos, type Motivo, type MotivoCampo } from "@/hooks/useCrm";
 import {
@@ -43,6 +77,8 @@ function CampoRow({
   catalogos: CatalogoMap;
 }) {
   const { guardarCampo, borrarCampo } = useMotivosAdmin();
+  const { role } = useAuth();
+  const isAdmin = role === "admin";
   const [draft, setDraft] = useState<Partial<MotivoCampo>>(
     campo ?? {
       tipo: "texto",
@@ -218,15 +254,14 @@ function CampoRow({
           </label>
         </div>
         <div className="flex gap-2">
-          {campo && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => borrarCampo.mutate(campo.id)}
+          {campo && isAdmin && (
+            <ConfirmarEliminar
+              etiqueta="Eliminar"
+              titulo="¿Eliminar este campo?"
+              retirar="En uso"
+              onConfirm={() => borrarCampo.mutate(campo.id)}
               disabled={borrarCampo.isPending}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />Eliminar
-            </Button>
+            />
           )}
           <Button size="sm" onClick={guardar} disabled={guardarCampo.isPending}>
             {guardarCampo.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : nuevo ? <Plus className="mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}
@@ -248,6 +283,8 @@ function MotivoEditor({
   verRetirados: boolean;
 }) {
   const { guardarMotivo, borrarMotivo } = useMotivosAdmin();
+  const { role } = useAuth();
+  const isAdmin = role === "admin";
   const [nombre, setNombre] = useState(motivo.nombre);
   const [descripcion, setDescripcion] = useState(motivo.descripcion ?? "");
   const [activo, setActivo] = useState(motivo.is_active);
@@ -272,9 +309,14 @@ function MotivoEditor({
           Disponible para los comerciales
         </label>
         <div className="flex gap-2">
-          <Button variant="ghost" size="sm" onClick={() => borrarMotivo.mutate(motivo.key)}>
-            <Trash2 className="mr-2 h-4 w-4" />Eliminar plantilla
-          </Button>
+          {isAdmin && (
+            <ConfirmarEliminar
+              etiqueta="Eliminar plantilla"
+              titulo="¿Eliminar esta plantilla?"
+              retirar="Disponible para los comerciales"
+              onConfirm={() => borrarMotivo.mutate(motivo.key)}
+            />
+          )}
           <Button
             size="sm"
             onClick={() =>
@@ -302,6 +344,7 @@ export default function AdminVisitas() {
   const { data: motivos, isLoading } = useMotivos();
   const { data: catalogos } = useCatalogos();
   const { guardarMotivo } = useMotivosAdmin();
+  const { role } = useAuth();
   const [nuevo, setNuevo] = useState("");
   const [verRetirados, setVerRetirados] = useState(false);
 
@@ -388,7 +431,7 @@ export default function AdminVisitas() {
         </Accordion>
       )}
 
-      <RevisionDatosVisitas />
+      {role === "admin" && <RevisionDatosVisitas />}
 
       <CatalogosAdmin />
     </div>

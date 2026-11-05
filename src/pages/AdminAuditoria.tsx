@@ -75,6 +75,9 @@ const TABLAS: Record<string, string> = {
   situaciones_cliente: "situación de cliente",
   cliente_perfil_datos: "perfil de cliente",
   app_settings: "ajuste",
+  motivos_visita: "plantilla de visita",
+  motivo_campos: "campo de plantilla",
+  catalogos_opciones: "opción de catálogo",
 };
 const OPERACION_DATO: Record<string, string> = { dato_alta: "Alta", dato_cambio: "Cambio", dato_baja: "Baja" };
 
