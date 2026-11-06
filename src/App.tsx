@@ -33,6 +33,7 @@ const AdminAuditoria = lazy(() => import("./pages/AdminAuditoria"));
 const AdminSeguridad = lazy(() => import("./pages/AdminSeguridad"));
 const AdminVisitas = lazy(() => import("./pages/AdminVisitas"));
 const RevisionVisitas = lazy(() => import("./pages/RevisionVisitas"));
+const MisRevisiones = lazy(() => import("./pages/MisRevisiones"));
 const AdminSituaciones = lazy(() => import("./pages/AdminSituaciones"));
 const AdminObjetivos = lazy(() => import("./pages/AdminObjetivos"));
 const Objetivos = lazy(() => import("./pages/Objetivos"));
@@ -257,6 +258,7 @@ const App = () => (
                 <Route path="/clientes/:cod" element={<ProtectedRoute dashboardKey="clientes"><ClienteDetalle /></ProtectedRoute>} />
                 <Route path="/visitas" element={<ProtectedRoute dashboardKey="visitas"><Visitas /></ProtectedRoute>} />
                 <Route path="/visitas/nueva" element={<ProtectedRoute dashboardKey="visitas"><NuevaVisita /></ProtectedRoute>} />
+                <Route path="/visitas/revisiones" element={<ProtectedRoute dashboardKey="visitas"><MisRevisiones /></ProtectedRoute>} />
                 <Route path="/visitas/revision" element={<ProtectedRoute dashboardKey="visitas"><RevisionVisitas /></ProtectedRoute>} />
                 <Route path="/agenda" element={<ProtectedRoute dashboardKey="agenda"><Agenda /></ProtectedRoute>} />
                 <Route path="/rutas" element={<ProtectedRoute dashboardKey="rutas"><Rutas /></ProtectedRoute>} />
