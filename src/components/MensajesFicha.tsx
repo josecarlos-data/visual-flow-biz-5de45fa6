@@ -8,7 +8,7 @@ import type { MensajesDeVisita } from "@/hooks/useVisitaMensajes";
 /** Mensajes de un bloque (o de la visita si bloqueId es null) en la ficha del cliente.
  *  Los datos y el permiso de escritura vienen del servidor, en una sola llamada para toda la ficha. */
 export function MensajesFicha({ visitaId, bloqueId, hilo }: {
-  visitaId: string; bloqueId: string | null; hilo: UseQueryResult<Map<string, MensajesDeVisita>>;
+  visitaId: string; bloqueId: string | null; hilo: Pick<UseQueryResult<Map<string, MensajesDeVisita>, unknown>, "data">;
 }) {
   const [abierto, setAbierto] = useState(false);
   const datos = hilo.data?.get(visitaId);
