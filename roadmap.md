@@ -48,4 +48,4 @@
 - [ ] Fase B: «Mi día» y mejoras móviles del comercial (pendiente de aprobación)
 - [ ] Fase C: panel «Análisis de rutas» y parámetros (pendiente de aprobación)
 - [x] Revisión de visitas por bloque (nota y estado por bloque, filtro Comercial, comercial automático)
-- [ ] Prueba de la revisión por bloque con visita PRUEBA como admin (sin sesión admin disponible para mí)
+- [x] Prueba de la revisión por bloque con visita PRUEBA (borrada)
