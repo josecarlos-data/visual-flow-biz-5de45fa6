@@ -3012,6 +3012,14 @@ export type Database = {
           texto: string
         }[]
       }
+      mensajes_visitas: {
+        Args: { _ids: string[] }
+        Returns: {
+          mensajes: Json
+          puede_escribir: boolean
+          visita_id: string
+        }[]
+      }
       mis_revisiones: {
         Args: { _filtro?: string; _limite?: number; _offset?: number }
         Returns: {
