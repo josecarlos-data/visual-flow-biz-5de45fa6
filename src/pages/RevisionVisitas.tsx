@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { CheckCircle2, Clock, XCircle, Search, ExternalLink, RefreshCw, Loader2, FileDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -106,6 +106,8 @@ export default function RevisionVisitas() {
   // Bloques de todas las visitas cargadas: los filtros por origen/motivo/confianza los miran.
   const { data: bloquesMap } = useVisitaBloques((visitas ?? []).map((v) => v.id));
   const bloquesDe = (v: Visita) => bloquesMap?.get(v.id) ?? [];
+  const cargandoBloques = !bloquesMap;
+  const dialogoRef = useRef<HTMLDivElement>(null);
   const resumenMotivos = (v: Visita) => {
     const bs = bloquesDe(v);
     if (!bs.length) return nombreMotivo(v.motivo_key);
@@ -163,11 +165,25 @@ export default function RevisionVisitas() {
     const b: Record<string, Borrador> = {};
     for (const x of bloquesDe(v)) b[x.id] = { validacion: x.validacion ?? "pendiente", nota: x.nota_revision ?? "" };
     setBorrador(b);
+    requestAnimationFrame(() => dialogoRef.current?.scrollTo({ top: 0 }));
   };
+
+  // Carga tardía o «Reanalizar»: añade bloques nuevos con su estado guardado y quita los que ya no existen.
+  const bloquesSel = sel ? bloquesMap?.get(sel.id) : undefined;
+  useEffect(() => {
+    if (!sel || !bloquesMap) return;
+    const bs = bloquesSel ?? [];
+    setBorrador((prev) => {
+      const next: Record<string, Borrador> = {};
+      for (const x of bs) next[x.id] = prev[x.id] ?? { validacion: x.validacion ?? "pendiente", nota: x.nota_revision ?? "" };
+      const igual = Object.keys(prev).length === bs.length && bs.every((x) => prev[x.id] === next[x.id]);
+      return igual ? prev : next;
+    });
+  }, [sel?.id, bloquesMap, bloquesSel]);
 
   const bloqueCambiado = (b: VisitaBloque) => {
     const d = borrador[b.id];
-    return !!d && (d.validacion !== (b.validacion ?? "pendiente") || d.nota.trim() !== (b.nota_revision ?? "").trim());
+    return !!d && (d.validacion !== (b.validacion ?? "pendiente") || (d.nota ?? "").trim() !== (b.nota_revision ?? "").trim());
   };
   const hayCambios = !!sel && (
     bloquesDe(sel).some(bloqueCambiado) ||
@@ -177,7 +193,11 @@ export default function RevisionVisitas() {
   );
 
   const setBloque = (id: string, p: Partial<Borrador>) =>
-    setBorrador((prev) => ({ ...prev, [id]: { ...prev[id], ...p } }));
+    setBorrador((prev) => {
+      const b = sel ? bloquesDe(sel).find((x) => x.id === id) : undefined;
+      const base: Borrador = prev[id] ?? { validacion: b?.validacion ?? "pendiente", nota: b?.nota_revision ?? "" };
+      return { ...prev, [id]: { ...base, ...p } };
+    });
   const alternar = (id: string, v: string) =>
     setBloque(id, { validacion: borrador[id]?.validacion === v ? "pendiente" : v });
   const marcarPendientesCorrectos = () =>
@@ -190,7 +210,7 @@ export default function RevisionVisitas() {
 
   /** Guarda solo lo cambiado. En visitas con bloques nunca escribe visitas.validacion. */
   const guardar = async (siguiente: boolean) => {
-    if (!sel) return;
+    if (!sel || cargandoBloques) return;
     // La siguiente se decide ANTES de guardar: al guardar la lista se reordena.
     const idx = filtradas.findIndex((v) => v.id === sel.id);
     const sig = siguiente ? filtradas.slice(idx + 1)[0] ?? null : null;
@@ -199,7 +219,7 @@ export default function RevisionVisitas() {
       const bs = bloquesDe(sel);
       for (const b of bs.filter(bloqueCambiado)) {
         const d = borrador[b.id];
-        await revisarBloque.mutateAsync({ id: b.id, validacion: d.validacion, nota_revision: d.nota.trim() || null });
+        await revisarBloque.mutateAsync({ id: b.id, validacion: d.validacion, nota_revision: (d.nota ?? "").trim() || null });
       }
       if (bs.length) {
         if (observaciones !== (sel.observaciones ?? "")) {
@@ -361,9 +381,12 @@ export default function RevisionVisitas() {
       )}
 
       <Dialog open={!!sel} onOpenChange={(o) => !o && cerrar()}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent ref={dialogoRef} className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader><DialogTitle>Revisar visita</DialogTitle></DialogHeader>
-          {sel && (
+          {sel && cargandoBloques && (
+            <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Cargando…</div>
+          )}
+          {sel && !cargandoBloques && (
             <div className="space-y-4">
               <div className="rounded-md border p-3 text-sm">
                 <p className="font-medium">
@@ -491,11 +514,11 @@ export default function RevisionVisitas() {
           )}
 
           <DialogFooter className="gap-2">
-            {sel && bloquesDe(sel).length > 0 && (
+            {sel && !cargandoBloques && bloquesDe(sel).length > 0 && (
               <Button variant="outline" className="sm:mr-auto" onClick={marcarPendientesCorrectos} disabled={guardando}>Marcar pendientes como correctos</Button>
             )}
-            <Button variant="outline" onClick={() => guardar(false)} disabled={guardando || !hayCambios}>Guardar</Button>
-            <Button onClick={() => guardar(true)} disabled={guardando}>
+            <Button variant="outline" onClick={() => guardar(false)} disabled={guardando || cargandoBloques || !hayCambios}>Guardar</Button>
+            <Button onClick={() => guardar(true)} disabled={guardando || cargandoBloques}>
               {guardando && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}Guardar y siguiente
             </Button>
           </DialogFooter>
