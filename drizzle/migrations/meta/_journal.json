@@ -225,6 +225,13 @@
       "when": 1793973522712,
       "tag": "0031_mensajes_lecturas_iniciales",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1793976304787,
+      "tag": "0032_mensajes_visitas_ficha",
+      "breakpoints": true
     }
   ]
 }

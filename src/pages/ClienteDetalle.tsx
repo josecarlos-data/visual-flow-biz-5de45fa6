@@ -30,6 +30,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { MensajesFicha } from "@/components/MensajesFicha";
+import { useMensajesVisitas } from "@/hooks/useVisitaMensajes";
 import {
   useCliente, useClienteVentas, useClienteKpis, useClienteProductos, useClienteMix,
   useClienteVisitas, useMotivos, usePuedeVerMargen, useSituacionesVigentes, useClienteDocumentos, useVisitaBloques,
@@ -131,6 +132,7 @@ export default function ClienteDetalle() {
   const { data: kpis } = useClienteKpis(codNum);
   const { data: mix } = useClienteMix(codNum);
   const { data: visitas } = useClienteVisitas(codNum);
+  const mensajesFicha = useMensajesVisitas((visitas ?? []).map((v) => v.id));
   const { data: bloquesMap } = useVisitaBloques((visitas ?? []).map((v) => v.id));
   const { data: documentos } = useClienteDocumentos(codNum);
 
@@ -929,6 +931,14 @@ const { campo, dir } = ordenProductos;
             </Card>
           )}
 
+          {mensajesFicha.isError && (
+            <Card className="border-destructive/40">
+              <CardContent className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
+                <span>No se han podido cargar los mensajes de revisión.</span>
+                <Button size="sm" variant="outline" onClick={() => mensajesFicha.refetch()}>Reintentar</Button>
+              </CardContent>
+            </Card>
+          )}
           {!visitas || visitas.length === 0 ? (
             <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Sin visitas registradas.</CardContent></Card>
           ) : (
@@ -955,7 +965,7 @@ const { campo, dir } = ordenProductos;
                               {String(val)}
                             </p>
                           ))}
-                          <MensajesFicha visitaId={v.id} bloqueId={b.id} puedeEscribir={v.user_id === user?.id || ["admin", "director_comercial", "jefe_de_zona"].includes(role ?? "")} />
+                          <MensajesFicha visitaId={v.id} bloqueId={b.id} hilo={mensajesFicha} />
                         </div>
 
                       ))
@@ -969,7 +979,7 @@ const { campo, dir } = ordenProductos;
                     )}
                     {bloques.length === 0 && v.observaciones && <p className="whitespace-pre-wrap text-sm">{v.observaciones}</p>}
                     {bloques.length === 0 && (
-                      <MensajesFicha visitaId={v.id} bloqueId={null} puedeEscribir={v.user_id === user?.id || ["admin", "director_comercial", "jefe_de_zona"].includes(role ?? "")} />
+                      <MensajesFicha visitaId={v.id} bloqueId={null} hilo={mensajesFicha} />
                     )}
                     {bloques.length > 0 && (v.transcripcion || v.observaciones_original) && (
                       <Collapsible>

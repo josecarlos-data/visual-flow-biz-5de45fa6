@@ -13,7 +13,12 @@ export interface VisitaMensaje {
   es_dueno: boolean;
 }
 
-const rpc = supabase.rpc as unknown as (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>;
+/** Llama a una RPC sin desligar el método del cliente (si se desliga, se pierde `this`). */
+const rpc = (fn: string, args?: Record<string, unknown>) =>
+  (supabase as unknown as { rpc: (f: string, a?: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }> }).rpc(fn, args);
+
+/** Los errores de permiso no se reintentan. */
+const reintentar = (n: number, e: unknown) => n < 1 && !/autorizado/i.test(String((e as Error)?.message ?? ""));
 
 /** Invalida todo lo relacionado con mensajes y contadores. */
 export function useInvalidarMensajes() {
@@ -30,6 +35,7 @@ export function useMensajesVisita(visitaId: string | null | undefined) {
   return useQuery({
     queryKey: ["visita_mensajes", visitaId],
     enabled: !!visitaId,
+    retry: reintentar,
     queryFn: async () => {
       const { data, error } = await rpc("mensajes_visita", { _visita_id: visitaId });
       if (error) throw new Error(error.message);
@@ -58,7 +64,11 @@ export function useMarcarLeida(visitaId: string | null | undefined) {
   const inv = useInvalidarMensajes();
   useEffect(() => {
     if (!visitaId) return;
-    rpc("marcar_visita_leida", { _visita_id: visitaId }).then(({ error }) => { if (!error) inv(); });
+    try {
+      rpc("marcar_visita_leida", { _visita_id: visitaId })
+        .then(({ error }) => { if (!error) inv(); })
+        .catch(() => undefined);
+    } catch { /* nunca debe tumbar la página */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visitaId]);
 }
@@ -70,6 +80,7 @@ export function useContadoresMensajes() {
     enabled: !!user,
     refetchInterval: 3 * 60 * 1000,
     refetchOnWindowFocus: true,
+    retry: reintentar,
     queryFn: async () => {
       const { data, error } = await rpc("contadores_mensajes");
       if (error) throw new Error(error.message);
@@ -119,3 +130,26 @@ export function useMisRevisiones(filtro: "sin_leer" | "esperando" | "todas", lim
 
 /** Último mensaje de un hilo (bloque o visita). */
 export const ultimoDe = (ms: VisitaMensaje[]) => (ms.length ? ms[ms.length - 1] : null);
+
+export interface MensajesDeVisita { puede_escribir: boolean; mensajes: VisitaMensaje[] }
+
+/** Mensajes de varias visitas (máx. 50) en una sola llamada. Solo devuelve las visitas donde el usuario puede conversar. */
+export function useMensajesVisitas(ids: string[]) {
+  const clave = [...ids].sort();
+  return useQuery({
+    queryKey: ["visita_mensajes", "lote", clave],
+    enabled: clave.length > 0,
+    retry: reintentar,
+    queryFn: async () => {
+      const mapa = new Map<string, MensajesDeVisita>();
+      for (let i = 0; i < clave.length; i += 50) {
+        const { data, error } = await rpc("mensajes_visitas", { _ids: clave.slice(i, i + 50) });
+        if (error) throw new Error(error.message);
+        for (const r of (data ?? []) as { visita_id: string; puede_escribir: boolean; mensajes: VisitaMensaje[] }[]) {
+          mapa.set(r.visita_id, { puede_escribir: r.puede_escribir, mensajes: r.mensajes ?? [] });
+        }
+      }
+      return mapa;
+    },
+  });
+}

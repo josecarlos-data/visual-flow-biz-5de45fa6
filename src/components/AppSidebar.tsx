@@ -62,7 +62,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {[
                 ...mainItems,
-                ...(role === "comercial" && tieneVisitas ? [{ title: "Mis revisiones", url: "/visitas/revisiones", icon: Icons.MessageSquare, end: false, contador: contadores?.mis_revisiones ?? 0 }] : []),
+                ...(tieneVisitas ? [{ title: "Avisos de revisión", url: "/visitas/revisiones", icon: Icons.MessageSquare, end: false, contador: contadores?.mis_revisiones ?? 0 }] : []),
                 ...(puedeRevisar ? [{ title: "Revisión de visitas", url: "/visitas/revision", icon: Icons.ClipboardCheck, end: false, contador: contadores?.respuestas_nuevas ?? 0 }] : []),
               ].map((item) => (
                 <SidebarMenuItem key={item.title}>

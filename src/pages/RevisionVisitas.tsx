@@ -102,7 +102,7 @@ export default function RevisionVisitas() {
   const [guardando, setGuardando] = useState(false);
   const [nuevaAlAbrir, setNuevaAlAbrir] = useState(false);
   const { data: respuestasNuevas } = useRespuestasNuevas(true);
-  const { data: mensajes } = useMensajesVisita(sel?.id);
+  const { data: mensajes, isError: errorMensajes, refetch: recargarMensajes } = useMensajesVisita(sel?.id);
   useMarcarLeida(sel?.id);
   const invalidarMensajes = useInvalidarMensajes();
   const hilo = (bloqueId: string | null) => (mensajes ?? []).filter((m) => m.bloque_id === bloqueId);
@@ -407,6 +407,12 @@ export default function RevisionVisitas() {
       <Dialog open={!!sel} onOpenChange={(o) => !o && cerrar()}>
         <DialogContent ref={dialogoRef} className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader><DialogTitle>Revisar visita</DialogTitle></DialogHeader>
+          {sel && errorMensajes && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-destructive/40 p-2 text-sm">
+              <span>No se han podido cargar los mensajes.</span>
+              <Button size="sm" variant="outline" onClick={() => recargarMensajes()}>Reintentar</Button>
+            </div>
+          )}
           {sel && cargandoBloques && (
             <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Cargando…</div>
           )}
@@ -427,8 +433,9 @@ export default function RevisionVisitas() {
                 const d = borrador[b.id] ?? { validacion: b.validacion ?? "pendiente", nota: "" };
                 const h = hilo(b.id);
                 const ult = ultimoDe(h);
+                // «Esperando» solo si el último mensaje tiene autor (no importado) y la visita tiene dueño en la app.
                 const marca = ult && (b.validacion ?? "pendiente") === "pendiente"
-                  ? (!ult.es_dueno ? badgeEsperando : nuevaAlAbrir ? badgeRespuesta : null)
+                  ? (!ult.es_dueno && ult.autor_id && sel?.user_id ? badgeEsperando : ult.es_dueno && nuevaAlAbrir ? badgeRespuesta : null)
                   : ult?.es_dueno && nuevaAlAbrir ? badgeRespuesta : null;
                 return (
                 <div key={b.id} className="space-y-2 rounded-md border p-3 text-sm">
