@@ -968,6 +968,9 @@ const { campo, dir } = ordenProductos;
                       ))
                     )}
                     {bloques.length === 0 && v.observaciones && <p className="whitespace-pre-wrap text-sm">{v.observaciones}</p>}
+                    {bloques.length === 0 && (
+                      <MensajesFicha visitaId={v.id} bloqueId={null} puedeEscribir={v.user_id === user?.id || ["admin", "director_comercial", "jefe_de_zona"].includes(role ?? "")} />
+                    )}
                     {bloques.length > 0 && (v.transcripcion || v.observaciones_original) && (
                       <Collapsible>
                         <CollapsibleTrigger className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
