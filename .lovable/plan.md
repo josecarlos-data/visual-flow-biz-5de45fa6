@@ -1,29 +1,34 @@
-# Director comercial gestiona plantillas de visita (sin borrar)
+# Revisión de visitas: el bloque es la unidad de revisión
 
-## Estado comprobado
-- Las tres tablas tienen una política `ALL` "Admins manage…" y una de `SELECT` para aprobados (ambas PERMISSIVE).
-- `/admin/visitas` es `adminOnly` (App.tsx:269); `/admin/objetivos` usa `adminOnly allowedRoles={["director_comercial"]}`.
-- `auditar_cambio()` toma `entidad_id` de `id` (o `key` solo en app_settings). En `motivos_visita` (sin `id`) el evento se registra igual, pero con `entidad_id` vacío: se sabe qué cambió (campos y tabla), no qué plantilla. No falla. Como no se puede modificar la función, lo dejo así; si queréis la clave de la plantilla en Auditoría, sería un cambio aparte en la función. Además, la función ignora cambios sin usuario (correcto aquí, todo pasa por la app).
+## Lo comprobado
+- La función de cálculo actual da prioridad a NO CORRECTO sobre pendiente (confirmado).
+- `enviar()` vuelve a escribir en la visita el estado que tenía al abrir el diálogo (confirmado en el código).
+- Hoy hay **13 visitas** cuyo estado no cuadra con el de sus bloques, y **27 visitas de la app** sin comercial (las 27 tienen usuario, así que se pueden rellenar todas). El número exacto de filas que cambian se dará después de aplicar.
 
-## Cambios
-1. Migración nueva en `drizzle/migrations/` (vía la herramienta de migraciones):
-   - DROP de "Admins manage motivos/motivo_campos/catalogos".
-   - Por tabla, tres políticas PERMISSIVE para `authenticated`:
-     - INSERT (WITH CHECK) y UPDATE (USING + WITH CHECK): `(SELECT public.is_approved(auth.uid())) AND (public.is_admin(auth.uid()) OR public.has_role(auth.uid(), 'director_comercial'::app_role))`
-     - DELETE: `(SELECT public.is_approved(auth.uid())) AND public.is_admin(auth.uid())`
-   - Políticas de SELECT intactas; sin cambios de GRANT ni estructura.
-   - Triggers `AFTER INSERT OR UPDATE OR DELETE ... FOR EACH ROW EXECUTE FUNCTION public.auditar_cambio()` en las tres tablas (`DROP TRIGGER IF EXISTS` previo).
-2. `App.tsx`: `/admin/visitas` con `adminOnly allowedRoles={["director_comercial"]}`, igual que objetivos. Sin filas en dashboards.
-3. `AppSidebar.tsx`: "Plantillas de visita" añadido a los ítems de `esDireccion`.
-4. `AdminVisitas.tsx`:
-   - `<RevisionDatosVisitas />` solo si admin.
-   - "Eliminar plantilla" y "Eliminar" de campo solo para admin, cada uno con AlertDialog: «Los datos ya registrados con este campo/plantilla se quedarán sin etiqueta. Para retirarlo sin perder información, usa "En uso" / "Disponible para los comerciales".»
-   - Revisar que la etiqueta de entidad nueva salga traducida en Auditoría (solo texto en `AdminAuditoria.tsx` si hace falta).
+## 1. Migración (una sola, en drizzle/migrations)
+a. `recalcular_validacion_visita()` con CREATE OR REPLACE y la misma firma: primero pendiente, después NO CORRECTO y si no, CORRECTO. El trigger no se toca.
+b. Un UPDATE de reajuste de `visitas.validacion` en las visitas con bloques donde no coincida (unas 13; entre ellas TALLERES PEREZ GOMEZ y CALEROTRUCKS).
+c. Nueva función `SECURITY DEFINER` (search_path fijo) y trigger BEFORE INSERT en visitas: si `comercial_nombre` es NULL y hay `user_id`, se rellena con `profiles.full_name`. REVOKE EXECUTE a PUBLIC, anon y authenticated. Relleno de las visitas de origen 'app' que lo tengan NULL (27). `visitas_dedupe_idx` no se ve afectado.
+Nota: el reajuste (b) pasa por el trigger de auditoría `auditar_cambio`, y como no hay usuario, ese trigger lo ignora (comportamiento actual). Si en algo hiciera falta otro enfoque, me detengo y lo explico.
 
-## Prueba
-- Sesión de un usuario director_comercial de prueba (pediré cuál si hay varios): menú visible, crear plantilla, añadir/editar campo, retirar con "En uso", añadir opción de catálogo; sin botones de eliminar ni revisión.
-- Bautista (comercial): sin menú y `/admin/visitas` redirige.
-- Comprobar eventos `dato_alta`/`dato_cambio` en Auditoría; borrar después las filas de prueba creadas (como admin vía consulta).
+## 2. Diálogo (RevisionVisitas.tsx, sm:max-w-2xl)
+- En cada bloque, botones «Correcto» y «No correcto» que se ven marcados; pulsar el que está marcado lo devuelve a pendiente. Debajo, la «Nota para el comercial» propia de cada bloque.
+- Campos con la etiqueta de la plantilla y en el orden de `sort_order`; los que no estén en la plantilla van al final con su clave.
+- Los cambios se guardan en el diálogo y los bloques modificados llevan la marca «sin guardar». En el pie: «Marcar pendientes como correctos» (solo los pendientes), «Guardar» y «Guardar y siguiente» (la siguiente de la lista filtrada). Si cierras con cambios, pide confirmación.
+- Al guardar: solo se actualizan los bloques que han cambiado (validacion y nota_revision); en la visita solo observaciones y, si toca, la situación de «Justificar caída». En visitas con bloques nunca se escribe `visitas.validacion`.
+- Se quitan la «Nota de revisión» de la visita y los botones «Validar»/«Marcar no correcta». En visitas sin bloques se queda como ahora.
+
+## 3. Lista
+- Filtro «Comercial» junto a Motivo, con los nombres de las visitas cargadas, en orden alfabético.
+- En cada fila, el comercial y el estado junto a cada motivo: ✓ correcto, ✗ no correcto y sin marca si está pendiente.
 
 ## No se toca
-Estructura de tablas, `visita-voz`, `useMotivos`, `auditar_cambio()`. Sin drizzle-kit push/generate.
+`visita_bloques_guard_revision`, las políticas, Reanalizar, ClienteDetalle ni el registro de visitas. No se usa drizzle-kit push ni generate.
+
+## Prueba (como admin)
+- Comprobar que TALLERES PEREZ GOMEZ y CALEROTRUCKS ya no salen en Pendientes.
+- Crear una visita de prueba propia en un domingo, con dos bloques, y comprobar:
+  - Correcto + nota y No correcto + otra nota: al guardar, cada bloque conserva su nota y la visita sale en No correctas.
+  - No correcto + pendiente: la visita sigue en Pendientes.
+  - «Marcar pendientes como correctos» no cambia el bloque que está en No correcto.
+- Comprobar que se ve el comercial y que el filtro funciona. Al terminar, borrar la visita de prueba y sus bloques, y no tocar ninguna visita real.
