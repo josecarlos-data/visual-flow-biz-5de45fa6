@@ -135,53 +135,89 @@ export default function RevisionVisitas() {
   const abrir = (v: Visita) => {
     setSel(v);
     setNota(v.nota_revision ?? "");
+    setValVisita(v.validacion ?? "pendiente");
     setObservaciones(v.observaciones ?? "");
     setJustificar(false);
     setEtiquetaSituacion("Caída justificada");
+    const b: Record<string, Borrador> = {};
+    for (const x of bloquesDe(v)) b[x.id] = { validacion: x.validacion ?? "pendiente", nota: x.nota_revision ?? "" };
+    setBorrador(b);
   };
 
-  /** Valida (o rechaza) todos los bloques de la visita de golpe. */
-  const enviar = async (validacion: string) => {
+  const bloqueCambiado = (b: VisitaBloque) => {
+    const d = borrador[b.id];
+    return !!d && (d.validacion !== (b.validacion ?? "pendiente") || d.nota.trim() !== (b.nota_revision ?? "").trim());
+  };
+  const hayCambios = !!sel && (
+    bloquesDe(sel).some(bloqueCambiado) ||
+    observaciones !== (sel.observaciones ?? "") ||
+    justificar ||
+    (bloquesDe(sel).length === 0 && (nota !== (sel.nota_revision ?? "") || valVisita !== (sel.validacion ?? "pendiente")))
+  );
+
+  const setBloque = (id: string, p: Partial<Borrador>) =>
+    setBorrador((prev) => ({ ...prev, [id]: { ...prev[id], ...p } }));
+  const alternar = (id: string, v: string) =>
+    setBloque(id, { validacion: borrador[id]?.validacion === v ? "pendiente" : v });
+  const marcarPendientesCorrectos = () =>
+    setBorrador((prev) => Object.fromEntries(Object.entries(prev).map(([k, d]) => [k, d.validacion === "pendiente" ? { ...d, validacion: "CORRECTO" } : d])));
+
+  const cerrar = () => {
+    if (hayCambios && !confirm("Hay cambios sin guardar. ¿Cerrar y descartarlos?")) return;
+    setSel(null);
+  };
+
+  /** Guarda solo lo cambiado. En visitas con bloques nunca escribe visitas.validacion. */
+  const guardar = async (siguiente: boolean) => {
     if (!sel) return;
+    // La siguiente se decide ANTES de guardar: al guardar la lista se reordena.
+    const idx = filtradas.findIndex((v) => v.id === sel.id);
+    const sig = siguiente ? filtradas.slice(idx + 1)[0] ?? null : null;
+    setGuardando(true);
     try {
       const bs = bloquesDe(sel);
-      for (const b of bs) {
-        await revisarBloque.mutateAsync({ id: b.id, validacion, nota_revision: nota || null });
+      for (const b of bs.filter(bloqueCambiado)) {
+        const d = borrador[b.id];
+        await revisarBloque.mutateAsync({ id: b.id, validacion: d.validacion, nota_revision: d.nota.trim() || null });
       }
-      // La validación de la cabecera la deriva el trigger a partir de los bloques.
-      await revisar.mutateAsync({
-        id: sel.id,
-        validacion: bs.length ? sel.validacion ?? validacion : validacion,
-        nota_revision: nota || null,
-        observaciones: observaciones || null,
-      });
+      if (bs.length) {
+        if (observaciones !== (sel.observaciones ?? "")) {
+          await revisar.mutateAsync({ id: sel.id, observaciones: observaciones || null });
+        }
+      } else if (hayCambios && !justificar || nota !== (sel.nota_revision ?? "") || valVisita !== (sel.validacion ?? "pendiente") || observaciones !== (sel.observaciones ?? "")) {
+        await revisar.mutateAsync({ id: sel.id, validacion: valVisita, nota_revision: nota || null, observaciones: observaciones || null });
+      }
       if (justificar && sel.cod_cliente) {
         await guardarSituacion.mutateAsync({
           cod_cliente: sel.cod_cliente,
           etiqueta: etiquetaSituacion || "Caída justificada",
           categoria: "perdida_cliente_final",
           efecto: "justificada",
-          nota: nota || observaciones || null,
+          nota: observaciones || null,
           activo: true,
           desde: hoyISO(),
         });
       }
-      toast({ title: validacion === "CORRECTO" ? "Visita validada" : "Visita marcada como no correcta" });
-      setSel(null);
+      toast({ title: "Revisión guardada" });
+      if (sig) abrir(sig); else setSel(null);
     } catch (e) {
       toast({ title: "No se ha podido guardar", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setGuardando(false);
     }
   };
 
-  /** Validación de un bloque concreto; el resto de bloques no se tocan. */
-  const enviarBloque = async (b: VisitaBloque, validacion: string) => {
-    try {
-      await revisarBloque.mutateAsync({ id: b.id, validacion });
-      toast({ title: validacion === "CORRECTO" ? "Bloque validado" : "Bloque marcado como no correcto" });
-    } catch (e) {
-      toast({ title: "No se ha podido guardar", description: (e as Error).message, variant: "destructive" });
-    }
+  /** Etiquetas y orden de la plantilla; lo que no esté en ella, al final con su clave. */
+  const camposOrdenados = (b: VisitaBloque) => {
+    const def = (motivos?.find((m) => m.key === b.motivo_key)?.campos ?? []).slice().sort((x, y) => x.sort_order - y.sort_order);
+    const vals = Object.entries(b.campos ?? {}).filter(([, val]) => val != null && val !== "");
+    const mapa = new Map(vals);
+    const out: [string, string, unknown][] = [];
+    for (const c of def) if (mapa.has(c.campo_key)) { out.push([c.campo_key, c.label, mapa.get(c.campo_key)]); mapa.delete(c.campo_key); }
+    for (const [k, v] of mapa) out.push([k, k, v]);
+    return out;
   };
+  const fmt = (v: unknown) => (Array.isArray(v) ? v.join(", ") : typeof v === "boolean" ? (v ? "Sí" : "No") : typeof v === "object" ? JSON.stringify(v) : String(v));
 
 
   return (
