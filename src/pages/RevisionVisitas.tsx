@@ -47,6 +47,13 @@ const badgeValidacion = (v: string | null) => {
   return <Badge variant="outline" className="gap-1"><Clock className="h-3 w-3" /> Pendiente</Badge>;
 };
 
+type Borrador = { validacion: string; nota: string };
+
+const marcaBloque = (v: string | null) =>
+  v === "CORRECTO" ? <CheckCircle2 className="inline h-3 w-3 text-primary" aria-label="correcto" />
+  : v === "NO CORRECTO" ? <XCircle className="inline h-3 w-3 text-destructive" aria-label="no correcto" />
+  : null;
+
 const badgeImportado = <Badge variant="outline" className="gap-1 border-primary/40 text-primary"><FileDown className="h-3 w-3" /> Importado</Badge>;
 
 
@@ -77,13 +84,16 @@ export default function RevisionVisitas() {
   const soloDudas = get("dudas") === "1";
   const desde = get("desde");
   const hasta = get("hasta");
-  const hayFiltros = ["estado", "q", "origen", "motivo", "dudas", "desde", "hasta"].some((k) => params.get(k));
+  const hayFiltros = ["estado", "q", "origen", "motivo", "comercial", "dudas", "desde", "hasta"].some((k) => params.get(k));
 
   const [sel, setSel] = useState<Visita | null>(null);
   const [nota, setNota] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [justificar, setJustificar] = useState(false);
   const [etiquetaSituacion, setEtiquetaSituacion] = useState("");
+  const [valVisita, setValVisita] = useState("pendiente");
+  const [borrador, setBorrador] = useState<Record<string, Borrador>>({});
+  const [guardando, setGuardando] = useState(false);
 
   const nombrePorCod = useMemo(() => {
     const m = new Map<number, string>();
@@ -101,6 +111,16 @@ export default function RevisionVisitas() {
     if (!bs.length) return nombreMotivo(v.motivo_key);
     return bs.map((b) => nombreMotivo(b.motivo_key)).join(" + ");
   };
+  const motivosConEstado = (v: Visita) => {
+    const bs = bloquesDe(v);
+    if (!bs.length) return <>{nombreMotivo(v.motivo_key)}</>;
+    return <>{bs.map((b, i) => <span key={b.id}>{i > 0 && " + "}{nombreMotivo(b.motivo_key)} {marcaBloque(b.validacion)}</span>)}</>;
+  };
+  const comercialFiltro = get("comercial", "todos");
+  const comerciales = useMemo(
+    () => [...new Set((visitas ?? []).map((v) => v.comercial_nombre).filter((x): x is string => !!x))].sort((a, b) => a.localeCompare(b, "es")),
+    [visitas],
+  );
   const visitaImportada = (v: Visita) => bloquesDe(v).some(esExterno);
 
   const filtradas = useMemo(() => {
@@ -110,6 +130,7 @@ export default function RevisionVisitas() {
       if (estado !== "todas" && val !== estado) return false;
       if (desde && v.fecha < desde) return false;
       if (hasta && v.fecha > hasta) return false;
+      if (comercialFiltro !== "todos" && v.comercial_nombre !== comercialFiltro) return false;
 
       const bs = bloquesMap?.get(v.id) ?? [];
       if (motivoFiltro !== "todos") {
@@ -126,7 +147,7 @@ export default function RevisionVisitas() {
         nombreMotivo(v.motivo_key).toLowerCase().includes(term)
       );
     });
-  }, [visitas, estado, q, motivoFiltro, soloDudas, desde, hasta, bloquesMap, nombrePorCod, motivos]);
+  }, [visitas, estado, q, motivoFiltro, comercialFiltro, soloDudas, desde, hasta, bloquesMap, nombrePorCod, motivos]);
 
   const pendientes = filtradas.filter((v) => (v.validacion ?? "pendiente") === "pendiente").length;
 
@@ -184,7 +205,7 @@ export default function RevisionVisitas() {
         if (observaciones !== (sel.observaciones ?? "")) {
           await revisar.mutateAsync({ id: sel.id, observaciones: observaciones || null });
         }
-      } else if (hayCambios && !justificar || nota !== (sel.nota_revision ?? "") || valVisita !== (sel.validacion ?? "pendiente") || observaciones !== (sel.observaciones ?? "")) {
+      } else if (nota !== (sel.nota_revision ?? "") || valVisita !== (sel.validacion ?? "pendiente") || observaciones !== (sel.observaciones ?? "")) {
         await revisar.mutateAsync({ id: sel.id, validacion: valVisita, nota_revision: nota || null, observaciones: observaciones || null });
       }
       if (justificar && sel.cod_cliente) {
@@ -268,6 +289,17 @@ export default function RevisionVisitas() {
           </div>
 
           <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Comercial</Label>
+            <Select value={comercialFiltro} onValueChange={(v) => setParam("comercial", v)}>
+              <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos los comerciales</SelectItem>
+                {comerciales.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Desde</Label>
             <Input type="date" className="w-40" value={desde} onChange={(e) => setParam("desde", e.target.value)} />
           </div>
@@ -307,8 +339,8 @@ export default function RevisionVisitas() {
                     {v.cod_cliente ? nombrePorCod.get(v.cod_cliente) ?? `Cliente ${v.cod_cliente}` : v.cliente_externo ?? "Sin cliente"}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {fechaCorta(v.fecha)}{v.hora ? ` · ${v.hora.slice(0, 5)}` : ""} · {resumenMotivos(v)}
-                    {v.comercial_nombre ? ` · ${v.comercial_nombre}` : ""}
+                    {fechaCorta(v.fecha)}{v.hora ? ` · ${v.hora.slice(0, 5)}` : ""} · {motivosConEstado(v)}
+                    {` · ${v.comercial_nombre ?? "Sin comercial"}`}
                   </p>
                   {v.observaciones && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{v.observaciones}</p>}
                 </button>
@@ -328,8 +360,8 @@ export default function RevisionVisitas() {
         </div>
       )}
 
-      <Dialog open={!!sel} onOpenChange={(o) => !o && setSel(null)}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+      <Dialog open={!!sel} onOpenChange={(o) => !o && cerrar()}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader><DialogTitle>Revisar visita</DialogTitle></DialogHeader>
           {sel && (
             <div className="space-y-4">
@@ -344,35 +376,39 @@ export default function RevisionVisitas() {
               </div>
 
               {/* Un bloque por plantilla: se valida cada uno por separado. */}
-              {bloquesDe(sel).map((b, i) => (
+              {bloquesDe(sel).map((b, i) => {
+                const d = borrador[b.id] ?? { validacion: b.validacion ?? "pendiente", nota: b.nota_revision ?? "" };
+                return (
                 <div key={b.id} className="space-y-2 rounded-md border p-3 text-sm">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-medium">{i + 1}. {nombreMotivo(b.motivo_key)}</p>
-                    <span className="flex items-center gap-2">{esExterno(b) && badgeImportado}{badgeValidacion(b.validacion)}</span>
+                    <span className="flex items-center gap-2">
+                      {bloqueCambiado(b) && <Badge variant="outline" className="border-warning text-xs">sin guardar</Badge>}
+                      {esExterno(b) && badgeImportado}{badgeValidacion(d.validacion)}
+                    </span>
                   </div>
-                  {Object.entries(b.campos ?? {}).filter(([, val]) => val != null && val !== "").map(([k, val]) => (
+                  {camposOrdenados(b).map(([k, label, val]) => (
                     <p key={k} className="flex justify-between gap-3">
-                      <span className="text-muted-foreground">{k}</span>
-                      <span className="text-right font-medium">{String(val)}</span>
+                      <span className="text-muted-foreground">{label}</span>
+                      <span className="text-right font-medium">{fmt(val)}</span>
                     </p>
                   ))}
-                  {b.nota_revision && (
-                    <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-destructive">Nota de revisión</p>
-                      <p className="whitespace-pre-wrap text-sm">{b.nota_revision}</p>
-                    </div>
-                  )}
 
                   <div className="flex gap-2 pt-1">
-                    <Button size="sm" variant="outline" disabled={revisarBloque.isPending} onClick={() => enviarBloque(b, "NO CORRECTO")}>
-                      No correcto
+                    <Button size="sm" variant={d.validacion === "CORRECTO" ? "default" : "outline"} aria-pressed={d.validacion === "CORRECTO"} onClick={() => alternar(b.id, "CORRECTO")}>
+                      <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Correcto
                     </Button>
-                    <Button size="sm" disabled={revisarBloque.isPending} onClick={() => enviarBloque(b, "CORRECTO")}>
-                      Validar bloque
+                    <Button size="sm" variant={d.validacion === "NO CORRECTO" ? "destructive" : "outline"} aria-pressed={d.validacion === "NO CORRECTO"} onClick={() => alternar(b.id, "NO CORRECTO")}>
+                      <XCircle className="mr-1 h-3.5 w-3.5" /> No correcto
                     </Button>
                   </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Nota para el comercial (opcional)</Label>
+                    <Textarea rows={2} value={d.nota} onChange={(e) => setBloque(b.id, { nota: e.target.value })} placeholder="Qué falta o qué corregir…" />
+                  </div>
                 </div>
-              ))}
+                );
+              })}
 
               {bloquesDe(sel).length === 0 && Object.keys(sel.campos ?? {}).length > 0 && (
                 <div className="space-y-1 rounded-md border p-3 text-sm">
@@ -426,10 +462,16 @@ export default function RevisionVisitas() {
                 <Textarea rows={3} value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
               </div>
 
-              <div className="space-y-1.5">
-                <Label>Nota de revisión</Label>
-                <Textarea rows={2} value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Qué falta o qué corregir…" />
-              </div>
+              {bloquesDe(sel).length === 0 && (
+                <div className="space-y-2 rounded-md border p-3">
+                  <div className="flex gap-2">
+                    <Button size="sm" variant={valVisita === "CORRECTO" ? "default" : "outline"} onClick={() => setValVisita(valVisita === "CORRECTO" ? "pendiente" : "CORRECTO")}>Correcta</Button>
+                    <Button size="sm" variant={valVisita === "NO CORRECTO" ? "destructive" : "outline"} onClick={() => setValVisita(valVisita === "NO CORRECTO" ? "pendiente" : "NO CORRECTO")}>No correcta</Button>
+                  </div>
+                  <Label>Nota de revisión</Label>
+                  <Textarea rows={2} value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Qué falta o qué corregir…" />
+                </div>
+              )}
 
               {sel.cod_cliente && (
                 <div className="space-y-2 rounded-md border p-3">
@@ -449,8 +491,13 @@ export default function RevisionVisitas() {
           )}
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => enviar("NO CORRECTO")} disabled={revisar.isPending}>Marcar no correcta</Button>
-            <Button onClick={() => enviar("CORRECTO")} disabled={revisar.isPending}>Validar</Button>
+            {sel && bloquesDe(sel).length > 0 && (
+              <Button variant="outline" className="sm:mr-auto" onClick={marcarPendientesCorrectos} disabled={guardando}>Marcar pendientes como correctos</Button>
+            )}
+            <Button variant="outline" onClick={() => guardar(false)} disabled={guardando || !hayCambios}>Guardar</Button>
+            <Button onClick={() => guardar(true)} disabled={guardando}>
+              {guardando && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}Guardar y siguiente
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
