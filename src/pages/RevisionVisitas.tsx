@@ -407,6 +407,12 @@ export default function RevisionVisitas() {
       <Dialog open={!!sel} onOpenChange={(o) => !o && cerrar()}>
         <DialogContent ref={dialogoRef} className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader><DialogTitle>Revisar visita</DialogTitle></DialogHeader>
+          {sel && errorMensajes && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-destructive/40 p-2 text-sm">
+              <span>No se han podido cargar los mensajes.</span>
+              <Button size="sm" variant="outline" onClick={() => recargarMensajes()}>Reintentar</Button>
+            </div>
+          )}
           {sel && cargandoBloques && (
             <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Cargando…</div>
           )}
