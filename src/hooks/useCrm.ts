@@ -646,9 +646,11 @@ export function useRevisionMutations() {
   };
 
   const revisar = useMutation({
-    mutationFn: async (v: { id: string; validacion: string; nota_revision?: string | null; observaciones?: string | null; campos?: Record<string, unknown> }) => {
+    /** En visitas con bloques NO se envía `validacion`: la deriva el trigger de los bloques. */
+    mutationFn: async (v: { id: string; validacion?: string; nota_revision?: string | null; observaciones?: string | null; campos?: Record<string, unknown> }) => {
       const { data: auth } = await supabase.auth.getUser();
       const { id, ...rest } = v;
+      if (rest.validacion === undefined) delete rest.validacion;
       const { error } = await supabase
         .from("visitas")
         .update({ ...rest, revisado_por: auth?.user?.id ?? null, revisado_en: new Date().toISOString() } as never)

@@ -47,6 +47,13 @@ const badgeValidacion = (v: string | null) => {
   return <Badge variant="outline" className="gap-1"><Clock className="h-3 w-3" /> Pendiente</Badge>;
 };
 
+type Borrador = { validacion: string; nota: string };
+
+const marcaBloque = (v: string | null) =>
+  v === "CORRECTO" ? <CheckCircle2 className="inline h-3 w-3 text-primary" aria-label="correcto" />
+  : v === "NO CORRECTO" ? <XCircle className="inline h-3 w-3 text-destructive" aria-label="no correcto" />
+  : null;
+
 const badgeImportado = <Badge variant="outline" className="gap-1 border-primary/40 text-primary"><FileDown className="h-3 w-3" /> Importado</Badge>;
 
 
@@ -77,13 +84,16 @@ export default function RevisionVisitas() {
   const soloDudas = get("dudas") === "1";
   const desde = get("desde");
   const hasta = get("hasta");
-  const hayFiltros = ["estado", "q", "origen", "motivo", "dudas", "desde", "hasta"].some((k) => params.get(k));
+  const hayFiltros = ["estado", "q", "origen", "motivo", "comercial", "dudas", "desde", "hasta"].some((k) => params.get(k));
 
   const [sel, setSel] = useState<Visita | null>(null);
   const [nota, setNota] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [justificar, setJustificar] = useState(false);
   const [etiquetaSituacion, setEtiquetaSituacion] = useState("");
+  const [valVisita, setValVisita] = useState("pendiente");
+  const [borrador, setBorrador] = useState<Record<string, Borrador>>({});
+  const [guardando, setGuardando] = useState(false);
 
   const nombrePorCod = useMemo(() => {
     const m = new Map<number, string>();
@@ -101,6 +111,16 @@ export default function RevisionVisitas() {
     if (!bs.length) return nombreMotivo(v.motivo_key);
     return bs.map((b) => nombreMotivo(b.motivo_key)).join(" + ");
   };
+  const motivosConEstado = (v: Visita) => {
+    const bs = bloquesDe(v);
+    if (!bs.length) return <>{nombreMotivo(v.motivo_key)}</>;
+    return <>{bs.map((b, i) => <span key={b.id}>{i > 0 && " + "}{nombreMotivo(b.motivo_key)} {marcaBloque(b.validacion)}</span>)}</>;
+  };
+  const comercialFiltro = get("comercial", "todos");
+  const comerciales = useMemo(
+    () => [...new Set((visitas ?? []).map((v) => v.comercial_nombre).filter((x): x is string => !!x))].sort((a, b) => a.localeCompare(b, "es")),
+    [visitas],
+  );
   const visitaImportada = (v: Visita) => bloquesDe(v).some(esExterno);
 
   const filtradas = useMemo(() => {
@@ -110,6 +130,7 @@ export default function RevisionVisitas() {
       if (estado !== "todas" && val !== estado) return false;
       if (desde && v.fecha < desde) return false;
       if (hasta && v.fecha > hasta) return false;
+      if (comercialFiltro !== "todos" && v.comercial_nombre !== comercialFiltro) return false;
 
       const bs = bloquesMap?.get(v.id) ?? [];
       if (motivoFiltro !== "todos") {
@@ -126,7 +147,7 @@ export default function RevisionVisitas() {
         nombreMotivo(v.motivo_key).toLowerCase().includes(term)
       );
     });
-  }, [visitas, estado, q, motivoFiltro, soloDudas, desde, hasta, bloquesMap, nombrePorCod, motivos]);
+  }, [visitas, estado, q, motivoFiltro, comercialFiltro, soloDudas, desde, hasta, bloquesMap, nombrePorCod, motivos]);
 
   const pendientes = filtradas.filter((v) => (v.validacion ?? "pendiente") === "pendiente").length;
 
@@ -135,53 +156,89 @@ export default function RevisionVisitas() {
   const abrir = (v: Visita) => {
     setSel(v);
     setNota(v.nota_revision ?? "");
+    setValVisita(v.validacion ?? "pendiente");
     setObservaciones(v.observaciones ?? "");
     setJustificar(false);
     setEtiquetaSituacion("Caída justificada");
+    const b: Record<string, Borrador> = {};
+    for (const x of bloquesDe(v)) b[x.id] = { validacion: x.validacion ?? "pendiente", nota: x.nota_revision ?? "" };
+    setBorrador(b);
   };
 
-  /** Valida (o rechaza) todos los bloques de la visita de golpe. */
-  const enviar = async (validacion: string) => {
+  const bloqueCambiado = (b: VisitaBloque) => {
+    const d = borrador[b.id];
+    return !!d && (d.validacion !== (b.validacion ?? "pendiente") || d.nota.trim() !== (b.nota_revision ?? "").trim());
+  };
+  const hayCambios = !!sel && (
+    bloquesDe(sel).some(bloqueCambiado) ||
+    observaciones !== (sel.observaciones ?? "") ||
+    justificar ||
+    (bloquesDe(sel).length === 0 && (nota !== (sel.nota_revision ?? "") || valVisita !== (sel.validacion ?? "pendiente")))
+  );
+
+  const setBloque = (id: string, p: Partial<Borrador>) =>
+    setBorrador((prev) => ({ ...prev, [id]: { ...prev[id], ...p } }));
+  const alternar = (id: string, v: string) =>
+    setBloque(id, { validacion: borrador[id]?.validacion === v ? "pendiente" : v });
+  const marcarPendientesCorrectos = () =>
+    setBorrador((prev) => Object.fromEntries(Object.entries(prev).map(([k, d]) => [k, d.validacion === "pendiente" ? { ...d, validacion: "CORRECTO" } : d])));
+
+  const cerrar = () => {
+    if (hayCambios && !confirm("Hay cambios sin guardar. ¿Cerrar y descartarlos?")) return;
+    setSel(null);
+  };
+
+  /** Guarda solo lo cambiado. En visitas con bloques nunca escribe visitas.validacion. */
+  const guardar = async (siguiente: boolean) => {
     if (!sel) return;
+    // La siguiente se decide ANTES de guardar: al guardar la lista se reordena.
+    const idx = filtradas.findIndex((v) => v.id === sel.id);
+    const sig = siguiente ? filtradas.slice(idx + 1)[0] ?? null : null;
+    setGuardando(true);
     try {
       const bs = bloquesDe(sel);
-      for (const b of bs) {
-        await revisarBloque.mutateAsync({ id: b.id, validacion, nota_revision: nota || null });
+      for (const b of bs.filter(bloqueCambiado)) {
+        const d = borrador[b.id];
+        await revisarBloque.mutateAsync({ id: b.id, validacion: d.validacion, nota_revision: d.nota.trim() || null });
       }
-      // La validación de la cabecera la deriva el trigger a partir de los bloques.
-      await revisar.mutateAsync({
-        id: sel.id,
-        validacion: bs.length ? sel.validacion ?? validacion : validacion,
-        nota_revision: nota || null,
-        observaciones: observaciones || null,
-      });
+      if (bs.length) {
+        if (observaciones !== (sel.observaciones ?? "")) {
+          await revisar.mutateAsync({ id: sel.id, observaciones: observaciones || null });
+        }
+      } else if (nota !== (sel.nota_revision ?? "") || valVisita !== (sel.validacion ?? "pendiente") || observaciones !== (sel.observaciones ?? "")) {
+        await revisar.mutateAsync({ id: sel.id, validacion: valVisita, nota_revision: nota || null, observaciones: observaciones || null });
+      }
       if (justificar && sel.cod_cliente) {
         await guardarSituacion.mutateAsync({
           cod_cliente: sel.cod_cliente,
           etiqueta: etiquetaSituacion || "Caída justificada",
           categoria: "perdida_cliente_final",
           efecto: "justificada",
-          nota: nota || observaciones || null,
+          nota: observaciones || null,
           activo: true,
           desde: hoyISO(),
         });
       }
-      toast({ title: validacion === "CORRECTO" ? "Visita validada" : "Visita marcada como no correcta" });
-      setSel(null);
+      toast({ title: "Revisión guardada" });
+      if (sig) abrir(sig); else setSel(null);
     } catch (e) {
       toast({ title: "No se ha podido guardar", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setGuardando(false);
     }
   };
 
-  /** Validación de un bloque concreto; el resto de bloques no se tocan. */
-  const enviarBloque = async (b: VisitaBloque, validacion: string) => {
-    try {
-      await revisarBloque.mutateAsync({ id: b.id, validacion });
-      toast({ title: validacion === "CORRECTO" ? "Bloque validado" : "Bloque marcado como no correcto" });
-    } catch (e) {
-      toast({ title: "No se ha podido guardar", description: (e as Error).message, variant: "destructive" });
-    }
+  /** Etiquetas y orden de la plantilla; lo que no esté en ella, al final con su clave. */
+  const camposOrdenados = (b: VisitaBloque) => {
+    const def = (motivos?.find((m) => m.key === b.motivo_key)?.campos ?? []).slice().sort((x, y) => x.sort_order - y.sort_order);
+    const vals = Object.entries(b.campos ?? {}).filter(([, val]) => val != null && val !== "");
+    const mapa = new Map(vals);
+    const out: [string, string, unknown][] = [];
+    for (const c of def) if (mapa.has(c.campo_key)) { out.push([c.campo_key, c.label, mapa.get(c.campo_key)]); mapa.delete(c.campo_key); }
+    for (const [k, v] of mapa) out.push([k, k, v]);
+    return out;
   };
+  const fmt = (v: unknown) => (Array.isArray(v) ? v.join(", ") : typeof v === "boolean" ? (v ? "Sí" : "No") : typeof v === "object" ? JSON.stringify(v) : String(v));
 
 
   return (
@@ -232,6 +289,17 @@ export default function RevisionVisitas() {
           </div>
 
           <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Comercial</Label>
+            <Select value={comercialFiltro} onValueChange={(v) => setParam("comercial", v)}>
+              <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos los comerciales</SelectItem>
+                {comerciales.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Desde</Label>
             <Input type="date" className="w-40" value={desde} onChange={(e) => setParam("desde", e.target.value)} />
           </div>
@@ -271,8 +339,8 @@ export default function RevisionVisitas() {
                     {v.cod_cliente ? nombrePorCod.get(v.cod_cliente) ?? `Cliente ${v.cod_cliente}` : v.cliente_externo ?? "Sin cliente"}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {fechaCorta(v.fecha)}{v.hora ? ` · ${v.hora.slice(0, 5)}` : ""} · {resumenMotivos(v)}
-                    {v.comercial_nombre ? ` · ${v.comercial_nombre}` : ""}
+                    {fechaCorta(v.fecha)}{v.hora ? ` · ${v.hora.slice(0, 5)}` : ""} · {motivosConEstado(v)}
+                    {` · ${v.comercial_nombre ?? "Sin comercial"}`}
                   </p>
                   {v.observaciones && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{v.observaciones}</p>}
                 </button>
@@ -292,8 +360,8 @@ export default function RevisionVisitas() {
         </div>
       )}
 
-      <Dialog open={!!sel} onOpenChange={(o) => !o && setSel(null)}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+      <Dialog open={!!sel} onOpenChange={(o) => !o && cerrar()}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader><DialogTitle>Revisar visita</DialogTitle></DialogHeader>
           {sel && (
             <div className="space-y-4">
@@ -308,35 +376,39 @@ export default function RevisionVisitas() {
               </div>
 
               {/* Un bloque por plantilla: se valida cada uno por separado. */}
-              {bloquesDe(sel).map((b, i) => (
+              {bloquesDe(sel).map((b, i) => {
+                const d = borrador[b.id] ?? { validacion: b.validacion ?? "pendiente", nota: b.nota_revision ?? "" };
+                return (
                 <div key={b.id} className="space-y-2 rounded-md border p-3 text-sm">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-medium">{i + 1}. {nombreMotivo(b.motivo_key)}</p>
-                    <span className="flex items-center gap-2">{esExterno(b) && badgeImportado}{badgeValidacion(b.validacion)}</span>
+                    <span className="flex items-center gap-2">
+                      {bloqueCambiado(b) && <Badge variant="outline" className="text-xs">sin guardar</Badge>}
+                      {esExterno(b) && badgeImportado}{badgeValidacion(d.validacion)}
+                    </span>
                   </div>
-                  {Object.entries(b.campos ?? {}).filter(([, val]) => val != null && val !== "").map(([k, val]) => (
+                  {camposOrdenados(b).map(([k, label, val]) => (
                     <p key={k} className="flex justify-between gap-3">
-                      <span className="text-muted-foreground">{k}</span>
-                      <span className="text-right font-medium">{String(val)}</span>
+                      <span className="text-muted-foreground">{label}</span>
+                      <span className="text-right font-medium">{fmt(val)}</span>
                     </p>
                   ))}
-                  {b.nota_revision && (
-                    <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-destructive">Nota de revisión</p>
-                      <p className="whitespace-pre-wrap text-sm">{b.nota_revision}</p>
-                    </div>
-                  )}
 
                   <div className="flex gap-2 pt-1">
-                    <Button size="sm" variant="outline" disabled={revisarBloque.isPending} onClick={() => enviarBloque(b, "NO CORRECTO")}>
-                      No correcto
+                    <Button size="sm" variant={d.validacion === "CORRECTO" ? "default" : "outline"} aria-pressed={d.validacion === "CORRECTO"} onClick={() => alternar(b.id, "CORRECTO")}>
+                      <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Correcto
                     </Button>
-                    <Button size="sm" disabled={revisarBloque.isPending} onClick={() => enviarBloque(b, "CORRECTO")}>
-                      Validar bloque
+                    <Button size="sm" variant={d.validacion === "NO CORRECTO" ? "destructive" : "outline"} aria-pressed={d.validacion === "NO CORRECTO"} onClick={() => alternar(b.id, "NO CORRECTO")}>
+                      <XCircle className="mr-1 h-3.5 w-3.5" /> No correcto
                     </Button>
                   </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Nota para el comercial (opcional)</Label>
+                    <Textarea rows={2} value={d.nota} onChange={(e) => setBloque(b.id, { nota: e.target.value })} placeholder="Qué falta o qué corregir…" />
+                  </div>
                 </div>
-              ))}
+                );
+              })}
 
               {bloquesDe(sel).length === 0 && Object.keys(sel.campos ?? {}).length > 0 && (
                 <div className="space-y-1 rounded-md border p-3 text-sm">
@@ -390,10 +462,16 @@ export default function RevisionVisitas() {
                 <Textarea rows={3} value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
               </div>
 
-              <div className="space-y-1.5">
-                <Label>Nota de revisión</Label>
-                <Textarea rows={2} value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Qué falta o qué corregir…" />
-              </div>
+              {bloquesDe(sel).length === 0 && (
+                <div className="space-y-2 rounded-md border p-3">
+                  <div className="flex gap-2">
+                    <Button size="sm" variant={valVisita === "CORRECTO" ? "default" : "outline"} onClick={() => setValVisita(valVisita === "CORRECTO" ? "pendiente" : "CORRECTO")}>Correcta</Button>
+                    <Button size="sm" variant={valVisita === "NO CORRECTO" ? "destructive" : "outline"} onClick={() => setValVisita(valVisita === "NO CORRECTO" ? "pendiente" : "NO CORRECTO")}>No correcta</Button>
+                  </div>
+                  <Label>Nota de revisión</Label>
+                  <Textarea rows={2} value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Qué falta o qué corregir…" />
+                </div>
+              )}
 
               {sel.cod_cliente && (
                 <div className="space-y-2 rounded-md border p-3">
@@ -413,8 +491,13 @@ export default function RevisionVisitas() {
           )}
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => enviar("NO CORRECTO")} disabled={revisar.isPending}>Marcar no correcta</Button>
-            <Button onClick={() => enviar("CORRECTO")} disabled={revisar.isPending}>Validar</Button>
+            {sel && bloquesDe(sel).length > 0 && (
+              <Button variant="outline" className="sm:mr-auto" onClick={marcarPendientesCorrectos} disabled={guardando}>Marcar pendientes como correctos</Button>
+            )}
+            <Button variant="outline" onClick={() => guardar(false)} disabled={guardando || !hayCambios}>Guardar</Button>
+            <Button onClick={() => guardar(true)} disabled={guardando}>
+              {guardando && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}Guardar y siguiente
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
