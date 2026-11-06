@@ -50,5 +50,5 @@
 - [x] Revisión de visitas por bloque (nota y estado por bloque, filtro Comercial, comercial automático)
 - [x] Prueba de la revisión por bloque con visita PRUEBA (borrada)
 - [x] Conversación por bloque revisor ↔ comercial (Mis revisiones, contadores, ficha). Notas Gespromo pasadas como «Gespromo (importado)»
-- [ ] Pasar las 9 notas de la app a mensajes (esperando a que el usuario diga cuáles)
-- [ ] Prueba con visita PRUEBA de Bautista en domingo (tras decidir las 9 notas)
+- [x] Las 9 notas de la app se quedan como histórico (eran pruebas)
+- [x] Prueba de conversación con visita PRUEBA (borrada). Pendiente: probar las pantallas con sesión real
