@@ -929,6 +929,14 @@ const { campo, dir } = ordenProductos;
             </Card>
           )}
 
+          {mensajesFicha.isError && (
+            <Card className="border-destructive/40">
+              <CardContent className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
+                <span>No se han podido cargar los mensajes de revisión.</span>
+                <Button size="sm" variant="outline" onClick={() => mensajesFicha.refetch()}>Reintentar</Button>
+              </CardContent>
+            </Card>
+          )}
           {!visitas || visitas.length === 0 ? (
             <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Sin visitas registradas.</CardContent></Card>
           ) : (
@@ -955,7 +963,7 @@ const { campo, dir } = ordenProductos;
                               {String(val)}
                             </p>
                           ))}
-                          <MensajesFicha visitaId={v.id} bloqueId={b.id} puedeEscribir={v.user_id === user?.id || ["admin", "director_comercial", "jefe_de_zona"].includes(role ?? "")} />
+                          <MensajesFicha visitaId={v.id} bloqueId={b.id} hilo={mensajesFicha} />
                         </div>
 
                       ))
@@ -969,7 +977,7 @@ const { campo, dir } = ordenProductos;
                     )}
                     {bloques.length === 0 && v.observaciones && <p className="whitespace-pre-wrap text-sm">{v.observaciones}</p>}
                     {bloques.length === 0 && (
-                      <MensajesFicha visitaId={v.id} bloqueId={null} puedeEscribir={v.user_id === user?.id || ["admin", "director_comercial", "jefe_de_zona"].includes(role ?? "")} />
+                      <MensajesFicha visitaId={v.id} bloqueId={null} hilo={mensajesFicha} />
                     )}
                     {bloques.length > 0 && (v.transcripcion || v.observaciones_original) && (
                       <Collapsible>
