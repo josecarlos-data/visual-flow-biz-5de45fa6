@@ -52,4 +52,5 @@
 - [x] Conversación por bloque revisor ↔ comercial (Mis revisiones, contadores, ficha). Notas Gespromo pasadas como «Gespromo (importado)»
 - [x] Las 9 notas de la app se quedan como histórico (eran pruebas)
 - [x] Prueba de conversación con visita PRUEBA (borrada). Pendiente: probar las pantallas con sesión real
-- [ ] Arreglar conversación de revisión (llamadas, errores visibles, «Avisos de revisión» para todos, ficha con una sola consulta, cabecera, listado de pruebas a limpiar antes de publicar)
+- [x] Arreglar conversación de revisión (llamadas, errores visibles, «Avisos de revisión» para todos, ficha con una sola consulta, cabecera, listado de pruebas a limpiar antes de publicar)
+- [ ] Limpiar mensajes y notas de prueba antes de publicar (decide el usuario)
