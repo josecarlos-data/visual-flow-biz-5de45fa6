@@ -383,7 +383,7 @@ export default function RevisionVisitas() {
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-medium">{i + 1}. {nombreMotivo(b.motivo_key)}</p>
                     <span className="flex items-center gap-2">
-                      {bloqueCambiado(b) && <Badge variant="outline" className="border-warning text-xs">sin guardar</Badge>}
+                      {bloqueCambiado(b) && <Badge variant="outline" className="text-xs">sin guardar</Badge>}
                       {esExterno(b) && badgeImportado}{badgeValidacion(d.validacion)}
                     </span>
                   </div>
