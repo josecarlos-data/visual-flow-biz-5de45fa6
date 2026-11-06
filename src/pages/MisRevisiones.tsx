@@ -16,18 +16,31 @@ const estadoBloque = (v: string | null) =>
   : v === "NO CORRECTO" ? <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" /> No correcto</Badge>
   : <Badge variant="outline" className="gap-1"><Clock className="h-3 w-3" /> Pendiente</Badge>;
 
+function ErrorCarga({ texto, reintentar }: { texto: string; reintentar: () => void }) {
+  return (
+    <Card className="border-destructive/40">
+      <CardContent className="flex flex-col items-center gap-3 py-8 text-center text-sm">
+        <p>{texto}</p>
+        <Button size="sm" variant="outline" onClick={reintentar}>Reintentar</Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 function Detalle({ r, volver }: { r: MiRevision; volver: () => void }) {
   useMarcarLeida(r.visita_id);
-  const { data: mensajes, isLoading } = useMensajesVisita(r.visita_id);
+  const { data: mensajes, isLoading, isError, refetch } = useMensajesVisita(r.visita_id);
   const hilo = (id: string | null) => (mensajes ?? []).filter((m) => m.bloque_id === id);
   return (
     <div className="space-y-3">
-      <Button variant="ghost" size="sm" onClick={volver}><ChevronLeft className="mr-1 h-4 w-4" /> Mis revisiones</Button>
+      <Button variant="ghost" size="sm" onClick={volver}><ChevronLeft className="mr-1 h-4 w-4" /> Avisos de revisión</Button>
       <div>
         <h1 className="text-xl font-bold">{r.cliente}</h1>
         <p className="text-sm text-muted-foreground">{fechaCorta(r.fecha)}</p>
       </div>
-      {isLoading ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : (
+      {isLoading ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : isError ? (
+        <ErrorCarga texto="No se han podido cargar los mensajes." reintentar={() => refetch()} />
+      ) : (
         <>
           {r.bloques.map((b, i) => (
             <Card key={b.id}>
@@ -58,7 +71,7 @@ export default function MisRevisiones() {
   const [filtro, setFiltro] = useState<Filtro>("sin_leer");
   const [limite, setLimite] = useState(30);
   const [sel, setSel] = useState<MiRevision | null>(null);
-  const { data, isLoading } = useMisRevisiones(filtro, limite);
+  const { data, isLoading, isError, refetch } = useMisRevisiones(filtro, limite);
   const total = data?.[0]?.total ?? 0;
 
   if (sel) return <Detalle r={sel} volver={() => setSel(null)} />;
@@ -66,7 +79,7 @@ export default function MisRevisiones() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Mis revisiones</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Avisos de revisión</h1>
         <p className="text-sm text-muted-foreground">Mensajes y correcciones de dirección sobre tus visitas.</p>
       </div>
       <Tabs value={filtro} onValueChange={(v) => { setFiltro(v as Filtro); setLimite(30); }}>
@@ -78,6 +91,8 @@ export default function MisRevisiones() {
       </Tabs>
       {isLoading ? (
         <div className="space-y-2">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-20" />)}</div>
+      ) : isError ? (
+        <ErrorCarga texto="No se han podido cargar los avisos de revisión." reintentar={() => refetch()} />
       ) : !data?.length ? (
         <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">No hay novedades.</CardContent></Card>
       ) : (

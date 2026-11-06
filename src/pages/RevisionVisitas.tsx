@@ -102,7 +102,7 @@ export default function RevisionVisitas() {
   const [guardando, setGuardando] = useState(false);
   const [nuevaAlAbrir, setNuevaAlAbrir] = useState(false);
   const { data: respuestasNuevas } = useRespuestasNuevas(true);
-  const { data: mensajes } = useMensajesVisita(sel?.id);
+  const { data: mensajes, isError: errorMensajes, refetch: recargarMensajes } = useMensajesVisita(sel?.id);
   useMarcarLeida(sel?.id);
   const invalidarMensajes = useInvalidarMensajes();
   const hilo = (bloqueId: string | null) => (mensajes ?? []).filter((m) => m.bloque_id === bloqueId);
@@ -427,8 +427,9 @@ export default function RevisionVisitas() {
                 const d = borrador[b.id] ?? { validacion: b.validacion ?? "pendiente", nota: "" };
                 const h = hilo(b.id);
                 const ult = ultimoDe(h);
+                // «Esperando» solo si el último mensaje tiene autor (no importado) y la visita tiene dueño en la app.
                 const marca = ult && (b.validacion ?? "pendiente") === "pendiente"
-                  ? (!ult.es_dueno ? badgeEsperando : nuevaAlAbrir ? badgeRespuesta : null)
+                  ? (!ult.es_dueno && ult.autor_id && sel?.user_id ? badgeEsperando : ult.es_dueno && nuevaAlAbrir ? badgeRespuesta : null)
                   : ult?.es_dueno && nuevaAlAbrir ? badgeRespuesta : null;
                 return (
                 <div key={b.id} className="space-y-2 rounded-md border p-3 text-sm">

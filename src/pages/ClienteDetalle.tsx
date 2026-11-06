@@ -30,6 +30,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { MensajesFicha } from "@/components/MensajesFicha";
+import { useMensajesVisitas } from "@/hooks/useVisitaMensajes";
 import {
   useCliente, useClienteVentas, useClienteKpis, useClienteProductos, useClienteMix,
   useClienteVisitas, useMotivos, usePuedeVerMargen, useSituacionesVigentes, useClienteDocumentos, useVisitaBloques,
@@ -131,6 +132,7 @@ export default function ClienteDetalle() {
   const { data: kpis } = useClienteKpis(codNum);
   const { data: mix } = useClienteMix(codNum);
   const { data: visitas } = useClienteVisitas(codNum);
+  const mensajesFicha = useMensajesVisitas((visitas ?? []).map((v) => v.id));
   const { data: bloquesMap } = useVisitaBloques((visitas ?? []).map((v) => v.id));
   const { data: documentos } = useClienteDocumentos(codNum);
 
