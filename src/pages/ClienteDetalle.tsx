@@ -29,6 +29,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { MensajesFicha } from "@/components/MensajesFicha";
 import {
   useCliente, useClienteVentas, useClienteKpis, useClienteProductos, useClienteMix,
   useClienteVisitas, useMotivos, usePuedeVerMargen, useSituacionesVigentes, useClienteDocumentos, useVisitaBloques,
@@ -954,12 +955,7 @@ const { campo, dir } = ordenProductos;
                               {String(val)}
                             </p>
                           ))}
-                          {b.nota_revision && (
-                            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-destructive">Nota de revisión</p>
-                              <p className="whitespace-pre-wrap text-sm">{b.nota_revision}</p>
-                            </div>
-                          )}
+                          <MensajesFicha visitaId={v.id} bloqueId={b.id} puedeEscribir={v.user_id === user?.id || ["admin", "director_comercial", "jefe_de_zona"].includes(role ?? "")} />
                         </div>
 
                       ))
@@ -972,6 +968,9 @@ const { campo, dir } = ordenProductos;
                       ))
                     )}
                     {bloques.length === 0 && v.observaciones && <p className="whitespace-pre-wrap text-sm">{v.observaciones}</p>}
+                    {bloques.length === 0 && (
+                      <MensajesFicha visitaId={v.id} bloqueId={null} puedeEscribir={v.user_id === user?.id || ["admin", "director_comercial", "jefe_de_zona"].includes(role ?? "")} />
+                    )}
                     {bloques.length > 0 && (v.transcripcion || v.observaciones_original) && (
                       <Collapsible>
                         <CollapsibleTrigger className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">

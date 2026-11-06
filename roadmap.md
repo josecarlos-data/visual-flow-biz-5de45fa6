@@ -49,3 +49,6 @@
 - [ ] Fase C: panel «Análisis de rutas» y parámetros (pendiente de aprobación)
 - [x] Revisión de visitas por bloque (nota y estado por bloque, filtro Comercial, comercial automático)
 - [x] Prueba de la revisión por bloque con visita PRUEBA (borrada)
+- [x] Conversación por bloque revisor ↔ comercial (Mis revisiones, contadores, ficha). Notas Gespromo pasadas como «Gespromo (importado)»
+- [ ] Pasar las 9 notas de la app a mensajes (esperando a que el usuario diga cuáles)
+- [ ] Prueba con visita PRUEBA de Bautista en domingo (tras decidir las 9 notas)

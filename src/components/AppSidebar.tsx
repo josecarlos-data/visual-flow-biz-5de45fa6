@@ -2,6 +2,7 @@ import * as Icons from "lucide-react";
 import { Users, Database, BarChart3, LogOut, Settings, KeyRound } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
+import { useContadoresMensajes } from "@/hooks/useVisitaMensajes";
 import logoRimosaIcon from "@/assets/logo_rimosa_icon.png";
 import {
   Sidebar,
@@ -21,10 +22,12 @@ export function AppSidebar() {
   const isAdmin = role === "admin";
   const esDireccion = role === "director_comercial";
   const puedeRevisar = isAdmin || esDireccion || role === "jefe_de_zona";
+  const tieneVisitas = dashboards.some((d) => d.key === "visitas");
+  const { data: contadores } = useContadoresMensajes();
 
   const mainItems = dashboards.map((d) => {
     const IconComp = (d.icon && (Icons as any)[d.icon]) || BarChart3;
-    return { title: d.name, url: d.route, icon: IconComp, end: d.route === "/" };
+    return { title: d.name, url: d.route, icon: IconComp, end: d.route === "/", contador: 0 };
   });
 
   const objetivosItem = { title: "Objetivos", url: "/admin/objetivos", icon: Icons.Target };
@@ -59,13 +62,17 @@ export function AppSidebar() {
             <SidebarMenu>
               {[
                 ...mainItems,
-                ...(puedeRevisar ? [{ title: "Revisión de visitas", url: "/visitas/revision", icon: Icons.ClipboardCheck, end: false }] : []),
+                ...(role === "comercial" && tieneVisitas ? [{ title: "Mis revisiones", url: "/visitas/revisiones", icon: Icons.MessageSquare, end: false, contador: contadores?.mis_revisiones ?? 0 }] : []),
+                ...(puedeRevisar ? [{ title: "Revisión de visitas", url: "/visitas/revision", icon: Icons.ClipboardCheck, end: false, contador: contadores?.respuestas_nuevas ?? 0 }] : []),
               ].map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} end={item.end} activeClassName="bg-accent text-accent-foreground font-medium">
                       <item.icon className="mr-2 h-4 w-4" />
                       <span>{item.title}</span>
+                      {item.contador > 0 && (
+                        <span className="ml-auto rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground">{item.contador}</span>
+                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

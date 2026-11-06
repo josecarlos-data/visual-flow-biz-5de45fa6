@@ -1854,6 +1854,161 @@ export type Database = {
           },
         ]
       }
+      visita_lecturas: {
+        Row: {
+          leido_en: string
+          user_id: string
+          visita_id: string
+        }
+        Insert: {
+          leido_en?: string
+          user_id: string
+          visita_id: string
+        }
+        Update: {
+          leido_en?: string
+          user_id?: string
+          visita_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visita_lecturas_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_accion_pendiente"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "visita_lecturas_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_bloques_campos"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "visita_lecturas_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_competencia"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "visita_lecturas_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_oferta"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "visita_lecturas_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "visitas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visita_mensajes: {
+        Row: {
+          autor_id: string | null
+          autor_nombre: string | null
+          bloque_id: string | null
+          created_at: string
+          id: string
+          texto: string
+          visita_id: string
+        }
+        Insert: {
+          autor_id?: string | null
+          autor_nombre?: string | null
+          bloque_id?: string | null
+          created_at?: string
+          id?: string
+          texto: string
+          visita_id: string
+        }
+        Update: {
+          autor_id?: string | null
+          autor_nombre?: string | null
+          bloque_id?: string | null
+          created_at?: string
+          id?: string
+          texto?: string
+          visita_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visita_mensajes_bloque_id_fkey"
+            columns: ["bloque_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_accion_pendiente"
+            referencedColumns: ["bloque_id"]
+          },
+          {
+            foreignKeyName: "visita_mensajes_bloque_id_fkey"
+            columns: ["bloque_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_bloques_campos"
+            referencedColumns: ["bloque_id"]
+          },
+          {
+            foreignKeyName: "visita_mensajes_bloque_id_fkey"
+            columns: ["bloque_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_competencia"
+            referencedColumns: ["bloque_id"]
+          },
+          {
+            foreignKeyName: "visita_mensajes_bloque_id_fkey"
+            columns: ["bloque_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_oferta"
+            referencedColumns: ["bloque_id"]
+          },
+          {
+            foreignKeyName: "visita_mensajes_bloque_id_fkey"
+            columns: ["bloque_id"]
+            isOneToOne: false
+            referencedRelation: "visita_bloques"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visita_mensajes_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_accion_pendiente"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "visita_mensajes_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_bloques_campos"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "visita_mensajes_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_competencia"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "visita_mensajes_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_oferta"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "visita_mensajes_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "visitas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       visitas: {
         Row: {
           analisis_modelo: string | null
@@ -2727,6 +2882,7 @@ export type Database = {
         Args: { _desde: string; _hasta: string; _user_id: string }
         Returns: Json
       }
+      contadores_mensajes: { Args: never; Returns: Json }
       descartar_recomendacion: {
         Args: {
           _cod_cliente: number
@@ -2842,6 +2998,34 @@ export type Database = {
       marcar_envio_recomendado: {
         Args: { _envio_id: string }
         Returns: undefined
+      }
+      marcar_visita_leida: { Args: { _visita_id: string }; Returns: undefined }
+      mensajes_visita: {
+        Args: { _visita_id: string }
+        Returns: {
+          autor_id: string
+          autor_nombre: string
+          bloque_id: string
+          created_at: string
+          es_dueno: boolean
+          id: string
+          texto: string
+        }[]
+      }
+      mis_revisiones: {
+        Args: { _filtro?: string; _limite?: number; _offset?: number }
+        Returns: {
+          bloques: Json
+          cliente: string
+          esperando: boolean
+          fecha: string
+          sin_leer: number
+          total: number
+          ultimo_autor: string
+          ultimo_en: string
+          ultimo_texto: string
+          visita_id: string
+        }[]
       }
       normalizar_texto: { Args: { _t: string }; Returns: string }
       objetivos_propuesta: {
@@ -3160,6 +3344,7 @@ export type Database = {
           unidades: number
         }[]
       }
+      puede_conversar_visita: { Args: { _visita_id: string }; Returns: boolean }
       puede_editar_bloque: { Args: { _visita_id: string }; Returns: boolean }
       puede_enviar_ofertas: { Args: { _uid: string }; Returns: boolean }
       puede_gestionar_ofertas: { Args: { _user_id: string }; Returns: boolean }
@@ -3216,6 +3401,15 @@ export type Database = {
       }
       requiere_2fa: { Args: { _user_id: string }; Returns: boolean }
       reset_maestro_isi_data: { Args: never; Returns: undefined }
+      revision_respuestas_nuevas: {
+        Args: { _limite?: number; _offset?: number }
+        Returns: {
+          nuevos: number
+          total: number
+          ultimo_en: string
+          visita_id: string
+        }[]
+      }
       ruta_clientes: {
         Args: { _ruta: string; _solo_activos?: boolean }
         Returns: {

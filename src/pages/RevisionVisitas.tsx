@@ -18,6 +18,8 @@ import {
   type Visita, type VisitaBloque,
 } from "@/hooks/useCrm";
 import { useScrollRestore } from "@/hooks/useScrollRestore";
+import { useMensajesVisita, useMarcarLeida, useRespuestasNuevas, useInvalidarMensajes, enviarMensaje, ultimoDe } from "@/hooks/useVisitaMensajes";
+import { ListaMensajes } from "@/components/ConversacionBloque";
 
 const ESTADOS = [
   { key: "pendiente", label: "Pendientes", icon: Clock },
@@ -54,6 +56,9 @@ const marcaBloque = (v: string | null) =>
   : v === "NO CORRECTO" ? <XCircle className="inline h-3 w-3 text-destructive" aria-label="no correcto" />
   : null;
 
+const badgeEsperando = <Badge variant="outline" className="text-xs">Esperando al comercial</Badge>;
+const badgeRespuesta = <Badge className="text-xs">Respuesta nueva</Badge>;
+
 const badgeImportado = <Badge variant="outline" className="gap-1 border-primary/40 text-primary"><FileDown className="h-3 w-3" /> Importado</Badge>;
 
 
@@ -82,9 +87,10 @@ export default function RevisionVisitas() {
   const q = get("q");
   const motivoFiltro = get("motivo", "todos");
   const soloDudas = get("dudas") === "1";
+  const soloRespuestas = get("respuestas") === "1";
   const desde = get("desde");
   const hasta = get("hasta");
-  const hayFiltros = ["estado", "q", "origen", "motivo", "comercial", "dudas", "desde", "hasta"].some((k) => params.get(k));
+  const hayFiltros = ["estado", "q", "origen", "motivo", "comercial", "dudas", "respuestas", "desde", "hasta"].some((k) => params.get(k));
 
   const [sel, setSel] = useState<Visita | null>(null);
   const [nota, setNota] = useState("");
@@ -94,6 +100,13 @@ export default function RevisionVisitas() {
   const [valVisita, setValVisita] = useState("pendiente");
   const [borrador, setBorrador] = useState<Record<string, Borrador>>({});
   const [guardando, setGuardando] = useState(false);
+  const [nuevaAlAbrir, setNuevaAlAbrir] = useState(false);
+  const { data: respuestasNuevas } = useRespuestasNuevas(true);
+  const { data: mensajes } = useMensajesVisita(sel?.id);
+  useMarcarLeida(sel?.id);
+  const invalidarMensajes = useInvalidarMensajes();
+  const hilo = (bloqueId: string | null) => (mensajes ?? []).filter((m) => m.bloque_id === bloqueId);
+  const editaObs = !!sel && sel.origen !== "app";
 
   const nombrePorCod = useMemo(() => {
     const m = new Map<number, string>();
@@ -140,6 +153,7 @@ export default function RevisionVisitas() {
         if (!enBloques && v.motivo_key !== motivoFiltro) return false;
       }
       if (soloDudas && !bs.some(tieneDudas)) return false;
+      if (soloRespuestas && !respuestasNuevas?.has(v.id)) return false;
 
       if (!term) return true;
       const nombre = v.cod_cliente ? nombrePorCod.get(v.cod_cliente) ?? "" : v.cliente_externo ?? "";
@@ -149,7 +163,7 @@ export default function RevisionVisitas() {
         nombreMotivo(v.motivo_key).toLowerCase().includes(term)
       );
     });
-  }, [visitas, estado, q, motivoFiltro, comercialFiltro, soloDudas, desde, hasta, bloquesMap, nombrePorCod, motivos]);
+  }, [visitas, estado, q, motivoFiltro, comercialFiltro, soloDudas, soloRespuestas, respuestasNuevas, desde, hasta, bloquesMap, nombrePorCod, motivos]);
 
   const pendientes = filtradas.filter((v) => (v.validacion ?? "pendiente") === "pendiente").length;
 
@@ -157,13 +171,14 @@ export default function RevisionVisitas() {
 
   const abrir = (v: Visita) => {
     setSel(v);
-    setNota(v.nota_revision ?? "");
+    setNota("");
+    setNuevaAlAbrir(!!respuestasNuevas?.has(v.id));
     setValVisita(v.validacion ?? "pendiente");
     setObservaciones(v.observaciones ?? "");
     setJustificar(false);
     setEtiquetaSituacion("Caída justificada");
     const b: Record<string, Borrador> = {};
-    for (const x of bloquesDe(v)) b[x.id] = { validacion: x.validacion ?? "pendiente", nota: x.nota_revision ?? "" };
+    for (const x of bloquesDe(v)) b[x.id] = { validacion: x.validacion ?? "pendiente", nota: "" };
     setBorrador(b);
     requestAnimationFrame(() => dialogoRef.current?.scrollTo({ top: 0 }));
   };
@@ -175,7 +190,7 @@ export default function RevisionVisitas() {
     const bs = bloquesSel ?? [];
     setBorrador((prev) => {
       const next: Record<string, Borrador> = {};
-      for (const x of bs) next[x.id] = prev[x.id] ?? { validacion: x.validacion ?? "pendiente", nota: x.nota_revision ?? "" };
+      for (const x of bs) next[x.id] = prev[x.id] ?? { validacion: x.validacion ?? "pendiente", nota: "" };
       const igual = Object.keys(prev).length === bs.length && bs.every((x) => prev[x.id] === next[x.id]);
       return igual ? prev : next;
     });
@@ -183,19 +198,19 @@ export default function RevisionVisitas() {
 
   const bloqueCambiado = (b: VisitaBloque) => {
     const d = borrador[b.id];
-    return !!d && (d.validacion !== (b.validacion ?? "pendiente") || (d.nota ?? "").trim() !== (b.nota_revision ?? "").trim());
+    return !!d && (d.validacion !== (b.validacion ?? "pendiente") || (d.nota ?? "").trim() !== "");
   };
   const hayCambios = !!sel && (
     bloquesDe(sel).some(bloqueCambiado) ||
-    observaciones !== (sel.observaciones ?? "") ||
+    (editaObs && observaciones !== (sel.observaciones ?? "")) ||
     justificar ||
-    (bloquesDe(sel).length === 0 && (nota !== (sel.nota_revision ?? "") || valVisita !== (sel.validacion ?? "pendiente")))
+    (bloquesDe(sel).length === 0 && (nota.trim() !== "" || valVisita !== (sel.validacion ?? "pendiente")))
   );
 
   const setBloque = (id: string, p: Partial<Borrador>) =>
     setBorrador((prev) => {
       const b = sel ? bloquesDe(sel).find((x) => x.id === id) : undefined;
-      const base: Borrador = prev[id] ?? { validacion: b?.validacion ?? "pendiente", nota: b?.nota_revision ?? "" };
+      const base: Borrador = prev[id] ?? { validacion: b?.validacion ?? "pendiente", nota: "" };
       return { ...prev, [id]: { ...base, ...p } };
     });
   const alternar = (id: string, v: string) =>
@@ -219,15 +234,19 @@ export default function RevisionVisitas() {
       const bs = bloquesDe(sel);
       for (const b of bs.filter(bloqueCambiado)) {
         const d = borrador[b.id];
-        await revisarBloque.mutateAsync({ id: b.id, validacion: d.validacion, nota_revision: (d.nota ?? "").trim() || null });
+        if (d.validacion !== (b.validacion ?? "pendiente")) await revisarBloque.mutateAsync({ id: b.id, validacion: d.validacion });
+        if ((d.nota ?? "").trim()) await enviarMensaje(sel.id, b.id, d.nota ?? "");
       }
+      const obsCambiada = editaObs && observaciones !== (sel.observaciones ?? "");
       if (bs.length) {
-        if (observaciones !== (sel.observaciones ?? "")) {
-          await revisar.mutateAsync({ id: sel.id, observaciones: observaciones || null });
+        if (obsCambiada) await revisar.mutateAsync({ id: sel.id, observaciones: observaciones || null });
+      } else {
+        if (valVisita !== (sel.validacion ?? "pendiente") || obsCambiada) {
+          await revisar.mutateAsync({ id: sel.id, validacion: valVisita, ...(obsCambiada ? { observaciones: observaciones || null } : {}) });
         }
-      } else if (nota !== (sel.nota_revision ?? "") || valVisita !== (sel.validacion ?? "pendiente") || observaciones !== (sel.observaciones ?? "")) {
-        await revisar.mutateAsync({ id: sel.id, validacion: valVisita, nota_revision: nota || null, observaciones: observaciones || null });
+        if (nota.trim()) await enviarMensaje(sel.id, null, nota);
       }
+      invalidarMensajes();
       if (justificar && sel.cod_cliente) {
         await guardarSituacion.mutateAsync({
           cod_cliente: sel.cod_cliente,
@@ -332,6 +351,10 @@ export default function RevisionVisitas() {
             <input type="checkbox" checked={soloDudas} onChange={(e) => setParam("dudas", e.target.checked ? "1" : null)} />
             Solo con confianza baja o media
           </label>
+          <label className="flex items-center gap-2 pb-2 text-sm">
+            <input type="checkbox" checked={soloRespuestas} onChange={(e) => setParam("respuestas", e.target.checked ? "1" : null)} />
+            Solo con respuesta nueva
+          </label>
 
           <div className="ml-auto flex items-center gap-3 pb-1.5">
             <span className="text-sm text-muted-foreground">{filtradas.length} resultado{filtradas.length === 1 ? "" : "s"}</span>
@@ -365,6 +388,7 @@ export default function RevisionVisitas() {
                   {v.observaciones && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{v.observaciones}</p>}
                 </button>
                 <div className="flex shrink-0 items-center gap-2">
+                  {respuestasNuevas?.has(v.id) && badgeRespuesta}
                   {visitaImportada(v) && badgeImportado}
                   {badgeValidacion(v.validacion)}
                   {v.cod_cliente && (
@@ -400,12 +424,18 @@ export default function RevisionVisitas() {
 
               {/* Un bloque por plantilla: se valida cada uno por separado. */}
               {bloquesDe(sel).map((b, i) => {
-                const d = borrador[b.id] ?? { validacion: b.validacion ?? "pendiente", nota: b.nota_revision ?? "" };
+                const d = borrador[b.id] ?? { validacion: b.validacion ?? "pendiente", nota: "" };
+                const h = hilo(b.id);
+                const ult = ultimoDe(h);
+                const marca = ult && (b.validacion ?? "pendiente") === "pendiente"
+                  ? (!ult.es_dueno ? badgeEsperando : nuevaAlAbrir ? badgeRespuesta : null)
+                  : ult?.es_dueno && nuevaAlAbrir ? badgeRespuesta : null;
                 return (
                 <div key={b.id} className="space-y-2 rounded-md border p-3 text-sm">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-medium">{i + 1}. {nombreMotivo(b.motivo_key)}</p>
                     <span className="flex items-center gap-2">
+                      {marca}
                       {bloqueCambiado(b) && <Badge variant="outline" className="text-xs">sin guardar</Badge>}
                       {esExterno(b) && badgeImportado}{badgeValidacion(d.validacion)}
                     </span>
@@ -426,8 +456,9 @@ export default function RevisionVisitas() {
                     </Button>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Nota para el comercial (opcional)</Label>
-                    <Textarea rows={2} value={d.nota} onChange={(e) => setBloque(b.id, { nota: e.target.value })} placeholder="Qué falta o qué corregir…" />
+                    <Label className="text-xs">Conversación con el comercial</Label>
+                    <ListaMensajes mensajes={h} />
+                    <Textarea rows={2} value={d.nota} onChange={(e) => setBloque(b.id, { nota: e.target.value })} placeholder="Escribe un mensaje (se envía al guardar)…" />
                   </div>
                 </div>
                 );
@@ -481,8 +512,17 @@ export default function RevisionVisitas() {
               )}
 
               <div className="space-y-1.5">
-                <Label>Observaciones (editable)</Label>
-                <Textarea rows={3} value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
+                {editaObs ? (
+                  <>
+                    <Label>Observaciones (editable)</Label>
+                    <Textarea rows={3} value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
+                  </>
+                ) : (
+                  <>
+                    <Label>Observaciones del comercial</Label>
+                    <p className="whitespace-pre-wrap rounded-md border bg-muted/40 p-2 text-sm">{sel.observaciones || "—"}</p>
+                  </>
+                )}
               </div>
 
               {bloquesDe(sel).length === 0 && (
@@ -491,8 +531,9 @@ export default function RevisionVisitas() {
                     <Button size="sm" variant={valVisita === "CORRECTO" ? "default" : "outline"} onClick={() => setValVisita(valVisita === "CORRECTO" ? "pendiente" : "CORRECTO")}>Correcta</Button>
                     <Button size="sm" variant={valVisita === "NO CORRECTO" ? "destructive" : "outline"} onClick={() => setValVisita(valVisita === "NO CORRECTO" ? "pendiente" : "NO CORRECTO")}>No correcta</Button>
                   </div>
-                  <Label>Nota de revisión</Label>
-                  <Textarea rows={2} value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Qué falta o qué corregir…" />
+                  <Label>Conversación con el comercial</Label>
+                  <ListaMensajes mensajes={hilo(null)} />
+                  <Textarea rows={2} value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Escribe un mensaje (se envía al guardar)…" />
                 </div>
               )}
 
