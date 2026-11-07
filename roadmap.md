@@ -53,4 +53,4 @@
 - [x] Las 9 notas de la app se quedan como histórico (eran pruebas)
 - [x] Prueba de conversación con visita PRUEBA (borrada). Pendiente: probar las pantallas con sesión real
 - [x] Arreglar conversación de revisión (llamadas, errores visibles, «Avisos de revisión» para todos, ficha con una sola consulta, cabecera, listado de pruebas a limpiar antes de publicar)
-- [ ] Limpiar mensajes y notas de prueba antes de publicar (decide el usuario)
+- [x] Limpiar mensajes, notas y validaciones de prueba antes de publicar (0033; CALEROTRUCKS de Fran conservada como mensaje)
