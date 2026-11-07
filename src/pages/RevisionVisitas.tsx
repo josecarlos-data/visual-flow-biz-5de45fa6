@@ -20,6 +20,8 @@ import {
 import { useScrollRestore } from "@/hooks/useScrollRestore";
 import { useMensajesVisita, useMarcarLeida, useRespuestasNuevas, useInvalidarMensajes, enviarMensaje, ultimoDe } from "@/hooks/useVisitaMensajes";
 import { ListaMensajes } from "@/components/ConversacionBloque";
+import { BotonAdjunto } from "@/components/VisorAdjunto";
+import { presentarCampos, documentosDe } from "@/lib/camposVisita";
 
 const ESTADOS = [
   { key: "pendiente", label: "Pendientes", icon: Clock },
@@ -267,17 +269,6 @@ export default function RevisionVisitas() {
     }
   };
 
-  /** Etiquetas y orden de la plantilla; lo que no esté en ella, al final con su clave. */
-  const camposOrdenados = (b: VisitaBloque) => {
-    const def = (motivos?.find((m) => m.key === b.motivo_key)?.campos ?? []).slice().sort((x, y) => x.sort_order - y.sort_order);
-    const vals = Object.entries(b.campos ?? {}).filter(([, val]) => val != null && val !== "");
-    const mapa = new Map(vals);
-    const out: [string, string, unknown][] = [];
-    for (const c of def) if (mapa.has(c.campo_key)) { out.push([c.campo_key, c.label, mapa.get(c.campo_key)]); mapa.delete(c.campo_key); }
-    for (const [k, v] of mapa) out.push([k, k, v]);
-    return out;
-  };
-  const fmt = (v: unknown) => (Array.isArray(v) ? v.join(", ") : typeof v === "boolean" ? (v ? "Sí" : "No") : typeof v === "object" ? JSON.stringify(v) : String(v));
 
 
   return (
@@ -447,11 +438,13 @@ export default function RevisionVisitas() {
                       {esExterno(b) && badgeImportado}{badgeValidacion(d.validacion)}
                     </span>
                   </div>
-                  {camposOrdenados(b).map(([k, label, val]) => (
-                    <p key={k} className="flex justify-between gap-3">
-                      <span className="text-muted-foreground">{label}</span>
-                      <span className="text-right font-medium">{fmt(val)}</span>
-                    </p>
+                  {presentarCampos(b.campos, motivos?.find((m) => m.key === b.motivo_key)?.campos).map((it) => (
+                    <div key={it.clave} className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">{it.label}</span>
+                      {it.clase === "adjunto"
+                        ? <BotonAdjunto adjunto={it.adjunto} />
+                        : <span className="text-right font-medium">{it.valor}</span>}
+                    </div>
                   ))}
 
                   <div className="flex gap-2 pt-1">
