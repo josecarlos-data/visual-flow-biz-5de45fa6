@@ -1,59 +1,69 @@
-# Visor de fotos y documentos de visita
+# Completar datos del bloque por el comercial tras la revisión
 
-## 1. Diagnóstico propio (revisado en el código)
+## 1. Diagnóstico propio (código y base de datos revisados)
 
-Confirmo lo descrito y añado lo que he encontrado:
+Confirmo lo que describe Claude y añado lo que he encontrado:
 
-- **Ficha del cliente** (`ClienteDetalle.tsx` ~962–980): los campos se pintan con `String(val)`. Además de la ruta y la línea «…_nombre», las listas de opciones (multiselección) salen como «a,b» sin espacio y los objetos como «[object Object]». Los documentos de la visita completa no salen nunca en visitas con bloques.
-- **Revisión** (`RevisionVisitas.tsx`, `camposOrdenados` l.271, `fmt` l.280): ruta como texto y `campos.documentos` como JSON. El revisor —quien más necesita ver la foto— no puede abrirla.
-- **Visitas** (`Visitas.tsx` l.149 → `abrirDocumento`): firma la URL y *después* hace `window.open`. En iPhone/Safari, abrir una pestaña tras una espera suele quedar bloqueado como ventana emergente: lo único que "funciona" hoy probablemente falla en el móvil. Y 60 s de validez es poco si la red va lenta.
-- **Mis revisiones**: no muestra campos; no lo cambio.
-- **Permisos del bucket** (0014): lectura solo para dueño de la carpeta, admin, director y quien puede revisar. Un jefe de zona o un comercial que ve en la ficha la visita de otro verá el botón, pero no podrá abrir el archivo.
-- **Formato**: los adjuntos de campo se suben sin reducir; una foto HEIC hecha desde la galería del iPhone no se puede mostrar en Chrome/Android. El visor debe contemplarlo en vez de enseñar una imagen rota.
-- **Plantilla cambiada**: si se borró o cambió el tipo de un campo, la definición de plantilla ya no dice que era adjunto y volvería a salir la ruta.
+- **El guardián actual solo actúa en UPDATE.** `visita_bloques_guard_revision` es `BEFORE UPDATE`. No hay nada en **INSERT** ni en **DELETE**:
+  - Un comercial puede **insertar** un bloque en su visita ya con `validacion='CORRECTO'` y `revisado_por` cualquiera. La cabecera se recalcula y la visita sale como Correcta sin que nadie la haya revisado. Es un hueco real, hoy abierto.
+  - Puede **borrar** cualquier bloque suyo, validado o no.
+- **En UPDATE, el dueño puede cambiar más que `campos`:** `visita_id` (mover un bloque a otra visita suya), `motivo_key`, `orden`, `campos_meta` y `completo`.
+- **Editar `campos` dispara `promover_perfil_desde_bloque`.** Los valores nuevos pasan a la ficha del cliente como `sin_confirmar`, pero con la `cita` y la `confianza` de la IA, que ya no corresponden. Hay que marcar en `campos_meta` que ese campo lo escribió el comercial.
+- **«Reanalizar» es más grave de lo que parece:** borra los bloques y, por las claves foráneas, **se borran en cascada los datos de perfil del cliente** que salieron de esos bloques (también los ya confirmados), y los mensajes pasan a `bloque_id NULL`.
+- **`puede_editar_bloque` deja editar cualquier visita a cualquier revisor**, incluido un jefe de zona con visitas de otra delegación (no mira `puede_ver_bloque`). No es de este cambio, pero conviene saberlo.
 
-## 2. Comparación con la propuesta de Claude
+## 2. Mi propuesta (antes de comparar)
 
-| Punto | Coincido | Matiz / mejora |
-|---|---|---|
-| Componente único `VisorAdjunto` en diálogo, pantalla completa en móvil | Sí | — |
-| Firmar al abrir, no al pintar | Sí | Además: validez ~10 min y volver a firmar si caduca. Así «Abrir en otra pestaña» y «Descargar» son enlaces ya firmados, sin espera, y no los bloquea el iPhone. Corrige de paso el fallo de la lista de Visitas. |
-| Imagen ajustada con zoom | Sí | Zoom sencillo (tocar para ampliar/arrastrar) con un fallback: si la imagen no carga (HEIC u otro), mostrar «No se puede previsualizar este formato» + Descargar, no un icono roto. |
-| PDF incrustado; en iPhone, otra pestaña | Sí | En iPhone el visor incrustado solo enseña la primera página: detectarlo y mostrar directamente el botón. |
-| Mensaje de permiso | Sí | Distinguir «No tienes permiso» de «El archivo ya no existe» (fallo distinto, mensaje distinto). |
-| Reconocer adjuntos por la plantilla | Sí, como criterio principal | Se queda corto: añadir respaldo cuando la plantilla ya no lo define, solo si existe la pareja `clave` + `clave_nombre` y la ruta empieza por un identificador de usuario. Sin esto, campos de plantillas modificadas vuelven a salir como ruta. |
-| Ocultar «…_nombre» | Sí | — |
-| Usar en ficha, Revisión y Visitas; documentos de visita en la ficha | Sí | Añadir Revisión también para `campos.documentos` (hoy sale JSON). Aprovechar la misma función de formato para que listas y sí/no salgan legibles en la ficha (hoy «a,b»). |
-| Sin miniaturas | Sí | — |
-| Sin cambios de base de datos | Sí, en este paso | El hueco de permisos (jefe de zona / otro comercial) es real; lo dejo como recomendación aparte, sin aplicar. |
+- Guardar mediante **una función de servidor** `completar_bloque(bloque, campos, version)` que, en una sola operación: comprueba que eres el dueño y que el bloque no está Correcto, verifica que nadie lo ha tocado desde que lo abriste (`updated_at`), guarda solo los campos de la plantilla que han cambiado, pasa No correcto a Pendiente y **escribe el mensaje «He completado: …» con las etiquetas de la plantilla**. Todo o nada.
+- Un guardián en la tabla como red de seguridad para cualquier otra vía (INSERT, UPDATE y DELETE).
 
-Error de Claude a corregir: da por bueno el comportamiento actual de la lista de Visitas como «el único sitio donde se puede abrir algo»; en iPhone probablemente tampoco abre.
+## 3. Comparación con la propuesta de Claude
 
-## 3. Plan final
+| Punto | Claude | Yo | Mejor |
+|---|---|---|---|
+| Regla en el servidor | UPDATE/DELETE | UPDATE/DELETE **e INSERT** | Mía: el INSERT es un hueco abierto hoy |
+| Columnas que puede tocar el dueño | Solo `campos` | Igual, y fijar explícitamente `visita_id`, `motivo_key`, `orden` | Coincidimos; lo concreto |
+| Correcto no se cambia | Sí | Sí | Coinciden |
+| No correcto → Pendiente | Sí, sin revisor ni fecha | Sí, pero **conserva `revisado_por`** como último revisor para saber a quién avisar | Debatible (ver más abajo) |
+| Mensaje a Fran | Lo crea la pantalla | Lo crea el servidor en la misma operación | Mía: si la pantalla falla entre el guardado y el mensaje, Fran nunca se entera |
+| Fran valida mientras se edita | Lo frena la regla de Correcto | También detecta **cualquier** cambio (p. ej. Fran marca No correcto con otra nota) | Mía: la de Claude no cubre ese caso |
+| Ficha del cliente | No lo menciona | Marcar en `campos_meta` el origen «comercial» | Mía: si no, la ficha enseña una cita de la IA que no corresponde |
+| Reanalizar | Fuera de alcance | Cerrar ya lo mínimo | Mía: borra datos de perfil ya confirmados |
+
+**Sobre limpiar revisor y fecha al volver a Pendiente:** Claude los vacía. Yo propongo vaciar `revisado_en` y mantener `revisado_por`, para que el aviso y la lista de Revisión sepan quién lo había marcado. Si prefieres que quede limpio del todo, se hace como dice Claude: el aviso no depende de ello, porque sale del mensaje.
+
+## 4. Plan final
 
 ### Imprescindible
-1. **`VisorAdjunto`** (nuevo): recibe ruta, nombre, tipo y tamaño opcionales. Diálogo a pantalla completa en móvil. Firma al abrir (10 min, re-firma si caduca). Imagen con zoom y fallback de formato; PDF incrustado salvo iPhone; otros: nombre, tamaño, Descargar. Siempre «Abrir en otra pestaña» y «Descargar» (con el nombre original). Mensajes claros de permiso o archivo inexistente.
-2. **Función común de presentación de campos** (nuevo fichero de ayuda): dada una visita/bloque y la definición de plantilla, devuelve filas de texto legible o adjuntos; detecta adjuntos por plantilla + respaldo descrito; oculta `…_nombre` y `documentos`; extrae `campos.documentos` como lista de adjuntos.
-3. **Ficha del cliente**: botón con icono y nombre («foto.jpg») en lugar de la ruta; documentos de la visita siempre, con o sin bloques.
-4. **Revisión**: igual en cada bloque y documentos de la visita en lugar del JSON.
-5. **Visitas**: los documentos abren el visor en lugar de pestaña nueva.
 
-### Recomendable (mismo cambio, bajo coste)
-- Listas y sí/no legibles en la ficha con la misma función.
-- Tamaño mostrado cuando se conozca (documentos de visita).
+1. **Migración 0034**
+   - Guardián nuevo en `visita_bloques` (`BEFORE INSERT OR UPDATE OR DELETE`) para quien no es revisor ni admin (sin sesión = migraciones, no se toca):
+     - INSERT: fuerza `validacion='PENDIENTE'` y vacía nota, revisor y fecha.
+     - UPDATE: rechaza si el bloque está Correcto («Este bloque ya está validado y no se puede cambiar»). Conserva `visita_id`, `motivo_key`, `orden` y los campos de revisión. Si cambian `campos` y estaba No correcto → Pendiente.
+     - DELETE: rechaza si está Correcto o No correcto.
+     - Sustituye al guardián actual (se elimina el trigger viejo; la función vieja se deja sin uso y se marca como retirada).
+   - Función `completar_bloque(_bloque_id uuid, _campos jsonb, _updated_at timestamptz)` `SECURITY DEFINER`: comprueba dueño, aprobado y estado; compara `_updated_at` y si no coincide devuelve «Fran ha revisado este bloque mientras lo editabas»; guarda solo claves de la plantilla activa; marca esas claves en `campos_meta` con origen comercial y fecha; crea el mensaje con las etiquetas cambiadas. Si no cambió nada, no guarda ni escribe mensaje. `GRANT EXECUTE` solo a `authenticated`.
+   - Auditoría: ya existe por trigger; no se añade más.
+2. **Pantalla «Avisos de revisión» (móvil)**: cada bloque enseña sus datos con `camposVisita.ts`. Pendiente o No correcto: botón «Completar datos» que abre un formulario a pantalla completa con `CampoVisita` y los valores actuales. Correcto: «Validado, no se puede cambiar». Al fallar por conflicto: aviso claro y recarga del bloque.
+3. **Revisión**: el bloque se ve ya actualizado y le sale «Respuesta nueva» por el mensaje.
 
-### Recomendable (aparte, no se aplica)
-- Permisos de lectura: permitir abrir el adjunto a quien puede ver esa visita (p. ej. jefe de zona de su delegación). Requiere cambio de permisos; lo planteo solo si lo pides.
-- Reducir también las fotos de campo al subirlas (fuera de alcance).
+### Recomendable
 
-### No se toca
-Base de datos, permisos del bucket, subida de archivos, biblioteca de ficheros, Mis revisiones, IA.
+4. **Reanalizar**: desactivarlo cuando algún bloque de la visita no esté Pendiente o tenga mensajes, con el motivo visible. Evita perder validaciones, mensajes por bloque y datos de perfil confirmados. Solo pantalla, sin migración.
+5. En Revisión, resaltar los campos que ha completado el comercial (sale de `campos_meta`).
+6. Aparte: limitar `puede_editar_bloque` para revisores a las visitas que pueden ver. Plan propio si quieres.
+
+### Fuera de alcance
+
+Añadir o quitar motivos, editar la cabecera de la visita, la biblioteca.
 
 ## Pruebas
-Con el comercial de prueba (Bautista): visita PRUEBA en domingo, sin cliente real, con una foto en un campo y un PDF como documento de visita. Comprobar en móvil (411 px) y escritorio: ficha, Revisión y Visitas; imagen, zoom, PDF, Descargar, otra pestaña, y mensaje de permiso con una cuenta sin acceso si la hay de prueba. Borrar visita y archivos al acabar. Nunca cuentas reales.
+
+- Base de datos, en una transacción que se deshace, con identidades simuladas: dueño completa un bloque No correcto (pasa a Pendiente y mensaje creado); dueño en bloque Correcto (rechazado); conflicto de versión; insertar bloque con Correcto (queda Pendiente); borrar bloque validado (rechazado); otro comercial (rechazado); revisor y admin sin cambios.
+- Ni Bautista ni cuentas reales. La prueba en pantalla la haces tú con la visita PRUEBA del domingo.
 
 ## Detalles técnicos
-- Ficheros: nuevo `src/components/VisorAdjunto.tsx`, nuevo `src/lib/camposVisita.ts`; cambios en `ClienteDetalle.tsx`, `RevisionVisitas.tsx`, `Visitas.tsx`; `abrirDocumento` queda sin usar (se retira o se deja como envoltorio).
-- Firma: `createSignedUrl(path, 600)` y otra con `{ download: nombre }` para Descargar.
-- Tipo: por `DocVisita.tipo` o extensión del nombre.
-- Detección iPhone: user agent iOS → sin iframe para PDF.
+
+- Archivos: `drizzle/migrations/0034_completar_bloque.sql`, `src/pages/MisRevisiones.tsx`, componente nuevo `CompletarBloqueDialog.tsx`, hook en `useVisitaMensajes.ts` o `useCrm.ts`, `RevisionVisitas.tsx` (punto 4 y 5).
+- La función es nueva: no hace falta DROP de firma previa.
+- Adjuntos del formulario: se suben a la carpeta del usuario al guardar; si se cancela no se sube nada.
