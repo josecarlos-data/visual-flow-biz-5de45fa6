@@ -464,14 +464,25 @@ export default function RevisionVisitas() {
                 );
               })}
 
-              {bloquesDe(sel).length === 0 && Object.keys(sel.campos ?? {}).length > 0 && (
+              {bloquesDe(sel).length === 0 && presentarCampos(sel.campos, motivos?.find((m) => m.key === sel.motivo_key)?.campos).length > 0 && (
                 <div className="space-y-1 rounded-md border p-3 text-sm">
-                  {Object.entries(sel.campos).map(([k, val]) => (
-                    <p key={k} className="flex justify-between gap-3">
-                      <span className="text-muted-foreground">{k}</span>
-                      <span className="text-right font-medium">{String(val)}</span>
-                    </p>
+                  {presentarCampos(sel.campos, motivos?.find((m) => m.key === sel.motivo_key)?.campos).map((it) => (
+                    <div key={it.clave} className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">{it.label}</span>
+                      {it.clase === "adjunto"
+                        ? <BotonAdjunto adjunto={it.adjunto} />
+                        : <span className="text-right font-medium">{it.valor}</span>}
+                    </div>
                   ))}
+                </div>
+              )}
+
+              {documentosDe(sel.campos).length > 0 && (
+                <div className="space-y-1.5 rounded-md border p-3 text-sm">
+                  <p className="text-xs font-medium text-muted-foreground">Documentos de la visita</p>
+                  <div className="flex flex-wrap gap-2">
+                    {documentosDe(sel.campos).map((a) => <BotonAdjunto key={a.path} adjunto={a} />)}
+                  </div>
                 </div>
               )}
 
