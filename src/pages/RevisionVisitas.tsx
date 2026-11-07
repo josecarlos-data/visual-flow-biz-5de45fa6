@@ -113,11 +113,7 @@ export default function RevisionVisitas() {
     const meta = (b.campos_meta ?? {}) as Record<string, { origen?: string } | undefined>;
     return meta[clave]?.origen === "comercial" || meta[`${clave}_nombre`]?.origen === "comercial";
   };
-  /** Reanalizar borra los bloques: se impide si hay revisiones o conversación que se perderían. */
-  const reanalizarBloqueado = !!sel && (
-    (bloquesMap?.get(sel.id) ?? []).some((b) => (b.validacion ?? "pendiente") !== "pendiente") ||
-    (mensajes ?? []).length > 0
-  );
+
   const editaObs = !!sel && sel.origen !== "app";
 
   const nombrePorCod = useMemo(() => {
@@ -130,6 +126,11 @@ export default function RevisionVisitas() {
 
   // Bloques de todas las visitas cargadas: los filtros por origen/motivo/confianza los miran.
   const { data: bloquesMap } = useVisitaBloques((visitas ?? []).map((v) => v.id));
+  /** Reanalizar borra los bloques: se impide si hay revisiones o conversación que se perderían. */
+  const reanalizarBloqueado = !!sel && (
+    (bloquesMap?.get(sel.id) ?? []).some((b) => (b.validacion ?? "pendiente") !== "pendiente") ||
+    (mensajes ?? []).length > 0
+  );
   const bloquesDe = (v: Visita) => bloquesMap?.get(v.id) ?? [];
   const cargandoBloques = !bloquesMap;
   const dialogoRef = useRef<HTMLDivElement>(null);
