@@ -108,6 +108,16 @@ export default function RevisionVisitas() {
   useMarcarLeida(sel?.id);
   const invalidarMensajes = useInvalidarMensajes();
   const hilo = (bloqueId: string | null) => (mensajes ?? []).filter((m) => m.bloque_id === bloqueId);
+  /** Campo (o su nombre de archivo) que el comercial ha completado tras la revisión. */
+  const completadoComercial = (b: VisitaBloque, clave: string) => {
+    const meta = (b.campos_meta ?? {}) as Record<string, { origen?: string } | undefined>;
+    return meta[clave]?.origen === "comercial" || meta[`${clave}_nombre`]?.origen === "comercial";
+  };
+  /** Reanalizar borra los bloques: se impide si hay revisiones o conversación que se perderían. */
+  const reanalizarBloqueado = !!sel && (
+    (bloquesMap?.get(sel.id) ?? []).some((b) => (b.validacion ?? "pendiente") !== "pendiente") ||
+    (mensajes ?? []).length > 0
+  );
   const editaObs = !!sel && sel.origen !== "app";
 
   const nombrePorCod = useMemo(() => {
@@ -439,8 +449,11 @@ export default function RevisionVisitas() {
                     </span>
                   </div>
                   {presentarCampos(b.campos, motivos?.find((m) => m.key === b.motivo_key)?.campos).map((it) => (
-                    <div key={it.clave} className="flex justify-between gap-3">
-                      <span className="text-muted-foreground">{it.label}</span>
+                    <div key={it.clave} className={`flex justify-between gap-3 ${completadoComercial(b, it.clave) ? "-mx-1 rounded bg-accent/60 px-1" : ""}`}>
+                      <span className="text-muted-foreground">
+                        {it.label}
+                        {completadoComercial(b, it.clave) && <Badge variant="outline" className="ml-1 text-[10px]">completado por el comercial</Badge>}
+                      </span>
                       {it.clase === "adjunto"
                         ? <BotonAdjunto adjunto={it.adjunto} />
                         : <span className="text-right font-medium">{it.valor}</span>}
@@ -493,7 +506,8 @@ export default function RevisionVisitas() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={reanalizar.isPending}
+                      title={reanalizarBloqueado ? "No se puede reanalizar: hay motivos revisados o mensajes en esta visita" : undefined}
+                      disabled={reanalizar.isPending || reanalizarBloqueado}
                       onClick={() => {
                         if (!confirm("Se sustituyen los bloques actuales por los que proponga el análisis. ¿Continuar?")) return;
                         reanalizar.mutate(
