@@ -679,6 +679,8 @@ export interface VisitaBloque {
   revisado_en: string | null;
   orden: number;
   created_at: string;
+  /** Texto tal cual del servidor (con microsegundos): versión para completar_bloque. */
+  updated_at: string;
 }
 
 /** Bloques de un conjunto de visitas, agrupados por visita_id. */
