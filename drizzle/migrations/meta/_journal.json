@@ -239,6 +239,13 @@
       "when": 1794069791548,
       "tag": "0033_limpieza_pruebas_revision",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1794072809647,
+      "tag": "0034_0034_completar_bloque",
+      "breakpoints": true
     }
   ]
 }

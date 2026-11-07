@@ -2796,6 +2796,10 @@ export type Database = {
           vendedor: string
         }[]
       }
+      completar_bloque: {
+        Args: { _bloque_id: string; _campos: Json; _updated_at: string }
+        Returns: Json
+      }
       comunicaciones_listado: {
         Args: {
           _delegacion?: string
