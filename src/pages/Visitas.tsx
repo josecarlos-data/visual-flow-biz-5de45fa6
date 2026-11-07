@@ -9,7 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useVisitas, useClientes, useMotivos, useVisitaBloques, fechaCorta } from "@/hooks/useCrm";
 import { useScrollRestore } from "@/hooks/useScrollRestore";
-import { abrirDocumento, nombreDoc, type DocVisita } from "@/components/DocumentosVisita";
+import { nombreDoc, type DocVisita } from "@/components/DocumentosVisita";
+import { BotonAdjunto } from "@/components/VisorAdjunto";
 
 export default function Visitas() {
   const { data: visitas, isLoading } = useVisitas(300);
@@ -139,24 +140,14 @@ export default function Visitas() {
                 {docsDe(v).length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {docsDe(v).map((d) => (
-                      <button
-                        key={d.path}
-                        type="button"
-                        className="flex max-w-full items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          void abrirDocumento(d.path!);
-                        }}
-                      >
-                        <Paperclip className="h-3 w-3 shrink-0" />
-                        <span className="truncate">{nombreDoc(d)}</span>
+                      <span key={d.path} className="inline-flex max-w-full items-center gap-1">
+                        <BotonAdjunto adjunto={{ path: d.path!, nombre: nombreDoc(d), tipo: d.tipo, tamano: d.tamano }} />
                         {d.motivo_key && motivoNombre.get(d.motivo_key) && (
-                          <Badge variant="secondary" className="ml-1 px-1 py-0 text-[10px]">
+                          <Badge variant="secondary" className="px-1 py-0 text-[10px]">
                             {motivoNombre.get(d.motivo_key)}
                           </Badge>
                         )}
-                      </button>
+                      </span>
                     ))}
                   </div>
                 )}

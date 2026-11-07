@@ -30,6 +30,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { MensajesFicha } from "@/components/MensajesFicha";
+import { BotonAdjunto } from "@/components/VisorAdjunto";
+import { presentarCampos, documentosDe } from "@/lib/camposVisita";
 import { useMensajesVisitas } from "@/hooks/useVisitaMensajes";
 import {
   useCliente, useClienteVentas, useClienteKpis, useClienteProductos, useClienteMix,
@@ -959,23 +961,29 @@ const { campo, dir } = ordenProductos;
                       bloques.map((b) => (
                         <div key={b.id} className="space-y-1 rounded-md border p-2">
                           <p className="text-xs font-medium text-muted-foreground">{motivoNombre(b.motivo_key)}</p>
-                          {Object.entries(b.campos ?? {}).filter(([, val]) => val).map(([k, val]) => (
-<p key={k} className="text-sm">
-                              <span className="text-muted-foreground">{campoNombre(b.motivo_key, k)}: </span>
-                              {String(val)}
-                            </p>
+                          {presentarCampos(b.campos, motivos?.find((m) => m.key === b.motivo_key)?.campos).map((it) => (
+                            <div key={it.clave} className="text-sm">
+                              <span className="text-muted-foreground">{it.label}: </span>
+                              {it.clase === "adjunto" ? <BotonAdjunto adjunto={it.adjunto} /> : it.valor}
+                            </div>
                           ))}
                           <MensajesFicha visitaId={v.id} bloqueId={b.id} hilo={mensajesFicha} />
                         </div>
 
                       ))
                     ) : (
-                      Object.entries(v.campos ?? {}).filter(([, val]) => val).map(([k, val]) => (
-<p key={k} className="text-sm">
-                          <span className="text-muted-foreground">{campoNombre(v.motivo_key, k)}: </span>
-                          {String(val)}
-                        </p>
+                      presentarCampos(v.campos, motivos?.find((m) => m.key === v.motivo_key)?.campos).map((it) => (
+                        <div key={it.clave} className="text-sm">
+                          <span className="text-muted-foreground">{it.label}: </span>
+                          {it.clase === "adjunto" ? <BotonAdjunto adjunto={it.adjunto} /> : it.valor}
+                        </div>
                       ))
+                    )}
+                    {documentosDe(v.campos).length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Documentos de la visita:</span>
+                        {documentosDe(v.campos).map((a) => <BotonAdjunto key={a.path} adjunto={a} />)}
+                      </div>
                     )}
                     {bloques.length === 0 && v.observaciones && <p className="whitespace-pre-wrap text-sm">{v.observaciones}</p>}
                     {bloques.length === 0 && (
