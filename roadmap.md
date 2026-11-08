@@ -56,3 +56,8 @@
 - [x] Limpiar mensajes, notas y validaciones de prueba antes de publicar (0033; CALEROTRUCKS de Fran conservada como mensaje)
 
 - [x] 0035: proteger validación de visitas y bloques en servidor (firma, autovalidación, bloqueos)
+
+## Objetivos v2
+- [x] Entrega 1: migración 0036 (tablas, catálogo, cálculo, permisos, auditoría, migración de los 19 objetivos de 2026), cuadre 19/19 y pruebas de permisos
+- [ ] Entrega 2 (espera «adelante»): asistente director/admin, tarjetas móviles del comercial, quitar «Ruta especial» de la pantalla, aviso de comerciales sin código
+- [ ] Más adelante: retirar tabla y funciones viejas cuando la pantalla nueva esté validada

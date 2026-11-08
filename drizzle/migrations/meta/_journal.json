@@ -253,6 +253,13 @@
       "when": 1794139985340,
       "tag": "0035_0035_proteger_validacion",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794144211002,
+      "tag": "0036_objetivos_v2",
+      "breakpoints": true
     }
   ]
 }
