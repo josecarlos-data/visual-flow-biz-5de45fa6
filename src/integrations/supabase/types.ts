@@ -860,6 +860,108 @@ export type Database = {
         }
         Relationships: []
       }
+      objetivo_asignaciones: {
+        Row: {
+          created_at: string
+          id: string
+          meta_tipo: string | null
+          meta_valor: number | null
+          nota: string | null
+          objetivo_id: string
+          updated_at: string
+          user_id: string | null
+          vendedor: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          meta_tipo?: string | null
+          meta_valor?: number | null
+          nota?: string | null
+          objetivo_id: string
+          updated_at?: string
+          user_id?: string | null
+          vendedor: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          meta_tipo?: string | null
+          meta_valor?: number | null
+          nota?: string | null
+          objetivo_id?: string
+          updated_at?: string
+          user_id?: string | null
+          vendedor?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "objetivo_asignaciones_objetivo_id_fkey"
+            columns: ["objetivo_id"]
+            isOneToOne: false
+            referencedRelation: "objetivos_v2"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      objetivo_clientes: {
+        Row: {
+          asignacion_id: string | null
+          cod_cliente: number
+          created_at: string
+          id: string
+          meta_tipo: string | null
+          meta_valor: number | null
+          objetivo_id: string
+          origen: string
+          titular_vendedor: string | null
+        }
+        Insert: {
+          asignacion_id?: string | null
+          cod_cliente: number
+          created_at?: string
+          id?: string
+          meta_tipo?: string | null
+          meta_valor?: number | null
+          objetivo_id: string
+          origen?: string
+          titular_vendedor?: string | null
+        }
+        Update: {
+          asignacion_id?: string | null
+          cod_cliente?: number
+          created_at?: string
+          id?: string
+          meta_tipo?: string | null
+          meta_valor?: number | null
+          objetivo_id?: string
+          origen?: string
+          titular_vendedor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "objetivo_clientes_asignacion_id_fkey"
+            columns: ["asignacion_id"]
+            isOneToOne: false
+            referencedRelation: "objetivo_asignaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "objetivo_clientes_cod_cliente_fkey"
+            columns: ["cod_cliente"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["cod_cliente"]
+          },
+          {
+            foreignKeyName: "objetivo_clientes_objetivo_id_fkey"
+            columns: ["objetivo_id"]
+            isOneToOne: false
+            referencedRelation: "objetivos_v2"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       objetivos: {
         Row: {
           activo: boolean
@@ -910,6 +1012,89 @@ export type Database = {
           vendedor?: string
         }
         Relationships: []
+      }
+      objetivos_v2: {
+        Row: {
+          atribucion: string
+          comparacion: string
+          contar_ajenos: boolean
+          created_at: string
+          created_by: string | null
+          desde: string
+          estado: string
+          excluir_de_cartera: boolean
+          hasta: string
+          id: string
+          medida: string
+          meta_tipo: string
+          meta_valor: number | null
+          modo_lista: string
+          mostrar_importe: boolean
+          nombre: string
+          nota: string | null
+          origen_legacy: Json | null
+          parametros: Json
+          tipo: string
+          tramos: Json
+          updated_at: string
+        }
+        Insert: {
+          atribucion?: string
+          comparacion?: string
+          contar_ajenos?: boolean
+          created_at?: string
+          created_by?: string | null
+          desde: string
+          estado?: string
+          excluir_de_cartera?: boolean
+          hasta: string
+          id?: string
+          medida?: string
+          meta_tipo?: string
+          meta_valor?: number | null
+          modo_lista?: string
+          mostrar_importe?: boolean
+          nombre: string
+          nota?: string | null
+          origen_legacy?: Json | null
+          parametros?: Json
+          tipo: string
+          tramos?: Json
+          updated_at?: string
+        }
+        Update: {
+          atribucion?: string
+          comparacion?: string
+          contar_ajenos?: boolean
+          created_at?: string
+          created_by?: string | null
+          desde?: string
+          estado?: string
+          excluir_de_cartera?: boolean
+          hasta?: string
+          id?: string
+          medida?: string
+          meta_tipo?: string
+          meta_valor?: number | null
+          modo_lista?: string
+          mostrar_importe?: boolean
+          nombre?: string
+          nota?: string | null
+          origen_legacy?: Json | null
+          parametros?: Json
+          tipo?: string
+          tramos?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "objetivos_v2_tipo_fkey"
+            columns: ["tipo"]
+            isOneToOne: false
+            referencedRelation: "tipos_objetivo"
+            referencedColumns: ["key"]
+          },
+        ]
       }
       ofertas: {
         Row: {
@@ -1623,6 +1808,42 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      tipos_objetivo: {
+        Row: {
+          created_at: string
+          descripcion: string | null
+          disponible: boolean
+          id: string
+          key: string
+          nombre: string
+          sort_order: number
+          updated_at: string
+          visible: boolean
+        }
+        Insert: {
+          created_at?: string
+          descripcion?: string | null
+          disponible?: boolean
+          id?: string
+          key: string
+          nombre: string
+          sort_order?: number
+          updated_at?: string
+          visible?: boolean
+        }
+        Update: {
+          created_at?: string
+          descripcion?: string | null
+          disponible?: boolean
+          id?: string
+          key?: string
+          nombre?: string
+          sort_order?: number
+          updated_at?: string
+          visible?: boolean
         }
         Relationships: []
       }
@@ -3040,6 +3261,33 @@ export type Database = {
         }[]
       }
       normalizar_texto: { Args: { _t: string }; Returns: string }
+      objetivo_filas: {
+        Args: { _asig: string[] }
+        Returns: {
+          asignacion_id: string
+          base_comparable: number
+          base_total: number
+          cli_meta_tipo: string
+          cli_meta_valor: number
+          cod_cliente: number
+          origen: string
+          titular: string
+          vendido: number
+        }[]
+      }
+      objetivo_fin_comparable: {
+        Args: { _comparacion: string; _desde: string; _hasta: string }
+        Returns: string
+      }
+      objetivo_meta: {
+        Args: { _base: number; _tipo: string; _valor: number }
+        Returns: number
+      }
+      objetivo_tomar_foto: {
+        Args: { _objetivo_id: string }
+        Returns: undefined
+      }
+      objetivo_tramo: { Args: { _pct: number; _tramos: Json }; Returns: Json }
       objetivos_propuesta: {
         Args: { _anio: number; _pct?: number }
         Returns: {
@@ -3068,6 +3316,64 @@ export type Database = {
           vendedor: string
           vendido: number
           vendido_anterior_ytd: number
+        }[]
+      }
+      objetivos_v2_avance: {
+        Args: { _desde?: string; _hasta?: string }
+        Returns: {
+          asignacion_id: string
+          atribucion: string
+          avance_pct: number
+          base_comparable: number
+          base_total: number
+          comparacion: string
+          desde: string
+          estado: string
+          falta: number
+          fecha_corte: string
+          fin_comparable: string
+          hasta: string
+          medida: string
+          meta: number
+          modo_lista: string
+          mostrar_importe: boolean
+          nombre: string
+          num_clientes: number
+          objetivo_id: string
+          proyeccion: number
+          proyeccion_pct: number
+          sin_usuario: boolean
+          tipo: string
+          tramo: Json
+          tramo_proyectado: Json
+          tramos: Json
+          user_id: string
+          vendedor: string
+          vendido: number
+        }[]
+      }
+      objetivos_v2_detalle: { Args: { _asignacion_id: string }; Returns: Json }
+      objetivos_v2_duplicar: { Args: { _id: string }; Returns: string }
+      objetivos_v2_guardar: { Args: { _d: Json }; Returns: string }
+      objetivos_v2_propuesta: {
+        Args: { _desde: string; _hasta: string; _pct?: number }
+        Returns: {
+          base_anterior: number
+          meta_sugerida: number
+          num_clientes: number
+          user_id: string
+          vendedor: string
+        }[]
+      }
+      objetivos_v2_sin_codigo: {
+        Args: never
+        Returns: {
+          caso: string
+          nombre: string
+          rol: string
+          user_id: string
+          username: string
+          vendedor: string
         }[]
       }
       oferta_envio_compras: {
@@ -3359,8 +3665,16 @@ export type Database = {
       puede_conversar_visita: { Args: { _visita_id: string }; Returns: boolean }
       puede_editar_bloque: { Args: { _visita_id: string }; Returns: boolean }
       puede_enviar_ofertas: { Args: { _uid: string }; Returns: boolean }
+      puede_gestionar_objetivos: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
       puede_gestionar_ofertas: { Args: { _user_id: string }; Returns: boolean }
       puede_revisar_visitas: { Args: { _user_id: string }; Returns: boolean }
+      puede_ver_asignacion_objetivo: {
+        Args: { _asig_user: string; _user_id: string; _vendedor: string }
+        Returns: boolean
+      }
       puede_ver_bloque: { Args: { _visita_id: string }; Returns: boolean }
       puede_ver_margen: { Args: { _user_id: string }; Returns: boolean }
       purgar_auditoria: { Args: never; Returns: number }
