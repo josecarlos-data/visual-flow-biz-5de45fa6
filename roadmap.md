@@ -54,3 +54,5 @@
 - [x] Prueba de conversación con visita PRUEBA (borrada). Pendiente: probar las pantallas con sesión real
 - [x] Arreglar conversación de revisión (llamadas, errores visibles, «Avisos de revisión» para todos, ficha con una sola consulta, cabecera, listado de pruebas a limpiar antes de publicar)
 - [x] Limpiar mensajes, notas y validaciones de prueba antes de publicar (0033; CALEROTRUCKS de Fran conservada como mensaje)
+
+- [x] 0035: proteger validación de visitas y bloques en servidor (firma, autovalidación, bloqueos)

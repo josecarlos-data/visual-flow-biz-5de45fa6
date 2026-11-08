@@ -246,6 +246,13 @@
       "when": 1794072809647,
       "tag": "0034_0034_completar_bloque",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1794139985340,
+      "tag": "0035_0035_proteger_validacion",
+      "breakpoints": true
     }
   ]
 }
