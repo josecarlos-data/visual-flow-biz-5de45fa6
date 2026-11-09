@@ -104,6 +104,20 @@ export default function AdminData() {
     });
   };
 
+  const handleAccion = async (accion: NonNullable<UploadResult["accion"]>) => {
+    if (!dataset) return;
+    setUploading(true);
+    const result = await accion.run();
+    setUploadResult(result);
+    setUploading(false);
+    dataset.invalidate(queryClient);
+    toast({
+      title: result.errors === 0 ? "Carga completada" : "Carga con errores",
+      description: result.message,
+      variant: result.errors > 0 ? "destructive" : "default",
+    });
+  };
+
   const previewRows = dataset && parsedData ? dataset.previewRows(parsedData, 20) : [];
   const totalRows = dataset && parsedData ? dataset.rowCount(parsedData) : 0;
   const summary = dataset?.summary && parsedData ? dataset.summary(parsedData) : [];
@@ -266,10 +280,17 @@ export default function AdminData() {
 
                 {uploadResult.message && <p className="text-xs text-muted-foreground">{uploadResult.message}</p>}
 
+                {uploadResult.accion && (
+                  <Button size="sm" variant="destructive" disabled={uploading} onClick={() => handleAccion(uploadResult.accion!)}>
+                    {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {uploadResult.accion.label}
+                  </Button>
+                )}
+
                 {uploadResult.stages && uploadResult.stages.length > 0 && (
                   <div className="space-y-1 border-t border-border pt-2 text-xs">
                     {uploadResult.stages.map((stage) => (
-                      <div key={stage.name} className="grid gap-1 sm:grid-cols-[180px_1fr]">
+                      <div key={stage.name + stage.message} className="grid gap-1 sm:grid-cols-[180px_1fr]">
                         <span className="font-medium text-foreground">{stage.name}</span>
                         <span className={stage.errors > 0 ? "text-destructive" : "text-muted-foreground"}>
                           {stage.success} éxitos · {stage.errors} errores{stage.message ? ` · ${stage.message}` : ""}

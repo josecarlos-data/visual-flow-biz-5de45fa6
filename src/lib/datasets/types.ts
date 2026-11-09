@@ -20,6 +20,8 @@ export interface UploadResult {
   errors: number;
   stages?: UploadStageResult[];
   message?: string;
+  /** Acción de seguimiento que el administrador puede confirmar (p. ej. «Aplicar de todas formas»). */
+  accion?: { label: string; run: () => Promise<UploadResult> };
 }
 
 /** Casilla opcional que el administrador marca antes de subir. */
