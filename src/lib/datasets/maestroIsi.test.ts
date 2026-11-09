@@ -13,7 +13,7 @@ describe("fechas del Maestro ISI en hora local", () => {
   });
 });
 
-import * as XLSX from "xlsx";
+import * as XLSX from "@e965/xlsx";
 import { maestroIsiDataset } from "./maestroIsi";
 
 function libro(hojas: Record<string, Record<string, unknown>[]>): ArrayBuffer {
