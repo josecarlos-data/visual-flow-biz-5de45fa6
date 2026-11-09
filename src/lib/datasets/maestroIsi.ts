@@ -1,7 +1,7 @@
 import * as XLSX from "@e965/xlsx";
 import { Database } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import type { DatasetModule, UploadStageResult } from "./types";
+import type { DatasetModule, UploadResult, UploadStageResult } from "./types";
 import { num as fmtNum } from "@/lib/format";
 
 type Row = Record<string, unknown>;
@@ -20,9 +20,12 @@ const boolv = (v: unknown): boolean => {
   const s = String(v ?? "").trim().toLowerCase();
   return s === "true" || s === "si" || s === "sí" || s === "1" || s === "x";
 };
-const datev = (v: unknown): string | null => {
+const p2 = (n: number) => String(n).padStart(2, "0");
+/** Fecha local (no UTC): SheetJS crea las fechas a medianoche en hora local. */
+const fechaLocal = (d: Date) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+export const datev = (v: unknown): string | null => {
   if (v === null || v === undefined || v === "") return null;
-  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : fechaLocal(v);
   if (typeof v === "number") {
     const d = XLSX.SSF.parse_date_code(v);
     return d ? `${d.y}-${String(d.m).padStart(2, "0")}-${String(d.d).padStart(2, "0")}` : null;
@@ -31,11 +34,11 @@ const datev = (v: unknown): string | null => {
   const m = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
   if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
   const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+  return isNaN(d.getTime()) ? null : fechaLocal(d);
 };
-const timev = (v: unknown): string | null => {
+export const timev = (v: unknown): string | null => {
   if (v === null || v === undefined || v === "") return null;
-  if (v instanceof Date) return v.toISOString().slice(11, 19);
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : `${p2(v.getHours())}:${p2(v.getMinutes())}:${p2(v.getSeconds())}`;
   if (typeof v === "number") {
     const total = Math.round((v % 1) * 86400);
     const p = (n: number) => String(n).padStart(2, "0");
@@ -131,6 +134,20 @@ export interface MaestroIsiParsed {
   clientes: MaestroCliente[];
   productos: MaestroProducto[];
   ventas: MaestroVenta[];
+  hojas: HojaLectura[];
+  descartesVentas: DescarteVenta[];
+}
+
+export interface HojaLectura {
+  hoja: string;
+  leidas: number;
+  descartadas: number;
+}
+
+export interface DescarteVenta {
+  fila: number;
+  falta: string;
+  row: Record<string, unknown>;
 }
 
 /** Campos del Excel que no tienen columna propia: se guardan en `extra`. */
@@ -154,15 +171,17 @@ const EXTRA_CLIENTE = [
 
 function sheetRows(wb: XLSX.WorkBook, ...names: string[]): Row[] {
   const name = names.find((n) => wb.SheetNames.includes(n));
-  if (!name) throw new Error(`Falta la hoja ${names[0]} en el Excel`);
+  if (!name) throw new Error(`Falta la hoja ${names[0]} en el Excel. No se ha subido nada.`);
   return XLSX.utils.sheet_to_json<Row>(wb.Sheets[name], { defval: null });
 }
 
 function parseExcel(buffer: ArrayBuffer): MaestroIsiParsed {
-  const wb = XLSX.read(buffer, { type: "array", cellDates: true });
+  const wb = XLSX.read(buffer, { type: "array", cellDates: true, nodim: true });
 
+  const hojas: HojaLectura[] = [];
   const clientes: MaestroCliente[] = [];
-  for (const r of sheetRows(wb, "Dim_Cliente")) {
+  const filasCli = sheetRows(wb, "Dim_Cliente");
+  for (const r of filasCli) {
     const cod = numv(r["Cliente"]);
     if (cod === null || isNaN(cod)) continue;
     const extra: Record<string, string> = {};
@@ -205,8 +224,11 @@ function parseExcel(buffer: ArrayBuffer): MaestroIsiParsed {
     });
   }
 
+  hojas.push({ hoja: "Dim_Cliente", leidas: filasCli.length, descartadas: filasCli.length - clientes.length });
+
   const productos: MaestroProducto[] = [];
-  for (const r of sheetRows(wb, "Dim_Referencia")) {
+  const filasRef = sheetRows(wb, "Dim_Referencia");
+  for (const r of filasRef) {
     const ref = str(r["Referencia"]);
     if (!ref) continue;
     productos.push({
@@ -229,12 +251,23 @@ function parseExcel(buffer: ArrayBuffer): MaestroIsiParsed {
     });
   }
 
+  hojas.push({ hoja: "Dim_Referencia", leidas: filasRef.length, descartadas: filasRef.length - productos.length });
+
   const ventas: MaestroVenta[] = [];
-  for (const r of sheetRows(wb, "Hechos_Diarios")) {
+  const descartesVentas: DescarteVenta[] = [];
+  const filasHechos = sheetRows(wb, "Hechos_Diarios");
+  if (filasHechos.length === 0) throw new Error("La hoja Hechos_Diarios está vacía. No se ha subido nada.");
+  for (let i = 0; i < filasHechos.length; i++) {
+    const r = filasHechos[i];
     const cod = numv(r["Cliente"]);
     const ref = str(r["Referencia"]);
     const fecha = datev(r["Fecha"]);
-    if (cod === null || !ref || !fecha) continue;
+    if (cod === null || isNaN(cod) || !ref || !fecha) {
+      const falta = [cod === null || isNaN(cod) ? "Cliente" : null, !ref ? "Referencia" : null, !fecha ? "Fecha" : null]
+        .filter(Boolean).join(", ");
+      descartesVentas.push({ fila: i + 2, falta, row: r });
+      continue;
+    }
     const doc = str(r["ID Documento"]);
     const contador = str(r["Contador"]);
     ventas.push({
@@ -266,11 +299,86 @@ function parseExcel(buffer: ArrayBuffer): MaestroIsiParsed {
 
   }
 
-  if (clientes.length === 0 && productos.length === 0 && ventas.length === 0) {
-    throw new Error("El Excel no contiene filas válidas en Dim_Cliente / Dim_Referencia / Hechos_Diarios");
+  hojas.push({ hoja: "Hechos_Diarios", leidas: filasHechos.length, descartadas: descartesVentas.length });
+
+  if (ventas.length === 0) {
+    throw new Error("La hoja Hechos_Diarios no tiene ninguna línea válida (con Cliente, Referencia y Fecha). No se ha subido nada.");
   }
 
-  return { clientes, productos, ventas };
+  return { clientes, productos, ventas, hojas, descartesVentas };
+}
+
+function ejemplosDescartes(d: MaestroIsiParsed): string {
+  if (d.descartesVentas.length === 0) return "";
+  const ej = d.descartesVentas.slice(0, 5).map((x) => `fila ${x.fila} (sin ${x.falta})`).join("; ");
+  return ` Hechos_Diarios: ${fmtNum(d.descartesVentas.length)} filas descartadas. Primeras: ${ej}.`;
+}
+
+interface Aplicacion { aplicada: boolean; aviso?: string; filas?: number; filas_carga?: number; filas_actuales?: number; desde?: string; hasta?: string }
+
+async function aplicarYRefrescar(
+  data: MaestroIsiParsed,
+  carga: string,
+  forzar: boolean,
+  stages: UploadStageResult[],
+): Promise<UploadResult> {
+  const { data: res, error } = await supabase.rpc("aplicar_carga_ventas" as never, { _carga: carga, _forzar: forzar } as never);
+  if (error) {
+    stages.push({ name: "Aplicar ventas", success: 0, errors: 1, message: error.message });
+    return { success: 0, errors: 1, stages, message: "No se han aplicado las ventas. El CRM sigue con las ventas anteriores." };
+  }
+  const r = res as unknown as Aplicacion;
+  if (!r.aplicada) {
+    stages.push({ name: "Aplicar ventas", success: 0, errors: 1, message: "Aviso del 95 %" });
+    return {
+      success: 0,
+      errors: 1,
+      stages,
+      message: `La carga trae ${fmtNum(r.filas_carga ?? 0)} líneas de venta y el CRM tiene ${fmtNum(r.filas_actuales ?? 0)} (menos del 95 %). No se ha cambiado ninguna venta.${ejemplosDescartes(data)}`,
+      accion: {
+        label: "Aplicar de todas formas",
+        run: () => aplicarYRefrescar(data, carga, true, stages.filter((s) => s.name !== "Aplicar ventas")),
+      },
+    };
+  }
+  stages.push({ name: "Aplicar ventas", success: r.filas ?? 0, errors: 0, message: `${r.desde} a ${r.hasta}` });
+
+  for (const fn of ["refrescar_resumenes_admin", "refrescar_documentos_resumen"]) {
+    const { error: e } = await supabase.rpc(fn as never);
+    stages.push(e ? { name: fn, success: 0, errors: 1, message: e.message } : { name: fn, success: 1, errors: 0 });
+  }
+  const errors = stages.reduce((a, s) => a + s.errors, 0);
+  return {
+    success: (r.filas ?? 0),
+    errors,
+    stages,
+    message:
+      (errors === 0
+        ? "Maestro ISI cargado y resúmenes regenerados."
+        : "Las ventas se han aplicado, pero algún paso posterior falló. Revisa el detalle.") + ejemplosDescartes(data),
+  };
+}
+
+async function subirMaestro(data: MaestroIsiParsed): Promise<UploadResult> {
+  const stages: UploadStageResult[] = [];
+  const { data: carga, error: prepError } = await supabase.rpc("preparar_carga_ventas" as never);
+  if (prepError || !carga) {
+    return { success: 0, errors: 1, stages: [{ name: "Preparar carga", success: 0, errors: 1, message: prepError?.message }], message: "No se ha iniciado la carga. No se ha cambiado nada." };
+  }
+  const SIZE = 2000;
+  let subidas = 0;
+  for (let i = 0; i < data.ventas.length; i += SIZE) {
+    const { error } = await supabase.rpc("insertar_ventas_carga" as never, { _carga: carga, _rows: data.ventas.slice(i, i + SIZE) } as never);
+    if (error) {
+      stages.push({ name: "Subir ventas", success: subidas, errors: data.ventas.length - subidas, message: error.message });
+      return { success: 0, errors: 1, stages, message: "Ha fallado una tanda de ventas. No se ha cambiado nada en el CRM; vuelve a intentarlo." };
+    }
+    subidas += Math.min(SIZE, data.ventas.length - i);
+  }
+  stages.push({ name: "Subir ventas", success: subidas, errors: 0 });
+  stages.push(await rpcBatches("upsert_clientes_maestro", "_rows", data.clientes, 500));
+  stages.push(await rpcBatches("upsert_productos_maestro", "_rows", data.productos, 1000));
+  return aplicarYRefrescar(data, carga as unknown as string, false, stages);
 }
 
 async function rpcBatches<T>(fn: string, key: string, rows: T[], size: number): Promise<UploadStageResult> {
@@ -310,68 +418,17 @@ export const maestroIsiDataset: DatasetModule<MaestroIsiParsed> = {
     { key: "prohibicion_venta", label: "Aviso" },
   ],
   previewRows: (d, limit) => d.clientes.slice(0, limit) as unknown as Record<string, unknown>[],
-  upload: async (data) => {
-    const stages: UploadStageResult[] = [];
-
-    const { error: resetError } = await supabase.rpc("reset_maestro_isi_data" as never);
-    if (resetError) {
-      console.error("reset_maestro_isi_data error:", resetError.message);
-      return {
-        success: 0,
-        errors: data.clientes.length + data.productos.length + data.ventas.length,
-        stages: [{ name: "Limpieza inicial", success: 0, errors: 1, message: resetError.message }],
-        message: "No se pudo limpiar la carga anterior. No se ha iniciado la importación.",
-      };
-    }
-    stages.push({ name: "Limpieza inicial", success: 1, errors: 0 });
-
-    stages.push(await rpcBatches("upsert_clientes_maestro", "_rows", data.clientes, 500));
-    stages.push(await rpcBatches("upsert_productos_maestro", "_rows", data.productos, 1000));
-
-    const SIZE = 2000;
-    let ventasSuccess = 0;
-    let ventasErrors = 0;
-    let ventasMessage: string | undefined;
-    for (let i = 0; i < data.ventas.length; i += SIZE) {
-      const { error } = await supabase.rpc("insertar_ventas_diarias" as never, {
-        _rows: data.ventas.slice(i, i + SIZE),
-        _reset: false,
-      } as never);
-      if (error) {
-        ventasErrors += Math.min(SIZE, data.ventas.length - i);
-        ventasMessage = error.message;
-        console.error("insertar_ventas_diarias error:", error.message);
-      } else {
-        ventasSuccess += Math.min(SIZE, data.ventas.length - i);
-      }
-    }
-    stages.push({ name: "insertar_ventas_diarias", success: ventasSuccess, errors: ventasErrors, message: ventasMessage });
-
-    const { error: refrescoError } = await supabase.rpc("refrescar_resumenes_admin" as never);
-    if (refrescoError) {
-      console.error("refrescar_resumenes_admin error:", refrescoError.message);
-      stages.push({ name: "refrescar_resumenes_admin", success: 0, errors: 1, message: refrescoError.message });
-    } else {
-      stages.push({ name: "refrescar_resumenes_admin", success: 1, errors: 0 });
-    }
-
-    const { error: documentosError } = await supabase.rpc("refrescar_documentos_resumen" as never);
-    if (documentosError) {
-      console.error("refrescar_documentos_resumen error:", documentosError.message);
-      stages.push({ name: "refrescar_documentos_resumen", success: 0, errors: 1, message: documentosError.message });
-    } else {
-      stages.push({ name: "refrescar_documentos_resumen", success: 1, errors: 0 });
-    }
-
-    const success = stages.reduce((acc, s) => acc + s.success, 0) - 3;
-    const errors = stages.reduce((acc, s) => acc + s.errors, 0);
-    return {
-      success: Math.max(0, success),
-      errors,
-      stages,
-      message: errors === 0 ? "Maestro ISI cargado y resúmenes regenerados." : "La carga quedó incompleta. Revisa el detalle antes de volver a intentarlo.",
-    };
-  },
+  summary: (d) => [
+    ...d.hojas.map((h) => ({
+      label: `${h.hoja}: leídas · ${fmtNum(h.descartadas)} descartadas`,
+      value: fmtNum(h.leidas),
+      tone: (h.descartadas > 0 ? "warn" : "default") as "warn" | "default",
+    })),
+  ],
+  rejections: (d) =>
+    d.descartesVentas.map((x) => ({ fila: x.fila, motivo: `Hechos_Diarios sin ${x.falta}`, row: x.row })),
+  rejectionColumns: ["Cliente", "Referencia", "Fecha", "ID Documento", "Importe"],
+  upload: async (data) => subirMaestro(data),
   invalidate: (qc) => {
     qc.invalidateQueries({ queryKey: ["historico_data"] });
     qc.invalidateQueries({ queryKey: ["vendedores_list"] });
