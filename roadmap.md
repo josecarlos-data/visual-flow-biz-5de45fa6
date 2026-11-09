@@ -65,3 +65,8 @@
 ## Objetivos v2
 - [x] Entrega 1 (0036) y entrega 2 (0037 + pantallas)
 - [ ] Prueba en pantalla por el usuario con cuentas de prueba
+
+## Recarga del Maestro ISI
+- [x] Carga por tabla de espera con identificador, aviso del 95 %, «Aplicar de todas formas», auditoría (migración 0038)
+- [x] Fechas/horas locales, lectura completa de hojas (nodim), filas descartadas por hoja con ejemplos
+- [ ] Carga real del Excel (la hace el usuario) y confirmar que el límite de 10 min se aplica desde la app
