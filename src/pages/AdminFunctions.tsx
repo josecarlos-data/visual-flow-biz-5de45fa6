@@ -140,19 +140,19 @@ const DOCS_EXTRA: { titulo: string; doc: Doc }[] = [
     },
   },
   {
-    titulo: "Objetivo de cartera vs rutas especiales",
+    titulo: "Objetivo de cartera vs lista de clientes",
     doc: {
       queCalcula:
-        "Los objetivos de un comercial se separan en dos bolsas independientes: su cartera habitual y las rutas especiales asignadas este año (por ejemplo JAB2026). Las ventas de una ruta especial nunca suman al objetivo de cartera.",
+        "Un comercial puede tener su objetivo de cartera y, además, objetivos sobre una lista de clientes (por ejemplo un sprint). Si la lista se marca «excluir de la cartera», sus ventas no suman al objetivo de cartera.",
       pasos: [
-        "Cada cliente tiene comercial asignado y, opcionalmente, una ruta especial.",
-        "Las ventas de clientes con ruta especial con objetivo propio van a ese objetivo de ruta.",
+        "La cartera toma los clientes del comercial (foto al crear o ficha actual, según el objetivo).",
+        "Las ventas de los clientes de una lista que excluye de la cartera van solo a esa lista.",
         "El resto de ventas del comercial van al objetivo de cartera.",
-        "La suma de todos sus objetivos coincide con su facturación total del año.",
+        "La suma de todos sus objetivos coincide con su facturación total del periodo.",
       ],
       ejemplo: [
         "Facturación total del comercial: 891.956 €",
-        "Ruta especial JAB2026: 184.914 €",
+        "Lista «Sprint Primavera» (excluida de la cartera): 184.914 €",
         "Cartera: 891.956 − 184.914 = 707.042 €",
       ],
     },
