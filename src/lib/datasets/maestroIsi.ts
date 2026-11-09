@@ -145,6 +145,7 @@ export interface HojaLectura {
 }
 
 export interface DescarteVenta {
+  hoja: string;
   fila: number;
   falta: string;
   row: Record<string, unknown>;
@@ -255,8 +256,7 @@ function parseExcel(buffer: ArrayBuffer): MaestroIsiParsed {
 
   const ventas: MaestroVenta[] = [];
   const descartesVentas: DescarteVenta[] = [];
-  const filasHechos = sheetRows(wb, "Hechos_Diarios");
-  if (filasHechos.length === 0) throw new Error("La hoja Hechos_Diarios está vacía. No se ha subido nada.");
+  for (const { hoja, filas: filasHechos } of hojasVentas(wb)) {
   for (let i = 0; i < filasHechos.length; i++) {
     const r = filasHechos[i];
     const cod = numv(r["Cliente"]);
@@ -265,7 +265,7 @@ function parseExcel(buffer: ArrayBuffer): MaestroIsiParsed {
     if (cod === null || isNaN(cod) || !ref || !fecha) {
       const falta = [cod === null || isNaN(cod) ? "Cliente" : null, !ref ? "Referencia" : null, !fecha ? "Fecha" : null]
         .filter(Boolean).join(", ");
-      descartesVentas.push({ fila: i + 2, falta, row: r });
+      descartesVentas.push({ hoja, fila: i + 2, falta, row: r });
       continue;
     }
     const doc = str(r["ID Documento"]);
@@ -298,20 +298,42 @@ function parseExcel(buffer: ArrayBuffer): MaestroIsiParsed {
     });
 
   }
-
-  hojas.push({ hoja: "Hechos_Diarios", leidas: filasHechos.length, descartadas: descartesVentas.length });
+  hojas.push({ hoja, leidas: filasHechos.length, descartadas: descartesVentas.filter((x) => x.hoja === hoja).length });
+  }
 
   if (ventas.length === 0) {
-    throw new Error("La hoja Hechos_Diarios no tiene ninguna línea válida (con Cliente, Referencia y Fecha). No se ha subido nada.");
+    throw new Error("Las hojas de ventas (Hechos_Diarios) no tienen ninguna línea válida (con Cliente, Referencia y Fecha). No se ha subido nada.");
   }
 
   return { clientes, productos, ventas, hojas, descartesVentas };
 }
 
+/**
+ * Hojas de ventas: «Hechos_Diarios» o «Hechos_Diarios_…» (una por año), en orden alfabético.
+ * Valida todas antes de procesar nada.
+ */
+export function hojasVentas(wb: XLSX.WorkBook): { hoja: string; filas: Row[] }[] {
+  const nombres = wb.SheetNames.filter((n) => n === "Hechos_Diarios" || n.startsWith("Hechos_Diarios_")).sort();
+  if (nombres.length === 0) throw new Error("Falta la hoja Hechos_Diarios en el Excel. No se ha subido nada.");
+  if (nombres.includes("Hechos_Diarios") && nombres.length > 1) {
+    throw new Error(
+      "El Excel tiene a la vez la hoja Hechos_Diarios y hojas Hechos_Diarios_AAAA: las ventas estarían duplicadas. No se ha subido nada.",
+    );
+  }
+  const res = nombres.map((hoja) => ({ hoja, filas: XLSX.utils.sheet_to_json<Row>(wb.Sheets[hoja], { defval: null }) }));
+  const vacia = res.find((h) => h.filas.length === 0);
+  if (vacia) {
+    throw new Error(
+      `La hoja ${vacia.hoja} ha llegado vacía. Si el Excel es muy grande puede ser por tamaño: parte las ventas en más hojas. No se ha subido nada.`,
+    );
+  }
+  return res;
+}
+
 function ejemplosDescartes(d: MaestroIsiParsed): string {
   if (d.descartesVentas.length === 0) return "";
-  const ej = d.descartesVentas.slice(0, 5).map((x) => `fila ${x.fila} (sin ${x.falta})`).join("; ");
-  return ` Hechos_Diarios: ${fmtNum(d.descartesVentas.length)} filas descartadas. Primeras: ${ej}.`;
+  const ej = d.descartesVentas.slice(0, 5).map((x) => `${x.hoja} fila ${x.fila} (sin ${x.falta})`).join("; ");
+  return ` Ventas: ${fmtNum(d.descartesVentas.length)} filas descartadas. Primeras: ${ej}.`;
 }
 
 interface Aplicacion { aplicada: boolean; aviso?: string; filas?: number; filas_carga?: number; filas_actuales?: number; desde?: string; hasta?: string }
@@ -403,7 +425,7 @@ export const maestroIsiDataset: DatasetModule<MaestroIsiParsed> = {
   name: "Maestro ISI (CRM)",
   description: "Clientes, referencias y ventas diarias con margen (origen: Maestro ISI)",
   icon: Database,
-  expectedColumns: ["Hoja Dim_Cliente", "Hoja Dim_Referencia", "Hoja Hechos_Diarios"],
+  expectedColumns: ["Hoja Dim_Cliente", "Hoja Dim_Referencia", "Hojas Hechos_Diarios_AAAA (una por año)"],
   parse: parseExcel,
   countLabel: (d) =>
     `${fmtNum(d.clientes.length)} clientes, ${fmtNum(d.productos.length)} referencias y ${fmtNum(d.ventas.length)} líneas de venta`,
@@ -426,7 +448,7 @@ export const maestroIsiDataset: DatasetModule<MaestroIsiParsed> = {
     })),
   ],
   rejections: (d) =>
-    d.descartesVentas.map((x) => ({ fila: x.fila, motivo: `Hechos_Diarios sin ${x.falta}`, row: x.row })),
+    d.descartesVentas.map((x) => ({ fila: x.fila, motivo: `${x.hoja} sin ${x.falta}`, row: x.row })),
   rejectionColumns: ["Cliente", "Referencia", "Fecha", "ID Documento", "Importe"],
   upload: async (data) => subirMaestro(data),
   invalidate: (qc) => {
