@@ -3108,6 +3108,7 @@ export type Database = {
         Returns: Json
       }
       contadores_mensajes: { Args: never; Returns: Json }
+      delegacion_vendedor: { Args: { _vendedor: string }; Returns: string }
       descartar_recomendacion: {
         Args: {
           _cod_cliente: number

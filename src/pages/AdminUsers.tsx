@@ -480,6 +480,9 @@ export default function AdminUsers() {
                           ))}
                         </SelectContent>
                       </Select>
+                      {(u.role === "comercial" || u.role === "jefe_de_zona") && !u.employee_code && (
+                        <p className="mt-1 text-xs text-destructive">Sin código: no se calculan sus objetivos</p>
+                      )}
     </>
   );
 

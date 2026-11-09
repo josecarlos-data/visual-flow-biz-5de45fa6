@@ -61,3 +61,7 @@
 - [x] Entrega 1: migración 0036 (tablas, catálogo, cálculo, permisos, auditoría, migración de los 19 objetivos de 2026), cuadre 19/19 y pruebas de permisos
 - [ ] Entrega 2 (espera «adelante»): asistente director/admin, tarjetas móviles del comercial, quitar «Ruta especial» de la pantalla, aviso de comerciales sin código
 - [ ] Más adelante: retirar tabla y funciones viejas cuando la pantalla nueva esté validada
+
+## Objetivos v2
+- [x] Entrega 1 (0036) y entrega 2 (0037 + pantallas)
+- [ ] Prueba en pantalla por el usuario con cuentas de prueba
