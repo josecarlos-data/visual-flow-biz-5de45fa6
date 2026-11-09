@@ -267,6 +267,13 @@
       "when": 1794211514980,
       "tag": "0037_0037_objetivos_jefe_y_foto",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794220891087,
+      "tag": "0038_carga_ventas_segura",
+      "breakpoints": true
     }
   ]
 }

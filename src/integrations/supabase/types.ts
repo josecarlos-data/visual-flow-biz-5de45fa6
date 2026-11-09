@@ -1984,6 +1984,93 @@ export type Database = {
         }
         Relationships: []
       }
+      ventas_diarias_carga: {
+        Row: {
+          almacen: string | null
+          canal: string | null
+          carga_id: string
+          cod_almacen: string | null
+          cod_cliente: number
+          cod_vendedor_linea: string | null
+          creado_en: string
+          descripcion_linea: string | null
+          ejercicio: number | null
+          familia: string | null
+          fecha: string
+          hora: string | null
+          id_doc_enlazado: string | null
+          id_documento: string | null
+          importe: number
+          linea: number | null
+          marca: string | null
+          margen: number
+          motivo_abono: string | null
+          num_documento: number | null
+          operacion: string | null
+          referencia: string
+          registrado_por: string | null
+          tipo_documento: string | null
+          unidades: number
+          vendedor_linea: string | null
+        }
+        Insert: {
+          almacen?: string | null
+          canal?: string | null
+          carga_id: string
+          cod_almacen?: string | null
+          cod_cliente: number
+          cod_vendedor_linea?: string | null
+          creado_en?: string
+          descripcion_linea?: string | null
+          ejercicio?: number | null
+          familia?: string | null
+          fecha: string
+          hora?: string | null
+          id_doc_enlazado?: string | null
+          id_documento?: string | null
+          importe?: number
+          linea?: number | null
+          marca?: string | null
+          margen?: number
+          motivo_abono?: string | null
+          num_documento?: number | null
+          operacion?: string | null
+          referencia: string
+          registrado_por?: string | null
+          tipo_documento?: string | null
+          unidades?: number
+          vendedor_linea?: string | null
+        }
+        Update: {
+          almacen?: string | null
+          canal?: string | null
+          carga_id?: string
+          cod_almacen?: string | null
+          cod_cliente?: number
+          cod_vendedor_linea?: string | null
+          creado_en?: string
+          descripcion_linea?: string | null
+          ejercicio?: number | null
+          familia?: string | null
+          fecha?: string
+          hora?: string | null
+          id_doc_enlazado?: string | null
+          id_documento?: string | null
+          importe?: number
+          linea?: number | null
+          marca?: string | null
+          margen?: number
+          motivo_abono?: string | null
+          num_documento?: number | null
+          operacion?: string | null
+          referencia?: string
+          registrado_por?: string | null
+          tipo_documento?: string | null
+          unidades?: number
+          vendedor_linea?: string | null
+        }
+        Relationships: []
+      }
       visita_bloques: {
         Row: {
           campos: Json
@@ -2871,6 +2958,10 @@ export type Database = {
         Args: { _accion: string; _id: string; _nombre?: string }
         Returns: Json
       }
+      aplicar_carga_ventas: {
+        Args: { _carga: string; _forzar?: boolean }
+        Returns: Json
+      }
       archivo_oferta_visible: { Args: { _path: string }; Returns: boolean }
       auditoria_listado: {
         Args: {
@@ -3213,6 +3304,10 @@ export type Database = {
       }
       importar_visitas_historicas: {
         Args: { _reset?: boolean; _rows: Json }
+        Returns: number
+      }
+      insertar_ventas_carga: {
+        Args: { _carga: string; _rows: Json }
         Returns: number
       }
       insertar_ventas_diarias: {
@@ -3663,6 +3758,7 @@ export type Database = {
           unidades: number
         }[]
       }
+      preparar_carga_ventas: { Args: never; Returns: string }
       puede_conversar_visita: { Args: { _visita_id: string }; Returns: boolean }
       puede_editar_bloque: { Args: { _visita_id: string }; Returns: boolean }
       puede_enviar_ofertas: { Args: { _uid: string }; Returns: boolean }
@@ -3727,7 +3823,6 @@ export type Database = {
         Returns: number
       }
       requiere_2fa: { Args: { _user_id: string }; Returns: boolean }
-      reset_maestro_isi_data: { Args: never; Returns: undefined }
       revision_respuestas_nuevas: {
         Args: { _limite?: number; _offset?: number }
         Returns: {
