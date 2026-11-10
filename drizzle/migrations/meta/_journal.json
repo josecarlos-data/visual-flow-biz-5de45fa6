@@ -281,6 +281,13 @@
       "when": 1794311993082,
       "tag": "0039_gespromo_carga_repetible",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1794312083307,
+      "tag": "0040_gespromo_carga_repetible_ajuste",
+      "breakpoints": true
     }
   ]
 }
