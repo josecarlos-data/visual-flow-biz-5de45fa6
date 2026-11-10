@@ -1,23 +1,25 @@
-# Ventas del Maestro ISI repartidas en hojas por año
+# Actualizar modelos de IA del CRM (sin migraciones)
 
-Solo se toca `src/lib/datasets/maestroIsi.ts` y `src/lib/datasets/maestroIsi.test.ts`. Sin migraciones, sin cambiar funciones de carga, orden de pasos, `datev`/`timev` ni `nodim`.
+## Mi plan propio
+1. **Paso 0 – comprobar el catálogo real** (con el listado del gateway, antes de tocar nada): IDs exactos de GPT Transcribe, gpt-6-luna, gpt-6.1-terra y gpt-6.1-sol; superficies admitidas; si aceptan `temperature`, qué `reasoning_effort` admiten y si transcripción acepta `language`, `languages`, `prompt` y `keywords`. Si algún ID o parámetro no cuadra, me detengo y lo explico.
+2. **Transcripción** (`visita-voz`): cambiar al ID confirmado de GPT Transcribe. Mantener el vocabulario en `prompt`. Enviar el idioma solo con el campo que el gateway acepte (`language` o `languages`). Añadir `keywords` solo si se admite.
+3. **Extracción**: `MODELO_EXTRACCION` pasa a gpt-6-luna. Prompt, esquema, `VERSION_PROMPT` y `reasoning_effort: "none"` no cambian (si luna no admite "none", me detengo). Añadir una línea de historial.
+4. **Temperatura**: cambiar el reintento ciego por una decisión fija según el modelo. Si el modelo no admite temperatura, no se envía. El reintento con 400 desaparece, así un 400 real ya no se oculta.
+5. **Informe de cliente**: modelo por defecto gpt-6.1-terra con `reasoning_effort: "low"` explícito. Lista: gpt-6.1-sol, gpt-6.1-terra, gpt-6-luna y gpt-5.5 (temporal).
+6. **Una sola lista**: crear `supabase/functions/_shared/modelosInsights.ts` (sin APIs de Deno). La función la usa y el comparador de la ficha la importa con una ruta relativa, igual que el banco de pruebas importa `visita-voz-prompt.ts`. Si Vite no lo resuelve, el plan B es copiar la lista con un test que compruebe que ambas son iguales.
+7. **Banco de pruebas**: confirmar que `bench.ts` sigue importando el modelo nuevo y comprobar sus tipos. No se ejecuta contra datos reales sin tu permiso.
 
-## Cambios
+## En qué difiero de tu propuesta
+- **Política de retención del espacio de trabajo**: ahora solo aparece permitido gpt-6.1-terra entre los modelos OpenAI retenidos. gpt-6-luna y GPT Transcribe podrían quedar bloqueados (403). Lo compruebo en el paso 0 y, si se bloquean, me detengo antes de cambiar de enfoque.
+- **Temperatura**: en vez de quitarla solo para luna, la decido por modelo para todos, porque el comparador también usa varios modelos.
+- **Lista única**: un fichero compartido en vez de dos copias, con un test como plan B.
+- **Llamadas directas al gateway**: mantengo las llamadas que ya existen y no migro al SDK, porque eso cambiaría la arquitectura, que pediste no tocar.
+- Por lo demás coincidimos: el modelo de visión no se toca, no hay migraciones y si algo falla me detengo.
 
-1. **Detección de hojas de ventas**: se toman las hojas llamadas `Hechos_Diarios` o que empiezan por `Hechos_Diarios_`, ordenadas alfabéticamente.
-   - Ninguna: se mantiene el error actual.
-   - `Hechos_Diarios` junto con alguna `Hechos_Diarios_…`: error «El Excel tiene a la vez la hoja Hechos_Diarios y hojas Hechos_Diarios_AAAA: las ventas estarían duplicadas. No se ha subido nada.»
-   - Cualquiera con 0 filas: «La hoja X ha llegado vacía. Si el Excel es muy grande puede ser por tamaño: parte las ventas en más hojas.» Se comprueba antes de procesar nada.
-2. **Lectura**: cada hoja pasa por la misma lógica de hoy y las ventas se juntan en una única lista. El orden de pasos de la carga no cambia.
-3. **Descartes**: cada descarte guarda también el nombre de la hoja (`hoja`, `fila`, `falta`). El resumen y la tabla de rechazos muestran «Hechos_Diarios_2025 fila 12 sin Referencia».
-4. **Vista previa**: una línea por hoja de ventas con leídas y descartadas, como ya pasa con Dim_Cliente y Dim_Referencia.
-5. **Ayuda**: `expectedColumns` pasa a «Hoja Dim_Cliente · Hoja Dim_Referencia · Hojas Hechos_Diarios_AAAA (una por año)».
-6. El error «ninguna línea válida» se mantiene, ahora para el total de todas las hojas de ventas.
+## Verificación
+- Llamada de prueba a la función de voz con un audio corto sintético: el texto sale en español y `analisis_modelo` vale gpt-6-luna. La nota real grabada desde el móvil la haces tú.
+- Revisar los registros de `visita-voz` para confirmar que no hay errores 400 ni avisos de «Reintento sin temperature».
+- Informe de cliente: `_meta.modelo` vale gpt-6.1-terra. Con el comparador, probar los 4 modelos.
 
-## Pruebas (`maestroIsi.test.ts`, libros pequeños creados en memoria)
-
-- Libro con `Hechos_Diarios_2024` y `Hechos_Diarios_2025`: las ventas se juntan, hay dos líneas por hoja y los descartes llevan su hoja.
-- Libro con `Hechos_Diarios` y `Hechos_Diarios_2025`: error de duplicado.
-- Libro con una hoja de ventas vacía: error con el nombre de esa hoja.
-
-No se cargan datos reales.
+## Ficheros
+`visita-voz/index.ts`, `_shared/visita-voz-prompt.ts`, `cliente-insights/index.ts`, `_shared/modelosInsights.ts` (nuevo), `src/pages/ClienteDetalle.tsx`. Después, desplegar las dos funciones.
