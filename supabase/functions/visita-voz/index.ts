@@ -189,7 +189,7 @@ const VOCABULARIO_BASE = [
   "JOST", "ROR", "Mann Filter", "Wabco", "Banner", "Axcar", "Meritor", "NRF", "IADA", "Ryme",
 ];
 
-let vocabCache: { texto: string; hasta: number } | null = null;
+let vocabCache: { texto: string; terminos: string[]; hasta: number } | null = null;
 
 async function vocabularioTranscripcion(): Promise<{ texto: string; terminos: string[] }> {
   if (vocabCache && vocabCache.hasta > Date.now()) return vocabCache;
