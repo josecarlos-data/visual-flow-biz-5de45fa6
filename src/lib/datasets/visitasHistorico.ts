@@ -77,6 +77,7 @@ export function codClienteDesde(v: unknown): { cod: number | null; externo: stri
 }
 
 /** Detecta marcadores de validación dentro del texto de observaciones. */
+/** Solo orientativo: el veredicto real lo calcula el servidor al importar. */
 export function validacionDesde(texto: string | null, estado: string | null): string | null {
   const t = sinAcentos(`${estado ?? ""} ${texto ?? ""}`);
   if (t.includes("no correcto") || t.includes("incorrecto")) return "no_correcto";
@@ -164,7 +165,7 @@ export const visitasHistoricoDataset: DatasetModule<VisitaHistorica[]> = {
     { key: "motivo_key", label: "Plantilla" },
     { key: "comercial_nombre", label: "Comercial" },
     { key: "ruta", label: "Ruta" },
-    { key: "validacion", label: "Validación" },
+    { key: "estado", label: "Estado" },
   ],
   previewRows: (d, limit) => d.slice(0, limit) as unknown as Record<string, unknown>[],
   upload: async (data) => {
