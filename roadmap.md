@@ -71,4 +71,4 @@
 - [x] Fechas/horas locales, lectura completa de hojas (nodim), filas descartadas por hoja con ejemplos
 - [ ] Carga real del Excel (la hace el usuario) y confirmar que el límite de 10 min se aplica desde la app
 
-- [ ] Modelos IA: transcripción gpt-transcribe, extracción gpt-6-luna, temperatura por modelo, informe gpt-6.1-sol (sin terra), lista única, visión sustituta de gemini-3.6-flash
+- [x] Modelos IA: transcripción gpt-transcribe, extracción gpt-6-luna, temperatura por modelo, informe gpt-6.1-sol (sin terra), lista única, visión sustituta de gemini-3.6-flash
