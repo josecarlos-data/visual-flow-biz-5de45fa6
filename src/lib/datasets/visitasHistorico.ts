@@ -20,7 +20,8 @@ const numv = (v: unknown): number | null => {
 
 const datev = (v: unknown): string | null => {
   if (v === null || v === undefined || v === "") return null;
-  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  // Fecha local (no toISOString, que desplaza un día según la zona horaria).
+  if (v instanceof Date) return fechaLocal(v);
   if (typeof v === "number") {
     const d = XLSX.SSF.parse_date_code(v);
     return d ? `${d.y}-${String(d.m).padStart(2, "0")}-${String(d.d).padStart(2, "0")}` : null;
@@ -29,8 +30,13 @@ const datev = (v: unknown): string | null => {
   const m = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
   if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
   const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+  return isNaN(d.getTime()) ? null : fechaLocal(d);
 };
+
+const fechaLocal = (d: Date): string | null =>
+  isNaN(d.getTime())
+    ? null
+    : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 const timev = (v: unknown): string | null => {
   if (v === null || v === undefined || v === "") return null;
@@ -71,6 +77,7 @@ export function codClienteDesde(v: unknown): { cod: number | null; externo: stri
 }
 
 /** Detecta marcadores de validación dentro del texto de observaciones. */
+/** Solo orientativo: el veredicto real lo calcula el servidor al importar. */
 export function validacionDesde(texto: string | null, estado: string | null): string | null {
   const t = sinAcentos(`${estado ?? ""} ${texto ?? ""}`);
   if (t.includes("no correcto") || t.includes("incorrecto")) return "no_correcto";
@@ -158,31 +165,43 @@ export const visitasHistoricoDataset: DatasetModule<VisitaHistorica[]> = {
     { key: "motivo_key", label: "Plantilla" },
     { key: "comercial_nombre", label: "Comercial" },
     { key: "ruta", label: "Ruta" },
-    { key: "validacion", label: "Validación" },
+    { key: "estado", label: "Estado" },
   ],
   previewRows: (d, limit) => d.slice(0, limit) as unknown as Record<string, unknown>[],
   upload: async (data) => {
-    const stages: UploadStageResult[] = [];
+    // Carga repetible: nunca borra; el servidor inserta las nuevas, actualiza estado/observaciones
+    // y calcula el veredicto. Repetir una tanda no duplica nada.
     const SIZE = 1000;
-    let success = 0;
+    const total = { nuevas: 0, estado_actualizado: 0, observaciones_actualizadas: 0, observaciones_ignoradas: 0, sin_cambios: 0 };
+    const tandas = Math.ceil(data.length / SIZE);
+    let ok = 0;
     let errors = 0;
     let message: string | undefined;
 
     for (let i = 0; i < data.length; i += SIZE) {
-      const { error } = await supabase.rpc("importar_visitas_historicas" as never, {
+      const { data: res, error } = await supabase.rpc("importar_visitas_historicas" as never, {
         _rows: data.slice(i, i + SIZE),
-        _reset: i === 0,
       } as never);
-      const size = Math.min(SIZE, data.length - i);
       if (error) {
-        errors += size;
+        errors += Math.min(SIZE, data.length - i);
         message = error.message;
         console.error("importar_visitas_historicas error:", error.message);
-      } else {
-        success += size;
+        continue;
       }
+      ok++;
+      const r = (res ?? {}) as Partial<typeof total>;
+      for (const k of Object.keys(total) as (keyof typeof total)[]) total[k] += Number(r[k] ?? 0);
     }
-    stages.push({ name: "importar_visitas_historicas", success, errors, message });
+
+    const resumen =
+      `${fmtNum(total.nuevas)} nuevas, ${fmtNum(total.estado_actualizado)} con estado actualizado, ` +
+      `${fmtNum(total.observaciones_actualizadas)} con observaciones actualizadas, ` +
+      `${fmtNum(total.observaciones_ignoradas)} cambios ignorados por estar revisadas en la app, ` +
+      `${fmtNum(total.sin_cambios)} sin cambios`;
+    const success = data.length - errors;
+    const stages: UploadStageResult[] = [
+      { name: "importar_visitas_historicas", success, errors, message: errors ? message : resumen },
+    ];
 
     return {
       success,
@@ -190,8 +209,8 @@ export const visitasHistoricoDataset: DatasetModule<VisitaHistorica[]> = {
       stages,
       message:
         errors === 0
-          ? "Histórico de visitas importado. Las visitas registradas desde la app se han conservado."
-          : "La importación quedó incompleta. Revisa el detalle antes de volver a intentarlo.",
+          ? `Carga completada: ${resumen}.`
+          : `Carga incompleta: ${ok} de ${tandas} tandas aplicadas (${resumen}). Puedes repetirla sin duplicar.`,
     };
   },
   invalidate: (qc) => {

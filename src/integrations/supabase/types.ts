@@ -3276,6 +3276,10 @@ export type Database = {
         }[]
       }
       fecha_corte_datos: { Args: never; Returns: string }
+      gespromo_partir_observaciones: {
+        Args: { _texto: string }
+        Returns: Record<string, unknown>
+      }
       get_distinct_delegaciones: {
         Args: never
         Returns: {
@@ -3304,7 +3308,7 @@ export type Database = {
       }
       importar_visitas_historicas: {
         Args: { _reset?: boolean; _rows: Json }
-        Returns: number
+        Returns: Json
       }
       insertar_ventas_carga: {
         Args: { _carga: string; _rows: Json }

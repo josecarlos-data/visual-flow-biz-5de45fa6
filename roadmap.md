@@ -72,3 +72,4 @@
 - [ ] Carga real del Excel (la hace el usuario) y confirmar que el límite de 10 min se aplica desde la app
 
 - [x] Modelos IA: transcripción gpt-transcribe, extracción gpt-6-luna, temperatura por modelo, informe gpt-6.1-sol (sin terra), lista única, visión sustituta de gemini-3.6-flash
+- [x] Gespromo: carga repetible sin borrar (función, bloque+veredicto, mensajes, recuentos, fechas locales); informar llamadas a repartir_observaciones_gespromo
