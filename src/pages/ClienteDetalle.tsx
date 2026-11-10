@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { MODELOS_INSIGHTS } from "../../supabase/functions/_shared/modelosInsights";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import {
@@ -62,7 +63,7 @@ interface Insights {
 }
 
 /** Modelos disponibles para las pruebas comparativas (lista blanca de la edge function). */
-const MODELOS_IA = ["openai/gpt-5.5", "openai/gpt-5.6-luna", "openai/gpt-5.6-terra", "openai/gpt-5.6-sol"];
+const MODELOS_IA: readonly string[] = MODELOS_INSIGHTS;
 
 interface MetaPrueba {
   modelo: string;
