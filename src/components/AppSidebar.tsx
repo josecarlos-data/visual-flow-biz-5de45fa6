@@ -44,7 +44,11 @@ export function AppSidebar() {
         { title: "Funciones", url: "/admin/functions", icon: Settings },
       ]
     : esDireccion
-      ? [{ title: "Plantillas de visita", url: "/admin/visitas", icon: Icons.ClipboardList }, objetivosItem]
+      ? [
+          { title: "Plantillas de visita", url: "/admin/visitas", icon: Icons.ClipboardList },
+          { title: "Situaciones de cliente", url: "/admin/situaciones", icon: Icons.ShieldAlert },
+          objetivosItem,
+        ]
       : [];
 
 
