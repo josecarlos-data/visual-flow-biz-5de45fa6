@@ -1,16 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { corsHeaders } from "../_shared/cors.ts";
+import { MODELO_INSIGHTS_POR_DEFECTO, MODELOS_INSIGHTS } from "../_shared/modelosInsights.ts";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 
-/** Modelos permitidos para pruebas comparativas desde la ficha. */
-const MODELOS_PERMITIDOS = [
-  "openai/gpt-5.5",
-  "openai/gpt-5.6-luna",
-  "openai/gpt-5.6-terra",
-  "openai/gpt-5.6-sol",
-] as const;
-const MODELO_POR_DEFECTO = "openai/gpt-5.5";
+/** Lista única compartida con la ficha de cliente (comparador). */
+const MODELOS_PERMITIDOS: readonly string[] = MODELOS_INSIGHTS;
+const MODELO_POR_DEFECTO = MODELO_INSIGHTS_POR_DEFECTO;
 
 /** Marcadores de basura que a veces cuelan los modelos al final del texto. */
 const MARCADORES = ["<|endoftext|>", "#+#+", "billing:", "COST:", "[PLUGIN]", "TOKEN ", "END asr"];
@@ -266,6 +262,9 @@ Deno.serve(async (req) => {
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: modeloUsado,
+        // Esfuerzo explícito: sin él cada modelo usa su valor por defecto (más tokens y latencia).
+        // Sin temperature: gpt-6.1-sol y gpt-5.5 la rechazan.
+        reasoning_effort: "low",
         messages: [
           {
             role: "system",

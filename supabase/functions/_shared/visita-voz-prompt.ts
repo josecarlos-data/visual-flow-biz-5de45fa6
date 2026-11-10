@@ -30,6 +30,10 @@
  *     del bloque; prohibido forzar a "Otra" ni al valor más parecido.
  *   · Un solo valor en los select (marca_competencia); " | " es exclusivo de multiselect.
  *   · Nueva sección de reglas para `informacion_potencial` (potencial de compra del cliente).
+ * - 10/11/2026 — Solo cambio de modelos (prompt y esquema sin tocar, misma versión):
+ *   extracción openai/gpt-5.6-luna → openai/gpt-6-luna; visión google/gemini-3.6-flash
+ *   (retirado el 19/11/2026) → openai/gpt-6-luna, que leyó bien las 4 líneas de un
+ *   albarán sintético.
  */
 export const VERSION_PROMPT = "fase4.4";
 
@@ -37,13 +41,13 @@ export const VERSION_PROMPT = "fase4.4";
  * Extracción: clasificar y rellenar campos con reglas explícitas. No es razonamiento,
  * por eso va con el modelo rápido y `reasoning_effort: "none"`.
  */
-export const MODELO_EXTRACCION = "openai/gpt-5.6-luna";
+export const MODELO_EXTRACCION = "openai/gpt-6-luna";
 
 /**
  * Lectura de albaranes fotografiados (fase B): necesita entrada de imagen.
  * Si la pasarela lo rechaza, el 400 queda en los logs con el detalle y se cambia aquí.
  */
-export const MODELO_VISION = "google/gemini-3.6-flash";
+export const MODELO_VISION = "openai/gpt-6-luna";
 
 export interface CampoDef {
   motivo_key: string;

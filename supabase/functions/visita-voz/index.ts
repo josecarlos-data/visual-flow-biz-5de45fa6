@@ -23,7 +23,28 @@ const GATEWAY = "https://ai.gateway.lovable.dev/v1";
  * proveedor (misma API OpenAI-compatible, cambiando base URL y clave) queda
  * documentada aquí pero NO implementada.
  */
-const MODELO_TRANSCRIPCION = "openai/gpt-4o-transcribe";
+const MODELO_TRANSCRIPCION = "openai/gpt-transcribe";
+
+/** Máximo de términos enviados como `keywords` a la transcripción. */
+const MAX_KEYWORDS = 200;
+
+/**
+ * Temperatura por modelo y esfuerzo, comprobada contra la pasarela (10/11/2026):
+ * gpt-6-luna admite temperature 0 solo con esfuerzo "none" (con "low" exige 1).
+ * Si el modelo no está aquí, no se envía temperature y se avisa en el log.
+ */
+const TEMPERATURA: Record<string, Partial<Record<string, number | null>>> = {
+  "openai/gpt-6-luna": { none: 0, low: null },
+};
+
+function temperaturaPara(modelo: string, esfuerzo: string): number | null {
+  const porEsfuerzo = TEMPERATURA[modelo];
+  if (!porEsfuerzo || !(esfuerzo in porEsfuerzo)) {
+    console.warn(`Modelo sin entrada en el mapa de temperatura: ${modelo} (${esfuerzo}); se envía sin temperature`);
+    return null;
+  }
+  return porEsfuerzo[esfuerzo] ?? null;
+}
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -168,10 +189,10 @@ const VOCABULARIO_BASE = [
   "JOST", "ROR", "Mann Filter", "Wabco", "Banner", "Axcar", "Meritor", "NRF", "IADA", "Ryme",
 ];
 
-let vocabCache: { texto: string; hasta: number } | null = null;
+let vocabCache: { texto: string; terminos: string[]; hasta: number } | null = null;
 
-async function vocabularioTranscripcion(): Promise<string> {
-  if (vocabCache && vocabCache.hasta > Date.now()) return vocabCache.texto;
+async function vocabularioTranscripcion(): Promise<{ texto: string; terminos: string[] }> {
+  if (vocabCache && vocabCache.hasta > Date.now()) return vocabCache;
   const terminos = [...VOCABULARIO_BASE];
   try {
     const { competidores, marcasRecambio, marcasRemolque } = await cargarCatalogo();
@@ -184,11 +205,12 @@ async function vocabularioTranscripcion(): Promise<string> {
   } catch (e) {
     console.error("No se ha podido ampliar el vocabulario:", (e as Error).message);
   }
+  const unicos = [...new Set(terminos.map((t) => t.trim()).filter(Boolean))];
   const texto =
     "Nota de voz de un comercial de recambios de automoción en España. Vocabulario habitual: " +
-    [...new Set(terminos)].join(", ") + ".";
-  vocabCache = { texto, hasta: Date.now() + TTL_CACHE_MS };
-  return texto;
+    unicos.join(", ") + ".";
+  vocabCache = { texto, terminos: unicos.slice(0, MAX_KEYWORDS), hasta: Date.now() + TTL_CACHE_MS };
+  return vocabCache;
 }
 
 // (El esquema y el system prompt viven en ./prompt.ts)
@@ -206,33 +228,22 @@ async function chatJson(
   modelo: string = MODELO_EXTRACCION,
   esfuerzo: string = "none",
 ) {
-  const cuerpo = (conTemperatura: boolean) =>
-    JSON.stringify({
+  const temperatura = temperaturaPara(modelo, esfuerzo);
+  const res = await fetch(`${GATEWAY}/chat/completions`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
       model: modelo,
       reasoning_effort: esfuerzo,
-      ...(conTemperatura ? { temperature: 0 } : {}),
+      ...(temperatura !== null ? { temperature: temperatura } : {}),
       messages: [
         // El system va SIEMPRE primero e idéntico: es lo que permite el prompt caching.
         { role: "system", content: sistema },
         { role: "user", content: usuario },
       ],
       response_format: { type: "json_schema", json_schema: { name: nombre, strict: true, schema } },
-    });
-
-  const llamar = (conTemperatura: boolean) =>
-    fetch(`${GATEWAY}/chat/completions`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: cuerpo(conTemperatura),
-    });
-
-  let res = await llamar(true);
-  if (res.status === 400) {
-    // Algunos modelos rechazan temperature: con el esquema estricto la salida ya está acotada.
-    const detalle = await res.text();
-    console.warn(`Reintento sin temperature: ${detalle.slice(0, 300)}`);
-    res = await llamar(false);
-  }
+    }),
+  });
   if (!res.ok) {
     const details = await res.text();
     console.error(`Extracción falló [${res.status}]: ${details}`);
@@ -256,8 +267,11 @@ async function transcribir(key: string, audio: File) {
   const upstream = new FormData();
   upstream.append("model", MODELO_TRANSCRIPCION);
   upstream.append("file", audio, "nota.wav");
-  upstream.append("language", "es");
-  upstream.append("prompt", await vocabularioTranscripcion());
+  // gpt-transcribe: idioma en `languages` (lista); vocabulario en `keywords` y en `prompt`.
+  const vocab = await vocabularioTranscripcion();
+  upstream.append("languages[]", "es");
+  for (const t of vocab.terminos) upstream.append("keywords[]", t);
+  upstream.append("prompt", vocab.texto);
 
   const tr = await fetch(`${GATEWAY}/audio/transcriptions`, {
     method: "POST",
