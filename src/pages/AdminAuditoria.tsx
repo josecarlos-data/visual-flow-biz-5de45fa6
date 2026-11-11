@@ -191,7 +191,6 @@ const NOMBRES_CAMPO: Record<string, string> = {
   is_active: "Activo",
   cod_cliente: "Código de cliente",
   atributo: "Atributo del perfil",
-  motivo: "Motivo",
   visita_id: "Visita",
   origen_visita: "Origen de la visita",
   valor_texto: "Valor",
