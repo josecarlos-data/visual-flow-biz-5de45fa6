@@ -76,7 +76,6 @@ export default function NuevaVisita() {
   // Documentos ya subidos en un intento anterior: no se vuelven a subir.
   const docsSubidosRef = useRef<DocVisita[] | null>(null);
   const [diasAtrasMax, setDiasAtrasMax] = useState(7);
-  useEffect(() => { docsSubidosRef.current = null; }, [documentos]);
   useEffect(() => {
     supabase.from("app_settings").select("value").eq("key", "visita_dias_atras_max").maybeSingle()
       .then(({ data }) => setDiasAtrasMax(parseDiasAtras((data as { value?: string } | null)?.value)));
@@ -94,6 +93,7 @@ export default function NuevaVisita() {
   const [observaciones, setObservaciones] = useState("");
   const [transcripcion, setTranscripcion] = useState("");
   const [documentos, setDocumentos] = useState<DocVisita[]>([]);
+  useEffect(() => { docsSubidosRef.current = null; }, [documentos]);
   const [analisis, setAnalisis] = useState<{ modelo: string | null; version: string | null }>({ modelo: null, version: null });
   const [transcribiendo, setTranscribiendo] = useState(false);
   const [extrayendo, setExtrayendo] = useState(false);
