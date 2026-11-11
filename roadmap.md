@@ -75,3 +75,4 @@
 - [x] Gespromo: carga repetible sin borrar (función, bloque+veredicto, mensajes, recuentos, fechas locales); informar llamadas a repartir_observaciones_gespromo
 
 - [x] Registro de visitas fiable (0042): función registrar_visita, trigger fecha/alta directa (ajuste apagado), NuevaVisita, ajustes, pruebas
+- [ ] Análisis IA del cliente: incluir bloques de visitas anteriores
