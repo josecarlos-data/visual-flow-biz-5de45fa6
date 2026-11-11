@@ -3275,6 +3275,10 @@ export type Database = {
           vendedor_linea: string
         }[]
       }
+      editar_bloque_revision: {
+        Args: { _bloque_id: string; _campos: Json; _updated_at: string }
+        Returns: Json
+      }
       fecha_corte_datos: { Args: never; Returns: string }
       gespromo_partir_observaciones: {
         Args: { _texto: string }
