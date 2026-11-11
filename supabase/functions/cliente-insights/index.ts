@@ -402,7 +402,8 @@ function textoValor(val: unknown): string {
   if (val == null) return "";
   if (Array.isArray(val)) return val.map(textoValor).filter(Boolean).join(", ");
   if (typeof val === "object") return "";
-  const t = String(val).trim();
+  if (typeof val === "boolean") return val ? "Sí" : "No";
+  const t = String(val).replace(/\s+/g, " ").trim();
   return esRutaAdjunto(t) ? "" : t;
 }
 
@@ -431,7 +432,7 @@ export function formatearVisitas(
       lineas.push(`    - ${nombreMotivo.get(motivo) ?? motivo ?? "Sin motivo"}${partes.length ? `: ${partes.join(" | ")}` : ""}`);
     }
     if (lineas.length === 1) {
-      const obs = ((v.observaciones as string) || (v.observaciones_original as string) || "").trim();
+      const obs = ((v.observaciones as string) || (v.observaciones_original as string) || "").replace(/\s+/g, " ").trim();
       if (obs) lineas.push(`    Observaciones: ${obs}`);
     }
     return lineas.join("\n");
