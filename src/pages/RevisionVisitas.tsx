@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { CheckCircle2, Clock, XCircle, Search, ExternalLink, RefreshCw, Loader2, FileDown, X } from "lucide-react";
+import { CheckCircle2, Clock, XCircle, Search, ExternalLink, RefreshCw, Loader2, FileDown, X, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +20,7 @@ import {
 import { useScrollRestore } from "@/hooks/useScrollRestore";
 import { useMensajesVisita, useMarcarLeida, useRespuestasNuevas, useInvalidarMensajes, enviarMensaje, ultimoDe } from "@/hooks/useVisitaMensajes";
 import { ListaMensajes } from "@/components/ConversacionBloque";
+import { CompletarBloqueDialog } from "@/components/CompletarBloqueDialog";
 import { BotonAdjunto } from "@/components/VisorAdjunto";
 import { presentarCampos, documentosDe } from "@/lib/camposVisita";
 
@@ -75,6 +76,7 @@ export default function RevisionVisitas() {
   const { revisarBloque } = useBloqueMutations();
   const { guardar: guardarSituacion } = useSituacionesMutations();
   const reanalizar = useReanalizarVisita();
+  const [editando, setEditando] = useState<VisitaBloque | null>(null);
 
   const get = (k: string, def = "") => params.get(k) ?? def;
   const setParam = (k: string, v: string | null) => {
@@ -468,6 +470,9 @@ export default function RevisionVisitas() {
                     <Button size="sm" variant={d.validacion === "NO CORRECTO" ? "destructive" : "outline"} aria-pressed={d.validacion === "NO CORRECTO"} onClick={() => alternar(b.id, "NO CORRECTO")}>
                       <XCircle className="mr-1 h-3.5 w-3.5" /> No correcto
                     </Button>
+                    <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setEditando(b)} disabled={!motivos}>
+                      <Pencil className="mr-1 h-3.5 w-3.5" /> Editar datos
+                    </Button>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Conversación con el comercial</Label>
@@ -591,6 +596,17 @@ export default function RevisionVisitas() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {editando && (
+        <CompletarBloqueDialog
+          modo="revisor"
+          bloque={editando}
+          campos={motivos?.find((m) => m.key === editando.motivo_key)?.campos ?? []}
+          titulo={nombreMotivo(editando.motivo_key)}
+          open={!!editando}
+          onOpenChange={(v) => { if (!v) setEditando(null); }}
+        />
+      )}
     </div>
   );
 }

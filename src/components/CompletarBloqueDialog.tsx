@@ -17,14 +17,17 @@ const aTexto = (v: unknown) => (v == null ? "" : Array.isArray(v) ? JSON.stringi
  * (updated_at tal cual llega del servidor, como texto, sin pasar por Date) y mensaje automático al revisor.
  */
 export function CompletarBloqueDialog({
-  bloque, campos, titulo, open, onOpenChange,
+  bloque, campos, titulo, open, onOpenChange, modo = "comercial",
 }: {
   bloque: VisitaBloque;
   campos: MotivoCampo[];
   titulo: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  /** «revisor»: corrige los datos con editar_bloque_revision; no cambia la validación ni avisa por mensaje. */
+  modo?: "comercial" | "revisor";
 }) {
+  const esRevisor = modo === "revisor";
   const qc = useQueryClient();
   const invalidarMensajes = useInvalidarMensajes();
   const { data: catalogos } = useCatalogos();
@@ -41,14 +44,17 @@ export function CompletarBloqueDialog({
 
   const guardar = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.rpc("completar_bloque" as never, {
+      const { data, error } = await supabase.rpc((esRevisor ? "editar_bloque_revision" : "completar_bloque") as never, {
         _bloque_id: bloque.id, _campos: valores, _updated_at: bloque.updated_at,
       } as never);
       if (error) throw new Error(error.message);
       return data as unknown as { cambiados: number };
     },
     onSuccess: (r) => {
-      toast({ title: r.cambiados ? "Datos completados. Se ha avisado al revisor." : "No había cambios que guardar." });
+      toast({
+        title: !r.cambiados ? "No había cambios que guardar."
+          : esRevisor ? "Datos corregidos. La validación no cambia." : "Datos completados. Se ha avisado al revisor.",
+      });
       onOpenChange(false);
     },
     onError: (e) => {
@@ -66,7 +72,7 @@ export function CompletarBloqueDialog({
     <Dialog open={open} onOpenChange={(v) => !guardar.isPending && onOpenChange(v)}>
       <DialogContent className="flex h-[100dvh] max-h-[100dvh] w-full max-w-lg flex-col gap-0 p-0 sm:h-auto sm:max-h-[90vh]">
         <DialogHeader className="border-b p-4">
-          <DialogTitle>Completar datos · {titulo}</DialogTitle>
+          <DialogTitle>{esRevisor ? "Editar datos" : "Completar datos"} · {titulo}</DialogTitle>
         </DialogHeader>
         <div className="flex-1 space-y-4 overflow-y-auto p-4">
           {activos.map((c) => (

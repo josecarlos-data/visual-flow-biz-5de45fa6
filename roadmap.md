@@ -76,3 +76,8 @@
 
 - [x] Registro de visitas fiable (0042): función registrar_visita, trigger fecha/alta directa (ajuste apagado), NuevaVisita, ajustes, pruebas
 - [x] Análisis IA del cliente: incluir bloques de visitas anteriores
+
+## Revisión de visitas: análisis IA y corrección de bloques
+- [x] A: análisis IA agrupa visitas Gespromo, observaciones app, perfil sin duplicar, «(sin confirmar)»
+- [x] B: editar_bloque_revision + auditoría de bloques (0043) + botón «Editar datos»
+- Nota: tras una corrección del revisor, el dato del perfil queda con fuente «voz», que no es exacta (se deja así)
