@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Save, Loader2, Wand2, FileText, Plus, Trash2, Lightbulb, AlertTriangle, Mic, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,8 @@ import { DocumentosVisita, subirDocumentos, type DocVisita } from "@/components/
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { useClientes, useMotivos, useCatalogos, hoyISO, crearBloques, marcarPlanificadaRealizada, type Motivo, type MotivoCampo } from "@/hooks/useCrm";
+import { useClientes, useMotivos, useCatalogos, type Motivo, type MotivoCampo } from "@/hooks/useCrm";
+import { hoyMadrid, limitesFechaVisita, pideUbicacion, parseDiasAtras } from "@/lib/fechaVisita";
 import { camposVisibles, normalizarValoresNumericos } from "@/lib/motivoCampos";
 import { cn } from "@/lib/utils";
 
@@ -69,13 +70,22 @@ const ETIQUETA_TIPO: Record<string, string> = {
 export default function NuevaVisita() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { user, employeeCode } = useAuth();
+  const { user, role } = useAuth();
+  // Id de la visita fijado al abrir el formulario: cada reintento usa el mismo y nunca duplica.
+  const visitaId = useRef<string>(crypto.randomUUID());
+  // Documentos ya subidos en un intento anterior: no se vuelven a subir.
+  const docsSubidosRef = useRef<DocVisita[] | null>(null);
+  const [diasAtrasMax, setDiasAtrasMax] = useState(7);
+  useEffect(() => {
+    supabase.from("app_settings").select("value").eq("key", "visita_dias_atras_max").maybeSingle()
+      .then(({ data }) => setDiasAtrasMax(parseDiasAtras((data as { value?: string } | null)?.value)));
+  }, []);
   const { data: clientes } = useClientes();
   const { data: motivos } = useMotivos();
   const { data: catalogos } = useCatalogos();
 
   const [codCliente, setCodCliente] = useState<string>(params.get("cliente") ?? "");
-  const [fecha, setFecha] = useState<string>(hoyISO());
+  const [fecha, setFecha] = useState<string>(hoyMadrid());
   const [resultado, setResultado] = useState<string>("efectiva");
   const [tipo, setTipo] = useState<string>("cliente");
   const [busqueda, setBusqueda] = useState("");
@@ -173,7 +183,8 @@ export default function NuevaVisita() {
 
   /** Solo las visitas efectivas llevan bloques; el resto son intentos fallidos. */
   const esEfectiva = resultado === "efectiva";
-  const requiereGeo = tipo !== "llamada";
+  const requiereGeo = pideUbicacion(tipo, fecha);
+  const limitesFecha = limitesFechaVisita(diasAtrasMax, role === "admin");
   const hayCambios =
     transcripcion.trim().length > 0 ||
     observaciones.trim().length > 0 ||
@@ -187,7 +198,7 @@ export default function NuevaVisita() {
     return () => window.removeEventListener("beforeunload", h);
   }, [hayCambios, saving]);
 
-  const fechaLabel = fecha === hoyISO() ? "hoy" : fecha.split("-").reverse().join("/");
+  const fechaLabel = fecha === hoyMadrid() ? "hoy" : fecha.split("-").reverse().join("/");
 
   // ---------------------------------------------------------------- referencias
 
@@ -452,13 +463,14 @@ export default function NuevaVisita() {
 
     setSaving(true);
 
-    // Los documentos viven en memoria hasta aquí: se suben justo antes de crear la visita.
-    let docsSubidos: DocVisita[] = [];
-    if (documentos.length) {
+    // Los documentos viven en memoria hasta aquí: se suben justo antes de crear la visita (una sola vez).
+    let docsSubidos: DocVisita[] = docsSubidosRef.current ?? [];
+    if (documentos.length && !docsSubidosRef.current) {
       try {
         docsSubidos = await subirDocumentos(documentos, user?.id ?? "", fecha, codCliente, (hecho, total) =>
           setSubiendoDocs({ hecho, total }),
         );
+        docsSubidosRef.current = docsSubidos;
       } catch (e) {
         toast({
           title: "No se han podido subir los documentos",
@@ -472,7 +484,8 @@ export default function NuevaVisita() {
       setSubiendoDocs(null);
     }
 
-    const pos = await obtenerPosicion();
+    // La ubicación solo se pide si es una visita presencial de hoy.
+    const pos = requiereGeo ? await obtenerPosicion() : null;
     if (!pos && requiereGeo) {
       toast({
         title: "Sin ubicación",
@@ -480,79 +493,47 @@ export default function NuevaVisita() {
       });
     }
 
-    const { data: creada, error } = await supabase
-      .from("visitas")
-      .insert({
+    // Visita y bloques se guardan juntos: o todo o nada.
+    const { data: res, error } = await supabase.rpc("registrar_visita", {
+      _id: visitaId.current,
+      _visita: {
         cod_cliente: Number(codCliente),
-        // legacy: se conserva el primer motivo para las vistas antiguas
-        motivo_key: esEfectiva ? bloques[0]?.motivoKey ?? null : null,
         fecha,
         tipo,
         resultado_visita: resultado,
-        user_id: user?.id ?? null,
-        vendedor: employeeCode ?? null,
         transcripcion: transcripcion || null,
         observaciones: observaciones || null,
         campos: docsSubidos.length ? { documentos: docsSubidos } : {},
-        estado: "registrada",
-        origen: "app",
         latitud: pos?.lat ?? null,
         longitud: pos?.lng ?? null,
         analisis_modelo: analisis.modelo,
         analisis_prompt_version: analisis.version,
-      } as never)
-      .select("id")
-      .single();
-
-    if (error || !creada) {
-      setSaving(false);
-      toast({ title: "No se ha podido guardar", description: error?.message ?? "Error desconocido", variant: "destructive" });
-      return;
-    }
-
-    try {
-      if (esEfectiva) {
-        await crearBloques(
-          (creada as { id: string }).id,
-          bloques.map((b) => ({
+      },
+      _bloques: esEfectiva
+        ? bloques.map((b) => ({
             motivo_key: b.motivoKey,
             // Los números se guardan como número: "0000", "00" o "0,00" quedan en 0.
             campos: normalizarValoresNumericos(motivoDe(b.motivoKey)?.campos ?? [], b.valores),
             campos_meta: b.meta,
             completo: pendientesDe(b).length === 0,
-          })),
-        );
-      }
-    } catch (e) {
-      setSaving(false);
-      toast({ title: "Visita guardada sin bloques", description: (e as Error).message, variant: "destructive" });
+          }))
+        : [],
+    } as never);
+
+    setSaving(false);
+    if (error) {
+      toast({
+        title: "No se ha podido guardar la visita",
+        description: `${error.message} No se ha guardado nada: revisa y pulsa Guardar de nuevo.`,
+        variant: "destructive",
+      });
       return;
     }
 
-    setSaving(false);
-
-    if (pos) {
-      await supabase.rpc("registrar_geo_cliente" as never, {
-        _cod: Number(codCliente),
-        _lat: pos.lat,
-        _lng: pos.lng,
-      } as never);
-    }
-
-    // Si el cliente estaba planificado hoy en la agenda, marcamos la parada como realizada.
-    // Es un extra: cualquier fallo aquí nunca debe afectar al guardado de la visita.
-    let agendaMarcada = false;
-    try {
-      if (user?.id) {
-        agendaMarcada = await marcarPlanificadaRealizada(user.id, Number(codCliente), fecha, (creada as { id: string }).id);
-      }
-    } catch (e) {
-      console.error("No se ha podido actualizar la agenda:", e);
-    }
-
+    const r = (res ?? {}) as { ya_existia?: boolean; agenda_marcada?: boolean };
     toast({
-      title: "Visita guardada",
-      description: agendaMarcada ? "Marcada como realizada en tu agenda." : undefined,
+      title: r.ya_existia ? "La visita ya estaba guardada" : "Visita guardada",
+      description: r.agenda_marcada ? "Marcada como realizada en tu agenda." : undefined,
     });
     const volverRaw = params.get("volver");
     const volver = volverRaw && volverRaw.startsWith("/") && !volverRaw.startsWith("//") ? volverRaw : `/clientes/${codCliente}`;
@@ -677,7 +658,7 @@ export default function NuevaVisita() {
 
           <div className="space-y-2">
             <Label>Fecha</Label>
-            <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+            <Input type="date" value={fecha} min={limitesFecha.min} max={limitesFecha.max} onChange={(e) => setFecha(e.target.value)} />
           </div>
         </CollapsibleContent>
       </Collapsible>
