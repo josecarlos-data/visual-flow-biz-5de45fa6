@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
     const desde24 = mesesAtras(24);
     const hastaPrev = new Date(desde12.getFullYear(), desde12.getMonth(), desde12.getDate() - 1);
 
-    const [clienteRes, ventasRes, productosRes, visitasRes, kpisRes, perfilRes, atributosRes, camposRes, situacionesRes] =
+    const [clienteRes, ventasRes, productosRes, visitasRes, kpisRes, perfilRes, atributosRes, camposRes, motivosRes, situacionesRes] =
       await Promise.all([
       userClient.from("clientes").select("*").eq("cod_cliente", cod_cliente).maybeSingle(),
       userClient.from("resumen_cliente_mes").select("anio, mes, importe").eq("cod_cliente", cod_cliente),
@@ -122,13 +122,14 @@ Deno.serve(async (req) => {
         _desde_prev: isoLocal(desde24),
         _hasta_prev: isoLocal(hastaPrev),
       }),
-      userClient.from("visitas").select("fecha, motivo_key, campos, observaciones").eq("cod_cliente", cod_cliente).order("fecha", { ascending: false }).limit(8),
+      userClient.from("visitas").select("id, fecha, tipo, resultado_visita, comercial_nombre, motivo_key, campos, observaciones, observaciones_original").eq("cod_cliente", cod_cliente).order("fecha", { ascending: false }).limit(8),
       userClient.from("cliente_kpis").select("*").eq("cod_cliente", cod_cliente).maybeSingle(),
       userClient.from("v_cliente_perfil_vigente")
         .select("atributo_key, valor_texto, valor_num, observado_en")
         .eq("cod_cliente", cod_cliente),
       userClient.from("perfil_atributos").select("key, nombre, unidad"),
-      userClient.from("motivo_campos").select("campo_key, label"),
+      userClient.from("motivo_campos").select("motivo_key, campo_key, label"),
+      userClient.from("motivos_visita").select("key, nombre"),
       userClient.from("situaciones_cliente")
         .select("etiqueta, activo, desde, hasta")
         .eq("cod_cliente", cod_cliente)
@@ -155,10 +156,31 @@ Deno.serve(async (req) => {
       etiquetaAtributo.set(a.key as string, (a.nombre as string) ?? (a.key as string));
       if (a.unidad) unidadAtributo.set(a.key as string, a.unidad as string);
     }
+    // Etiqueta por motivo + campo: el mismo campo puede llamarse distinto en cada plantilla.
     const etiquetaCampo = new Map<string, string>();
     for (const c of camposRes.data ?? []) {
-      if (!etiquetaCampo.has(c.campo_key as string)) etiquetaCampo.set(c.campo_key as string, (c.label as string) ?? (c.campo_key as string));
+      etiquetaCampo.set(`${c.motivo_key}|${c.campo_key}`, (c.label as string) ?? (c.campo_key as string));
     }
+    const nombreMotivo = new Map<string, string>();
+    for (const m of motivosRes.data ?? []) nombreMotivo.set(m.key as string, (m.nombre as string) ?? (m.key as string));
+
+    // Bloques de esas visitas, con la sesión del usuario: solo los que puede ver.
+    const visitas = visitasRes.data ?? [];
+    const idsVisitas = visitas.map((v) => v.id as string);
+    const bloquesRes = idsVisitas.length
+      ? await userClient.from("visita_bloques")
+        .select("visita_id, motivo_key, campos, validacion, orden")
+        .in("visita_id", idsVisitas)
+        .order("orden", { ascending: true })
+      : { data: [] as Record<string, unknown>[] };
+    const bloquesPorVisita = new Map<string, Record<string, unknown>[]>();
+    for (const b of (bloquesRes.data ?? []) as Record<string, unknown>[]) {
+      if (b.validacion === "NO CORRECTO") continue;
+      const lista = bloquesPorVisita.get(b.visita_id as string) ?? [];
+      lista.push(b);
+      bloquesPorVisita.set(b.visita_id as string, lista);
+    }
+    const seccionVisitas = formatearVisitas(visitas, bloquesPorVisita, etiquetaCampo, nombreMotivo);
 
     // Situación vigente: mismo criterio que la cabecera de la ficha
     const situacion = (situacionesRes.data ?? []).find(
@@ -245,15 +267,7 @@ Deno.serve(async (req) => {
       }).join("\n") || "  Sin datos",
       "",
       "ÚLTIMAS VISITAS:",
-      (visitasRes.data ?? []).map((v) => {
-        const campos = v.campos && typeof v.campos === "object"
-          ? Object.entries(v.campos as Record<string, unknown>)
-              .filter(([, val]) => val)
-              .map(([k, val]) => `${etiquetaCampo.get(k) ?? k}: ${val}`)
-              .join(" | ")
-          : "";
-        return `  ${v.fecha} [${v.motivo_key ?? "—"}] ${campos || v.observaciones || ""}`;
-      }).join("\n") || "  Sin visitas registradas",
+      seccionVisitas,
     ].filter(Boolean).join("\n");
 
     const t0 = performance.now();
@@ -273,7 +287,8 @@ Deno.serve(async (req) => {
               "Sé concreto y accionable: cifras, familias de producto y acciones. Nada de generalidades. Responde siempre en español. " +
               "Si una referencia relevante ha caído respecto al periodo anterior (últimos 12 meses vs. 12 anteriores), menciónala explícitamente en alertas u oportunidades, con su nombre y su porcentaje de variación. " +
               "El año en curso está incompleto. NUNCA compares su importe con el total de un año cerrado ni presentes esa diferencia como una caída o una subida. " +
-              "Para cualquier afirmación sobre la evolución anual usa exclusivamente el bloque COMPARACIÓN VÁLIDA. Si ese bloque no aparece, no afirmes nada sobre la tendencia anual.",
+              "Para cualquier afirmación sobre la evolución anual usa exclusivamente el bloque COMPARACIÓN VÁLIDA. Si ese bloque no aparece, no afirmes nada sobre la tendencia anual. " +
+              "Usa los acuerdos, las próximas acciones y las ofertas pendientes de ÚLTIMAS VISITAS para proponer qué retomar en la siguiente visita, y no vuelvas a proponer lo que el cliente ya rechazó.",
           },
           { role: "user", content: contexto },
         ],
@@ -371,3 +386,55 @@ Deno.serve(async (req) => {
     });
   }
 });
+
+// ---------------------------------------------------------------- últimas visitas
+
+const ETIQUETA_TIPO: Record<string, string> = { cliente: "Cliente", ruta: "Ruta", llamada: "Llamada", agenda: "Agenda" };
+const ETIQUETA_RESULTADO: Record<string, string> = {
+  cliente_ausente: "Cliente ausente",
+  cerrado: "Cerrado",
+  sin_acceso: "Sin acceso",
+};
+
+const esRutaAdjunto = (v: string) => /^[0-9a-f-]{36}\/.+\.[a-z0-9]{2,5}$/i.test(v.trim());
+
+function textoValor(val: unknown): string {
+  if (val == null) return "";
+  if (Array.isArray(val)) return val.map(textoValor).filter(Boolean).join(", ");
+  if (typeof val === "object") return "";
+  if (typeof val === "boolean") return val ? "Sí" : "No";
+  const t = String(val).replace(/\s+/g, " ").trim();
+  return esRutaAdjunto(t) ? "" : t;
+}
+
+export function formatearVisitas(
+  visitas: Record<string, unknown>[],
+  bloquesPorVisita: Map<string, Record<string, unknown>[]>,
+  etiquetaCampo: Map<string, string>,
+  nombreMotivo: Map<string, string>,
+): string {
+  if (!visitas.length) return "  Sin visitas registradas";
+  return visitas.map((v) => {
+    const cab = [v.fecha as string, ETIQUETA_TIPO[v.tipo as string] ?? (v.tipo as string)];
+    if (v.comercial_nombre) cab.push(v.comercial_nombre as string);
+    const res = ETIQUETA_RESULTADO[v.resultado_visita as string];
+    if (res) cab.push(`resultado: ${res}`);
+    const lineas = [`  ${cab.filter(Boolean).join(" · ")}`];
+
+    for (const b of bloquesPorVisita.get(v.id as string) ?? []) {
+      const motivo = b.motivo_key as string;
+      const campos = b.campos && typeof b.campos === "object" ? (b.campos as Record<string, unknown>) : {};
+      const partes = Object.entries(campos)
+        .filter(([k]) => k !== "documentos" && !k.endsWith("_nombre"))
+        .map(([k, val]) => [k, textoValor(val)] as const)
+        .filter(([, t]) => t !== "")
+        .map(([k, t]) => `${etiquetaCampo.get(`${motivo}|${k}`) ?? k}: ${t}`);
+      lineas.push(`    - ${nombreMotivo.get(motivo) ?? motivo ?? "Sin motivo"}${partes.length ? `: ${partes.join(" | ")}` : ""}`);
+    }
+    if (lineas.length === 1) {
+      const obs = ((v.observaciones as string) || (v.observaciones_original as string) || "").replace(/\s+/g, " ").trim();
+      if (obs) lineas.push(`    Observaciones: ${obs}`);
+    }
+    return lineas.join("\n");
+  }).join("\n");
+}
