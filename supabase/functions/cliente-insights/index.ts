@@ -473,32 +473,38 @@ export function formatearVisitas(
     const obsDe = (f: Record<string, unknown>) =>
       ((f.observaciones as string) || (f.observaciones_original as string) || "").replace(/\s+/g, " ").trim();
 
+    const obsGrupo: string[] = [];
     for (const fila of grupo) {
+      const esApp = fila.origen === "app";
       const bloques = bloquesPorVisita.get(fila.id as string) ?? [];
-      
+      let conContenido = false;
       for (const b of bloques) {
         const motivo = b.motivo_key as string;
         const campos = b.campos && typeof b.campos === "object" ? (b.campos as Record<string, unknown>) : {};
         const todos = Object.entries(campos).filter(([k]) => k !== "documentos" && !k.endsWith("_nombre"));
-        const partes = todos
+        const conTexto = todos.filter(([, val]) => textoValor(val) !== "");
+        const partes = conTexto
           .filter(([k]) => {
             const attr = atributoDeCampo?.get(`${motivo}|${k}`);
             return !(attr && vigentePorBloque?.has(`${b.id}|${attr}`));
           })
-          .map(([k, val]) => [k, textoValor(val)] as const)
-          .filter(([, t]) => t !== "")
-          .map(([k, t]) => `${etiquetaCampo.get(`${motivo}|${k}`) ?? k}: ${t}`);
+          .map(([k, val]) => `${etiquetaCampo.get(`${motivo}|${k}`) ?? k}: ${textoValor(val)}`);
         const huboOcultos = todos.length > 0 && partes.length === 0 &&
           todos.some(([k]) => atributoDeCampo?.has(`${motivo}|${k}`));
+        if (!esApp && conTexto.length === 0) continue; // Gespromo: bloque vacío no se escribe
+        if (conTexto.length > 0) conContenido = true;
         if (huboOcultos) continue; // todo lo del bloque ya está en PERFIL DEL TALLER
         lineas.push(`    - ${nombreMotivo.get(motivo) ?? motivo ?? "Sin motivo"}${partes.length ? `: ${partes.join(" | ")}` : ""}`);
       }
-      // App: las observaciones del comercial siempre. Gespromo: solo si no hay bloques.
-      if (fila.origen === "app" || bloques.length === 0) {
+      if (esApp) {
         const obs = obsDe(fila);
         if (obs) lineas.push(`    Observaciones: ${obs}`);
+      } else if (!conContenido) {
+        const obs = obsDe(fila);
+        if (obs && !obsGrupo.includes(obs)) obsGrupo.push(obs);
       }
     }
+    if (obsGrupo.length) lineas.push(`    Observaciones: ${obsGrupo.join(" | ")}`);
     return lineas.join("\n");
   }).join("\n");
 }

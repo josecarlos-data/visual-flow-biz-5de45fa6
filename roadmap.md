@@ -81,3 +81,4 @@
 - [x] A: análisis IA agrupa visitas Gespromo, observaciones app, perfil sin duplicar, «(sin confirmar)»
 - [x] B: editar_bloque_revision + auditoría de bloques (0043) + botón «Editar datos»
 - Nota: tras una corrección del revisor, el dato del perfil queda con fuente «voz», que no es exacta (se deja así)
+- [x] cliente-insights: bloques Gespromo vacíos no se escriben; observaciones por fila sin bloques con contenido, una línea al final del grupo
