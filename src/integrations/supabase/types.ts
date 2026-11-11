@@ -3818,6 +3818,10 @@ export type Database = {
         }
         Returns: Json
       }
+      registrar_visita: {
+        Args: { _bloques: Json; _id: string; _visita: Json }
+        Returns: Json
+      }
       repartir_observaciones_gespromo: {
         Args: { _forzar?: boolean }
         Returns: Json
