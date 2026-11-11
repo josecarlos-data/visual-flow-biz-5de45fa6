@@ -122,13 +122,13 @@ Deno.serve(async (req) => {
         _desde_prev: isoLocal(desde24),
         _hasta_prev: isoLocal(hastaPrev),
       }),
-      userClient.from("visitas").select("id, fecha, tipo, resultado_visita, comercial_nombre, motivo_key, campos, observaciones, observaciones_original").eq("cod_cliente", cod_cliente).order("fecha", { ascending: false }).limit(8),
+      userClient.from("visitas").select("id, fecha, tipo, origen, user_id, resultado_visita, comercial_nombre, motivo_key, campos, observaciones, observaciones_original").eq("cod_cliente", cod_cliente).order("fecha", { ascending: false }).order("created_at", { ascending: false }).limit(LIMITE_FILAS_VISITAS),
       userClient.from("cliente_kpis").select("*").eq("cod_cliente", cod_cliente).maybeSingle(),
       userClient.from("v_cliente_perfil_vigente")
-        .select("atributo_key, valor_texto, valor_num, observado_en")
+        .select("atributo_key, valor_texto, valor_num, observado_en, bloque_id, estado")
         .eq("cod_cliente", cod_cliente),
       userClient.from("perfil_atributos").select("key, nombre, unidad"),
-      userClient.from("motivo_campos").select("motivo_key, campo_key, label"),
+      userClient.from("motivo_campos").select("motivo_key, campo_key, label, perfil_atributo_key"),
       userClient.from("motivos_visita").select("key, nombre"),
       userClient.from("situaciones_cliente")
         .select("etiqueta, activo, desde, hasta")
@@ -158,8 +158,15 @@ Deno.serve(async (req) => {
     }
     // Etiqueta por motivo + campo: el mismo campo puede llamarse distinto en cada plantilla.
     const etiquetaCampo = new Map<string, string>();
+    const atributoDeCampo = new Map<string, string>();
     for (const c of camposRes.data ?? []) {
       etiquetaCampo.set(`${c.motivo_key}|${c.campo_key}`, (c.label as string) ?? (c.campo_key as string));
+      if (c.perfil_atributo_key) atributoDeCampo.set(`${c.motivo_key}|${c.campo_key}`, c.perfil_atributo_key as string);
+    }
+    // Atributos del perfil cuyo valor vigente sale de cada bloque: no se repiten en ÚLTIMAS VISITAS.
+    const vigentePorBloque = new Set<string>();
+    for (const p of perfilRes.data ?? []) {
+      if (p.bloque_id) vigentePorBloque.add(`${p.bloque_id}|${p.atributo_key}`);
     }
     const nombreMotivo = new Map<string, string>();
     for (const m of motivosRes.data ?? []) nombreMotivo.set(m.key as string, (m.nombre as string) ?? (m.key as string));
@@ -169,7 +176,7 @@ Deno.serve(async (req) => {
     const idsVisitas = visitas.map((v) => v.id as string);
     const bloquesRes = idsVisitas.length
       ? await userClient.from("visita_bloques")
-        .select("visita_id, motivo_key, campos, validacion, orden")
+        .select("id, visita_id, motivo_key, campos, validacion, orden")
         .in("visita_id", idsVisitas)
         .order("orden", { ascending: true })
       : { data: [] as Record<string, unknown>[] };
@@ -180,7 +187,11 @@ Deno.serve(async (req) => {
       lista.push(b);
       bloquesPorVisita.set(b.visita_id as string, lista);
     }
-    const seccionVisitas = formatearVisitas(visitas, bloquesPorVisita, etiquetaCampo, nombreMotivo);
+    const seccionVisitas = formatearVisitas(visitas, bloquesPorVisita, etiquetaCampo, nombreMotivo, {
+      atributoDeCampo,
+      vigentePorBloque,
+      limiteFilas: LIMITE_FILAS_VISITAS,
+    });
 
     // Situación vigente: mismo criterio que la cabecera de la ficha
     const situacion = (situacionesRes.data ?? []).find(
@@ -200,7 +211,8 @@ Deno.serve(async (req) => {
         ? `${Number(p.valor_num).toLocaleString("es-ES")}${unidad ? ` ${unidad}` : ""}`
         : (p.valor_texto as string) ?? "";
       const obs = ddmm(p.observado_en as string);
-      return `  ${label}: ${valor}${obs ? ` (observado ${obs})` : ""}`;
+      const sinConfirmar = p.estado !== "confirmado" ? " (sin confirmar)" : "";
+      return `  ${label}: ${valor}${obs ? ` (observado ${obs})` : ""}${sinConfirmar}`;
     });
 
     const eur0 = (n: number) => Math.round(n).toLocaleString("es-ES");
@@ -407,33 +419,86 @@ function textoValor(val: unknown): string {
   return esRutaAdjunto(t) ? "" : t;
 }
 
+export const LIMITE_FILAS_VISITAS = 40;
+export const MAX_VISITAS = 10;
+
+type OpcionesVisitas = {
+  atributoDeCampo?: Map<string, string>;
+  vigentePorBloque?: Set<string>;
+  limiteFilas?: number;
+};
+
+/**
+ * Gespromo guarda una fila por motivo: se juntan las del mismo día y comercial.
+ * Las visitas de la app ya son una fila con todos sus bloques y no se juntan.
+ * Si se llegó al límite de filas, el último grupo puede estar incompleto y se quita.
+ */
+export function agruparVisitas(visitas: Record<string, unknown>[], limiteFilas?: number): Record<string, unknown>[][] {
+  const grupos: Record<string, unknown>[][] = [];
+  const indice = new Map<string, number>();
+  for (const v of visitas) {
+    if (v.origen === "gespromo") {
+      const clave = `${v.fecha}|${(v.user_id as string) ?? ""}|${(v.comercial_nombre as string) ?? ""}`;
+      const pos = indice.get(clave);
+      if (pos !== undefined) { grupos[pos].push(v); continue; }
+      indice.set(clave, grupos.length);
+    }
+    grupos.push([v]);
+  }
+  if (limiteFilas && visitas.length >= limiteFilas && grupos.length > 1) {
+    const ultima = visitas[visitas.length - 1];
+    const k = grupos.findIndex((g) => g.includes(ultima));
+    if (k >= 0 && grupos[k][0].origen === "gespromo") grupos.splice(k, 1);
+  }
+  return grupos.slice(0, MAX_VISITAS);
+}
+
 export function formatearVisitas(
   visitas: Record<string, unknown>[],
   bloquesPorVisita: Map<string, Record<string, unknown>[]>,
   etiquetaCampo: Map<string, string>,
   nombreMotivo: Map<string, string>,
+  opciones: OpcionesVisitas = {},
 ): string {
   if (!visitas.length) return "  Sin visitas registradas";
-  return visitas.map((v) => {
+  const { atributoDeCampo, vigentePorBloque, limiteFilas } = opciones;
+  return agruparVisitas(visitas, limiteFilas).map((grupo) => {
+    const v = grupo[0];
     const cab = [v.fecha as string, ETIQUETA_TIPO[v.tipo as string] ?? (v.tipo as string)];
     if (v.comercial_nombre) cab.push(v.comercial_nombre as string);
-    const res = ETIQUETA_RESULTADO[v.resultado_visita as string];
+    const res = grupo.map((g) => ETIQUETA_RESULTADO[g.resultado_visita as string]).find(Boolean);
     if (res) cab.push(`resultado: ${res}`);
     const lineas = [`  ${cab.filter(Boolean).join(" · ")}`];
 
-    for (const b of bloquesPorVisita.get(v.id as string) ?? []) {
-      const motivo = b.motivo_key as string;
-      const campos = b.campos && typeof b.campos === "object" ? (b.campos as Record<string, unknown>) : {};
-      const partes = Object.entries(campos)
-        .filter(([k]) => k !== "documentos" && !k.endsWith("_nombre"))
-        .map(([k, val]) => [k, textoValor(val)] as const)
-        .filter(([, t]) => t !== "")
-        .map(([k, t]) => `${etiquetaCampo.get(`${motivo}|${k}`) ?? k}: ${t}`);
-      lineas.push(`    - ${nombreMotivo.get(motivo) ?? motivo ?? "Sin motivo"}${partes.length ? `: ${partes.join(" | ")}` : ""}`);
-    }
-    if (lineas.length === 1) {
-      const obs = ((v.observaciones as string) || (v.observaciones_original as string) || "").replace(/\s+/g, " ").trim();
-      if (obs) lineas.push(`    Observaciones: ${obs}`);
+    const obsDe = (f: Record<string, unknown>) =>
+      ((f.observaciones as string) || (f.observaciones_original as string) || "").replace(/\s+/g, " ").trim();
+
+    for (const fila of grupo) {
+      const bloques = bloquesPorVisita.get(fila.id as string) ?? [];
+      let escritos = 0;
+      for (const b of bloques) {
+        const motivo = b.motivo_key as string;
+        const campos = b.campos && typeof b.campos === "object" ? (b.campos as Record<string, unknown>) : {};
+        const todos = Object.entries(campos).filter(([k]) => k !== "documentos" && !k.endsWith("_nombre"));
+        const partes = todos
+          .filter(([k]) => {
+            const attr = atributoDeCampo?.get(`${motivo}|${k}`);
+            return !(attr && vigentePorBloque?.has(`${b.id}|${attr}`));
+          })
+          .map(([k, val]) => [k, textoValor(val)] as const)
+          .filter(([, t]) => t !== "")
+          .map(([k, t]) => `${etiquetaCampo.get(`${motivo}|${k}`) ?? k}: ${t}`);
+        const huboOcultos = todos.length > 0 && partes.length === 0 &&
+          todos.some(([k]) => atributoDeCampo?.has(`${motivo}|${k}`));
+        if (huboOcultos) continue; // todo lo del bloque ya está en PERFIL DEL TALLER
+        lineas.push(`    - ${nombreMotivo.get(motivo) ?? motivo ?? "Sin motivo"}${partes.length ? `: ${partes.join(" | ")}` : ""}`);
+        escritos++;
+      }
+      // App: las observaciones del comercial siempre. Gespromo: solo si no hay bloques.
+      if (fila.origen === "app" || escritos === 0) {
+        const obs = obsDe(fila);
+        if (obs) lineas.push(`    Observaciones: ${obs}`);
+      }
     }
     return lineas.join("\n");
   }).join("\n");
