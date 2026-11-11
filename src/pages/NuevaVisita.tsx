@@ -76,6 +76,7 @@ export default function NuevaVisita() {
   // Documentos ya subidos en un intento anterior: no se vuelven a subir.
   const docsSubidosRef = useRef<DocVisita[] | null>(null);
   const [diasAtrasMax, setDiasAtrasMax] = useState(7);
+  useEffect(() => { docsSubidosRef.current = null; }, [documentos]);
   useEffect(() => {
     supabase.from("app_settings").select("value").eq("key", "visita_dias_atras_max").maybeSingle()
       .then(({ data }) => setDiasAtrasMax(parseDiasAtras((data as { value?: string } | null)?.value)));
