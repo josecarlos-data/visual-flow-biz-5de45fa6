@@ -475,7 +475,7 @@ export function formatearVisitas(
 
     for (const fila of grupo) {
       const bloques = bloquesPorVisita.get(fila.id as string) ?? [];
-      let escritos = 0;
+      
       for (const b of bloques) {
         const motivo = b.motivo_key as string;
         const campos = b.campos && typeof b.campos === "object" ? (b.campos as Record<string, unknown>) : {};
@@ -492,10 +492,9 @@ export function formatearVisitas(
           todos.some(([k]) => atributoDeCampo?.has(`${motivo}|${k}`));
         if (huboOcultos) continue; // todo lo del bloque ya está en PERFIL DEL TALLER
         lineas.push(`    - ${nombreMotivo.get(motivo) ?? motivo ?? "Sin motivo"}${partes.length ? `: ${partes.join(" | ")}` : ""}`);
-        escritos++;
       }
       // App: las observaciones del comercial siempre. Gespromo: solo si no hay bloques.
-      if (fila.origen === "app" || escritos === 0) {
+      if (fila.origen === "app" || bloques.length === 0) {
         const obs = obsDe(fila);
         if (obs) lineas.push(`    Observaciones: ${obs}`);
       }
