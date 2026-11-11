@@ -596,6 +596,17 @@ export default function RevisionVisitas() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {editando && (
+        <CompletarBloqueDialog
+          modo="revisor"
+          bloque={editando}
+          campos={motivos?.find((m) => m.key === editando.motivo_key)?.campos ?? []}
+          titulo={nombreMotivo(editando.motivo_key)}
+          open={!!editando}
+          onOpenChange={(v) => { if (!v) setEditando(null); }}
+        />
+      )}
     </div>
   );
 }

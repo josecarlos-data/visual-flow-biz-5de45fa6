@@ -78,6 +78,6 @@
 - [x] Análisis IA del cliente: incluir bloques de visitas anteriores
 
 ## Revisión de visitas: análisis IA y corrección de bloques
-- [ ] A: análisis IA agrupa visitas Gespromo, observaciones app, perfil sin duplicar, «(sin confirmar)»
-- [ ] B: editar_bloque_revision + auditoría de bloques (0043) + botón «Editar datos»
+- [x] A: análisis IA agrupa visitas Gespromo, observaciones app, perfil sin duplicar, «(sin confirmar)»
+- [x] B: editar_bloque_revision + auditoría de bloques (0043) + botón «Editar datos»
 - Nota: tras una corrección del revisor, el dato del perfil queda con fuente «voz», que no es exacta (se deja así)
