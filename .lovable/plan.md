@@ -1,26 +1,25 @@
-# Decimales en bloques y etiquetas de referencia
+# Volver a GPT-5.6 Luna solo en la extracción de bloques
 
-## 1. normalizarNumero (src/lib/motivoCampos.ts)
-- Quitar espacios.
-- Si el texto lleva coma: formato español → borrar puntos (miles) y cambiar la coma por punto.
-- Si no lleva coma: el punto es el decimal y se respeta.
-- Se mantiene: "0", "00", "0000", "0,00" → "0". Texto no numérico se devuelve tal cual.
-- Nota: "1.250" sin coma pasará a 1,25 (antes 1250). Es coherente con la regla pedida (la IA y los campos numéricos nunca envían separador de miles).
+## Medición (banco de dictados cortos, prompt fase4.6, 11 casos × 5 ejecuciones)
 
-## 2. Pruebas (nuevo src/lib/motivoCampos.test.ts)
-56.3→56.3 · 56.30→56.3 · 56,30→56.3 · 1.250,50→1250.5 · 1250→1250 · 0000→0 · 0,00→0.
+| Configuración | Bloques esperados | Sin bloques* | Latencia media | p90 | Coste por extracción |
+|---|---|---|---|---|---|
+| openai/gpt-6-luna · none (publicado) | 100 % | 0 % | 7,6 s | 17,1 s | 0,0062 créditos |
+| openai/gpt-5.6-luna · none | 100 % | 0 % | 2,9 s | 5,8 s | 0,0121 créditos |
 
-## 3. Otros sitios revisados (no se cambian)
-- `completar_bloque` y `editar_bloque_revision` (0034/0043): no convierten números; guardan el texto recibido.
-- `CompletarBloqueDialog.tsx`: envía los valores sin normalizar. No reproduce el fallo (no borra puntos), pero un «56,30» escrito ahí se guarda como texto «56,30» sin convertir. Propuesta para otra entrega: aplicar `normalizarValoresNumericos` antes de llamar a la función.
-- `src/lib/datasets/maestroIsi.ts` y `sync-onedrive`: misma lógica de borrar puntos, pero leen Excel de ventas en formato español, no bloques. Se dejan.
-- `bloquesExtraccion.ts` (carga CSV): ya respeta el punto decimal.
+*Sin contar el caso «no estaba», que en ambos da 0 bloques y resultado no efectivo (correcto en 5/5).
 
-## 4. Lista de bloques afectados (solo lectura, ya consultada)
-Sospechosos de punto borrado: 2109 AUTOBUSES PACO PEPE 11/11 Nuestro precio 2297 («22,97»); 10833 PERFECT CAR 12/11 Nuestro precio 563 y Precio competidor 463 («56,30 … 10 euros más barato»), Promoción 563 («56,30») y 321 («32,10»). El resto coincide con su cita. Se entregará la tabla completa en la respuesta final.
+Los 11 casos dan 5/5 en los dos modelos. No hubo ningún cero por bloques descartados.
+Diferencia de motivos: en «Icer / plan de choque», GPT-6 añadió además Seguimiento en la primera ejecución; GPT-5.6 no.
 
-## 5. Etiquetas de referencia (src/lib/camposVisita.ts → presentarCampos)
-- Claves `<ref>_marca`, `<ref>_familia`, `<ref>_descripcion` cuya `<ref>` existe en el bloque: se colocan justo debajo de la referencia con etiqueta «Marca», «Familia», «Descripción» (sin el nombre interno).
-- Afecta a la ficha del cliente y a Revisión, que ya usan esa función. Prueba añadida en camposVisita.test.ts.
+## Estado en la pasarela
+- openai/gpt-5.6-luna: sin fecha de retirada (expiration_date vacío), no marcado como obsoleto, retención cero en chat-completions y responses.
+- Coste: aproximadamente el doble por extracción (unos 0,006 créditos más por visita).
 
-Sin migraciones, sin cambios de datos.
+## Cambio propuesto (mínimo)
+1. `supabase/functions/_shared/visita-voz-prompt.ts`: `MODELO_EXTRACCION = "openai/gpt-5.6-luna"`. `MODELO_VISION` se queda en `openai/gpt-6-luna` (lectura de fotos sin cambios).
+2. `supabase/functions/visita-voz/index.ts`: añadir al mapa de temperatura `"openai/gpt-5.6-luna": { none: 0 }` (el banco lo envió con temperature 0 y esfuerzo none sin error).
+3. Redesplegar `visita-voz`. Las visitas nuevas guardarán `analisis_modelo = openai/gpt-5.6-luna`.
+4. Volver a pasar el banco con lo publicado y anotar el resultado en `RESULTADOS-cortos.md` y en `roadmap.md`.
+
+Sin migraciones. No cambian el prompt, la transcripción, las pantallas ni el guardado.
