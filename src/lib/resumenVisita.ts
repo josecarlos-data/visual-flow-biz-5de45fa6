@@ -40,6 +40,18 @@ export function estadoRevision(validacion: string | null | undefined): EstadoRev
   return "Pendiente";
 }
 
+/**
+ * Etiqueta de estado (Pendiente / Correcto / No correcto): siempre en las visitas
+ * de la app; en las importadas de Gespromo solo si están validadas.
+ */
+export function muestraEtiquetaEstado(
+  origen: string | null | undefined,
+  validacion: string | null | undefined,
+): boolean {
+  if (origen === "app") return true;
+  return validacion === "CORRECTO" || validacion === "NO CORRECTO";
+}
+
 /** Bloques que el comercial puede completar: visita propia y bloque Pendiente o No correcto. */
 export function bloquesCompletables<T extends { validacion: string | null }>(
   esPropia: boolean,
