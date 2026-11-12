@@ -3768,6 +3768,10 @@ export type Database = {
       }
       preparar_carga_ventas: { Args: never; Returns: string }
       puede_conversar_visita: { Args: { _visita_id: string }; Returns: boolean }
+      puede_crear_bloque_propio: {
+        Args: { _visita_id: string }
+        Returns: boolean
+      }
       puede_editar_bloque: { Args: { _visita_id: string }; Returns: boolean }
       puede_enviar_ofertas: { Args: { _uid: string }; Returns: boolean }
       puede_gestionar_objetivos: {
@@ -3775,6 +3779,7 @@ export type Database = {
         Returns: boolean
       }
       puede_gestionar_ofertas: { Args: { _user_id: string }; Returns: boolean }
+      puede_revisar_bloque: { Args: { _visita_id: string }; Returns: boolean }
       puede_revisar_visitas: { Args: { _user_id: string }; Returns: boolean }
       puede_ver_asignacion_objetivo: {
         Args: { _asig_user: string; _user_id: string; _vendedor: string }
