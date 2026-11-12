@@ -101,3 +101,6 @@
 - [x] normalizarNumero respeta el punto decimal sin coma; pruebas
 - [x] CompletarBloqueDialog normaliza números antes de guardar
 - [x] Etiquetas legibles para marca/familia/descripción de referencia
+
+## Modelo de extracción
+- [x] Volver a openai/gpt-5.6-luna solo en extracción (visión sigue en gpt-6-luna); banco repetido

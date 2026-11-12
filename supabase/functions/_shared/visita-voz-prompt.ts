@@ -48,7 +48,7 @@ export const VERSION_PROMPT = "fase4.6";
  * Extracción: clasificar y rellenar campos con reglas explícitas. No es razonamiento,
  * por eso va con el modelo rápido y `reasoning_effort: "none"`.
  */
-export const MODELO_EXTRACCION = "openai/gpt-6-luna";
+export const MODELO_EXTRACCION = "openai/gpt-5.6-luna";
 
 /**
  * Lectura de albaranes fotografiados (fase B): necesita entrada de imagen.

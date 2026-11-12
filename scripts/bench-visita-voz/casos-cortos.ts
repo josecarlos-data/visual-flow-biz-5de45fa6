@@ -1,7 +1,7 @@
 /**
  * Banco de dictados cortos (fase4.6). Mide si la extracción crea los bloques esperados.
  *
- *   bun scripts/bench-visita-voz/casos-cortos.ts                       # gpt-6-luna, esfuerzo none, 5 ejecuciones
+ *   bun scripts/bench-visita-voz/casos-cortos.ts                       # gpt-5.6-luna (publicado), esfuerzo none, 5 ejecuciones
  *   CONF=gpt-6-luna/low REPS=3 bun scripts/bench-visita-voz/casos-cortos.ts
  *
  * Criterio de «bloques esperados» por caso:
@@ -101,7 +101,7 @@ const CONFS: Record<string, { model: string; effort: string; temp: number | null
   "gpt-5.6-luna/none": { model: "openai/gpt-5.6-luna", effort: "none", temp: 0, pin: 0.0000008, pout: 0.0000048 },
   "gemini-3.8-flash/low": { model: "google/gemini-3.8-flash", effort: "low", temp: null, pin: 0.000003, pout: 0.000015 },
 };
-const CONF_ID = process.env.CONF ?? "gpt-6-luna/none";
+const CONF_ID = process.env.CONF ?? "gpt-5.6-luna/none";
 const CONF = CONFS[CONF_ID];
 if (!CONF) throw new Error(`CONF desconocida: ${CONF_ID}`);
 const REPS = Number(process.env.REPS ?? 5);

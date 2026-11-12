@@ -35,6 +35,7 @@ const MAX_KEYWORDS = 200;
  */
 const TEMPERATURA: Record<string, Partial<Record<string, number | null>>> = {
   "openai/gpt-6-luna": { none: 0, low: null },
+  "openai/gpt-5.6-luna": { none: 0 },
 };
 
 function temperaturaPara(modelo: string, esfuerzo: string): number | null {
