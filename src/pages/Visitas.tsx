@@ -8,6 +8,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useVisitas, useClientes, useMotivos, useVisitaBloques, fechaCorta } from "@/hooks/useCrm";
+import { useAuth } from "@/hooks/useAuth";
+import { CompletarDatosVisita } from "@/components/CompletarDatosVisita";
+import { agruparMotivos, quitarMarcaInterna, etiquetaNoEfectiva, estadoRevision, bloquesCompletables } from "@/lib/resumenVisita";
 import { useScrollRestore } from "@/hooks/useScrollRestore";
 import { nombreDoc, type DocVisita } from "@/components/DocumentosVisita";
 import { BotonAdjunto } from "@/components/VisorAdjunto";
@@ -17,6 +20,7 @@ export default function Visitas() {
   useScrollRestore("visitas", !isLoading);
   const { data: clientes } = useClientes(false);
   const { data: motivos } = useMotivos();
+  const { user } = useAuth();
   const [q, setQ] = useState("");
   const [motivoFiltro, setMotivoFiltro] = useState("todos");
 
@@ -107,35 +111,42 @@ export default function Visitas() {
       ) : (
         <div className="space-y-2">
           {filtered.map((v) => {
+            const bs = bloquesMap?.get(v.id) ?? [];
+            const noEf = etiquetaNoEfectiva(v.resultado_visita);
+            const incompleta = bs.some((b) => !b.completo);
+            const estado = estadoRevision(v.validacion);
+            const preview = quitarMarcaInterna(v.observaciones || v.transcripcion);
+            const completables = bloquesCompletables(!!user && v.user_id === user.id, bs);
+            const acciones = completables.length > 0 && (
+              <div className="px-4 pb-3"><CompletarDatosVisita bloques={completables} motivos={motivos} /></div>
+            );
             const contenido = (
               <>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{titulo(v)}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {fechaCorta(v.fecha)}
-                      {v.hora ? ` · ${v.hora.slice(0, 5)}` : ""}
-                      {v.comercial_nombre ? ` · ${v.comercial_nombre}` : ""}
-                      {v.ruta ? ` · Ruta ${v.ruta}` : ""}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    {(motivosDe(v.id, v.motivo_key).length ? motivosDe(v.id, v.motivo_key) : [null]).map((k, i) => (
-                      <Badge key={`${k}-${i}`} variant="secondary">
-                        {motivos?.find((m) => m.key === k)?.nombre ?? "Visita"}
-                      </Badge>
-                    ))}
-                    {v.validacion && v.validacion !== "pendiente" && (
-                      <Badge variant={v.validacion === "CORRECTO" ? "outline" : "destructive"}>
-                        {v.validacion === "CORRECTO" ? "Correcto" : "No correcto"}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                {(v.observaciones || v.transcripcion) && (
-                  <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
-                    {v.observaciones || v.transcripcion}
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{titulo(v)}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {fechaCorta(v.fecha)}
+                    {v.hora ? ` · ${v.hora.slice(0, 5)}` : ""}
+                    {v.comercial_nombre ? ` · ${v.comercial_nombre}` : ""}
+                    {v.ruta ? ` · Ruta ${v.ruta}` : ""}
                   </p>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {noEf ? (
+                    <Badge variant="outline">{noEf}</Badge>
+                  ) : (
+                    agruparMotivos(motivosDe(v.id, v.motivo_key).length ? motivosDe(v.id, v.motivo_key) : [null]).map((g) => (
+                      <Badge key={String(g.key)} variant="secondary">
+                        {(g.key && motivoNombre.get(g.key)) || "Visita"}{g.n > 1 ? ` ×${g.n}` : ""}
+                      </Badge>
+                    ))
+                  )}
+                  {v.tipo === "llamada" && <Badge variant="outline">Llamada</Badge>}
+                  {incompleta && <Badge variant="outline" className="border-destructive/50 text-destructive">Incompleta</Badge>}
+                  <Badge variant={estado === "No correcto" ? "destructive" : "outline"}>{estado}</Badge>
+                </div>
+                {preview && (
+                  <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{preview}</p>
                 )}
                 {docsDe(v).length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -158,12 +169,17 @@ export default function Visitas() {
                 )}
               </>
             );
-            return v.cod_cliente != null ? (
-              <Link key={v.id} to={`/clientes/${v.cod_cliente}?volver=${encodeURIComponent('/visitas')}&volverTxt=${encodeURIComponent('Visitas')}`} className="block rounded-lg border bg-card p-4 hover:bg-accent">
-                {contenido}
-              </Link>
-            ) : (
-              <div key={v.id} className="rounded-lg border bg-card p-4">{contenido}</div>
+            return (
+              <div key={v.id} className="rounded-lg border bg-card">
+                {v.cod_cliente != null ? (
+                  <Link to={`/clientes/${v.cod_cliente}?volver=${encodeURIComponent('/visitas')}&volverTxt=${encodeURIComponent('Visitas')}`} className="block rounded-lg p-4 hover:bg-accent">
+                    {contenido}
+                  </Link>
+                ) : (
+                  <div className="p-4">{contenido}</div>
+                )}
+                {acciones}
+              </div>
             );
           })}
         </div>

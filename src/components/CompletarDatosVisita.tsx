@@ -10,9 +10,8 @@ export function CompletarDatosVisita({ bloques, motivos }: { bloques: VisitaBloq
   const [abierto, setAbierto] = useState<VisitaBloque | null>(null);
   if (!bloques.length || !motivos) return null;
   const nombre = (b: VisitaBloque) => motivos.find((m) => m.key === b.motivo_key)?.nombre ?? "Bloque";
-  const parar = (e: React.SyntheticEvent) => { e.preventDefault(); e.stopPropagation(); };
   return (
-    <div onClick={parar} onKeyDown={(e) => e.stopPropagation()}>
+    <div>
       {bloques.length === 1 ? (
         <Button size="sm" variant="outline" onClick={() => setAbierto(bloques[0])}>
           <Pencil className="mr-1 h-3.5 w-3.5" />Completar datos
@@ -24,7 +23,7 @@ export function CompletarDatosVisita({ bloques, motivos }: { bloques: VisitaBloq
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             {bloques.map((b, i) => (
-              <DropdownMenuItem key={b.id} onSelect={() => setAbierto(b)}>{nombre(b)} {bloques.length > 1 ? `(${i + 1})` : ""}</DropdownMenuItem>
+              <DropdownMenuItem key={b.id} onSelect={() => setAbierto(b)}>{nombre(b)} ({i + 1})</DropdownMenuItem>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
