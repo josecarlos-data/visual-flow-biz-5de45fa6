@@ -37,8 +37,12 @@
  * - 12/11/2026 — fase4.5: si no se pudo tratar nada con el cliente no se crea ningún bloque;
  *   el mensaje de usuario lleva la fecha de la visita (con día de la semana) para resolver
  *   fechas relativas («el martes», «mañana»).
+ * - 12/11/2026 — fase4.6: las condiciones «Vale si…» de la descripción del motivo son el criterio
+ *   del revisor, no requisito para crear el bloque. Sin esto, gpt-6-luna dejaba sin bloques los
+ *   dictados de oferta cortos. Además, Promoción lleva una descripción propia para la IA
+ *   (DESCRIPCION_IA). Banco de dictados cortos: 58 % → 95 % (solo regla) → 100 % (regla + Promoción).
  */
-export const VERSION_PROMPT = "fase4.5";
+export const VERSION_PROMPT = "fase4.6";
 
 /**
  * Extracción: clasificar y rellenar campos con reglas explícitas. No es razonamiento,
@@ -82,6 +86,17 @@ export function admiteIA(c: { is_active: boolean; visibilidad: string; tipo: str
 }
 
 /** Descripción de un campo para el modelo: la ayuda de la plantilla es la fuente. */
+/**
+ * Descripción de motivo que ve la IA. La de la plantilla («Vale si…») es el criterio del revisor y
+ * no se toca; solo Promoción lleva aquí cuándo usarlo, porque con la regla general sola el banco
+ * de dictados cortos se quedaba en 95 % (fallaba la promoción cuando va con una competencia).
+ */
+const DESCRIPCION_IA: Record<string, string> = {
+  promocion:
+    "Una oferta o promoción que el comercial presenta, deja o envía al cliente, aunque falten referencia, cantidad o precio.",
+};
+export const descripcionMotivoIA = (m: { key: string; descripcion: string | null }) => DESCRIPCION_IA[m.key] ?? m.descripcion ?? "";
+
 export function descripcionCampo(c: CampoDef): string {
   const partes = [`${c.label}.`];
   if (c.ayuda) partes.push(c.ayuda);
@@ -170,7 +185,7 @@ export function esquemaExtraccion(motivos: MotivoDef[]) {
     properties[`bloques_${m.key}`] = {
       type: "array",
       description:
-        `${m.nombre}. ${m.descripcion ?? ""} Añade un elemento por cada asunto distinto de este tipo que aparezca en la narración ` +
+        `${m.nombre}. ${descripcionMotivoIA(m)} Añade un elemento por cada asunto distinto de este tipo que aparezca en la narración ` +
         "(dos ofertas distintas = dos elementos). Deja la lista vacía si no hay ningún dato real de este tipo." + extra,
       items: esquemaBloque(m),
     };
@@ -186,7 +201,7 @@ export function esquemaExtraccion(motivos: MotivoDef[]) {
 /** System prompt: FIJO entre llamadas (prompt caching). Nada variable aquí. */
 export function sistemaExtraccion(motivos: MotivoDef[]) {
   const catalogo = motivos
-    .map((m) => `- ${m.key} (${m.nombre}): ${m.descripcion ?? ""}`)
+    .map((m) => `- ${m.key} (${m.nombre}): ${descripcionMotivoIA(m)}`)
     .join("\n");
   return (
     "Eres el asistente de un comercial de recambios de automoción. Recibes la transcripción de una nota de voz grabada tras una " +
@@ -212,6 +227,9 @@ export function sistemaExtraccion(motivos: MotivoDef[]) {
     "  Ejemplo con dos referencias: «la batería de 110 se la dan a 78 y nosotros a 92, y la de 140 a 105 frente a nuestros 121» => " +
     "DOS bloques competencia: uno con precio_competencia=78 y precio_rimosa=92, otro con precio_competencia=105 y " +
     "precio_rimosa=121, cada uno con su referencia y su resultado_venta.\n" +
+    "- La descripción de cada motivo indica de qué trata. Las condiciones del tipo \"Vale si…\" son el criterio con el que el " +
+    "revisor validará después: no son requisito para crear el bloque. Crea el bloque en cuanto haya un asunto real de ese " +
+    "motivo, aunque falten datos; los campos que no se digan van a null.\n" +
     "- Un motivo solo se instancia si hay al menos un dato real en la narración. Nunca crees un bloque vacío por si acaso.\n" +
     "- VISITA SIN CONTENIDO: si la narración dice que no se pudo tratar nada con el cliente (no estaba, el taller estaba cerrado, " +
     "no le han atendido, vuelve otro día), resultado_visita es el que corresponda (cliente_ausente, cerrado o sin_acceso) y " +

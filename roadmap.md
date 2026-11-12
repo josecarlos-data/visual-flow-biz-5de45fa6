@@ -90,4 +90,9 @@
 - [x] Borrador único por usuario (3 días); preguntar si el enlace trae otro cliente; borrar solo en logout manual
 - [x] fecha_visita en extracción; prompt fase4.5 sin bloques si no se trató nada
 - [x] Tests utilidades + 2 narraciones en banco
-- [ ] Extracción en narraciones cortas devuelve a menudo 0 bloques (también sin los cambios de fase4.5). Pendiente de decisión del usuario.
+- [x] Extracción en narraciones cortas devuelve a menudo 0 bloques → resuelto en fase4.6 (prompt).
+
+## Extracción fiable en dictados cortos (fase4.6)
+- [x] Regla general «Vale si… no es requisito» en el prompt; banco 11 casos × 5
+- [x] Si no llega al 100 %, frase fija de Promoción y medir mejora
+- [x] Guardar casos cortos y criterio de bloques esperados en scripts/bench-visita-voz
