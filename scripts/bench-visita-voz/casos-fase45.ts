@@ -113,4 +113,5 @@ for (const c of CASOS) {
   console.log(`Narración: ${c.narracion}`);
   console.log(`resultado_visita: ${r.salida.resultado_visita} · listas con bloques: ${bloques.length}`);
   console.log(JSON.stringify(Object.fromEntries(bloques), null, 2));
+  if (process.env.CRUDO) console.log(JSON.stringify(r.salida).slice(0, 3000));
 }
