@@ -83,5 +83,25 @@ export function presentarCampos(
       out.push({ clase: "texto", clave: k, label: d?.label ?? k, valor: formatearValor(val) });
     }
   }
-  return out.filter((i) => !ocultas.has(i.clave) && (i.clase === "adjunto" || i.valor !== ""));
+  // Datos auxiliares de una referencia (<ref>_marca/_familia/_descripcion): debajo de la referencia, con etiqueta legible.
+  const AUX: [string, string][] = [["_descripcion", "Descripción"], ["_marca", "Marca"], ["_familia", "Familia"]];
+  const auxDe = new Map<string, ItemCampo[]>();
+  const esAux = new Set<string>();
+  for (const i of out) {
+    for (const [suf, label] of AUX) {
+      if (!i.clave.endsWith(suf) || porClave.has(i.clave)) continue;
+      const base = i.clave.slice(0, -suf.length);
+      if (!(base in c)) continue;
+      esAux.add(i.clave);
+      auxDe.set(base, [...(auxDe.get(base) ?? []), { ...i, label }]);
+    }
+  }
+  const ordenado: ItemCampo[] = [];
+  for (const i of out) {
+    if (esAux.has(i.clave)) continue;
+    ordenado.push(i);
+    const aux = auxDe.get(i.clave);
+    if (aux) ordenado.push(...AUX.flatMap(([suf]) => aux.filter((a) => a.clave === i.clave + suf)));
+  }
+  return ordenado.filter((i) => !ocultas.has(i.clave) && (i.clase === "adjunto" || i.valor !== ""));
 }
