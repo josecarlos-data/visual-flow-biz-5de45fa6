@@ -60,20 +60,26 @@
 - `visitas` DELETE: solo admin.
 - `visitas_guard_alta`: usuario no admin con `origen <> 'app'` → «Solo se pueden registrar visitas desde la app.»
 - `visita_bloques` UPDATE/DELETE: admin, o revisor con alcance sobre la visita **y que no sea suya**. El comercial solo cambia datos con `completar_bloque`.
-- `visita_bloques` INSERT: admin; revisor sobre visitas ajenas (reanalizar); dueño solo dentro de `registrar_visita` o mientras `visita_alta_directa_bloqueada` sea false, y solo si la visita está pendiente.
+- `visita_bloques` INSERT: admin; revisor sobre visitas ajenas (reanalizar); dueño solo dentro de `registrar_visita` (marca `crm.registrar_visita = '1'`) o mientras `visita_alta_directa_bloqueada` sea false, y solo si `COALESCE(validacion, 'pendiente') = 'pendiente'`.
+- `registrar_visita`: hoy (0042, línea 150) apaga la marca justo después de insertar la visita y **antes** de los bloques (línea 163), así que con la regla nueva y el ajuste en true fallaría. `CREATE OR REPLACE` con la misma firma, copiando la definición vigente y cambiando solo eso: la marca se apaga después de insertar los bloques y también antes del `RETURN` anticipado de la línea 159 (el de la línea 87 ocurre antes de encenderla). `REVOKE` y `GRANT EXECUTE` explícitos como en 0042. Al terminar, diff contra 0042 con las líneas que cambian.
 - `editar_bloque_revision`: «No puedes corregir bloques de tus propias visitas» salvo admin. Misma firma; `CREATE OR REPLACE` y `GRANT EXECUTE` explícito a authenticated.
 - Todas las reglas con `(SELECT public.is_approved(auth.uid())) AND (…)`, permisivas.
 - Antes de escribirla compruebo que los triggers que actualizan la visita desde los bloques (`recalcular_validacion_visita`) y `completar_bloque` siguen funcionando sin el UPDATE del dueño.
 
-### E. Punto abierto (decides tú)
-Visitas a cliente fuera de ISI y jefe de zona: propongo que el jefe las vea y revise cuando el **comercial autor** sea de su delegación. Si no lo quieres ahora, solo las verán el comercial, el director y el admin.
+### E. Cliente fuera de ISI y jefe de zona (aplazado)
+No se cambia ahora: esas visitas las ven el comercial autor, el director y el admin. Se anota como pendiente en `roadmap.md`.
 
 ### F. Pruebas (identidades simuladas, transacción deshecha)
 - Comercial: borrar su visita, cambiar cliente, insertar `origen='gespromo'`, borrar/reescribir un bloque directamente → rechazado. `completar_bloque` en bloque suyo pendiente → permitido. `registrar_visita` con dos bloques → sigue funcionando. Con el ajuste en false, alta directa con bloque → entra.
+- Con `visita_alta_directa_bloqueada = true`: comercial `registrar_visita` con dos bloques → visita y dos bloques guardados; comercial inserta un bloque directamente en su visita pendiente → rechazado.
+- Con el ajuste en false: `registrar_visita` con `cliente_externo` y un bloque → se guarda.
 - Admin: borrar visita y alta `gespromo` → permitido.
 - Director: corregir bloque de visita suya (RPC y directo) → rechazado; de otro comercial → permitido. Reanalizar visita ajena → permitido.
 - Visita con `cliente_externo` → se guarda y sale en el listado del comercial y del director.
 - Tests de las utilidades nuevas (agrupar motivos, quitar marca).
+
+### Al terminar
+Ficheros cambiados, confirmación de una sola migración nueva (0044), diff de `registrar_visita` frente a 0042 y lista de lo no probado en pantalla.
 
 ### No se toca
 Extracción por voz y prompt, análisis IA, conversación, registro salvo el buscador, importador Gespromo.
