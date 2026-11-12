@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useVisitas, useClientes, useMotivos, useVisitaBloques, fechaCorta } from "@/hooks/useCrm";
 import { useAuth } from "@/hooks/useAuth";
 import { CompletarDatosVisita } from "@/components/CompletarDatosVisita";
-import { agruparMotivos, quitarMarcaInterna, etiquetaNoEfectiva, estadoRevision, bloquesCompletables } from "@/lib/resumenVisita";
+import { agruparMotivos, quitarMarcaInterna, etiquetaNoEfectiva, estadoRevision, bloquesCompletables, muestraEtiquetaEstado } from "@/lib/resumenVisita";
 import { useScrollRestore } from "@/hooks/useScrollRestore";
 import { nombreDoc, type DocVisita } from "@/components/DocumentosVisita";
 import { BotonAdjunto } from "@/components/VisorAdjunto";

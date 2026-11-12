@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { quitarMarcaInterna, agruparMotivos, etiquetaNoEfectiva, estadoRevision, bloquesCompletables } from "./resumenVisita";
+import { quitarMarcaInterna, agruparMotivos, etiquetaNoEfectiva, estadoRevision, bloquesCompletables, muestraEtiquetaEstado } from "./resumenVisita";
 
 describe("resumenVisita", () => {
   it("quita la marca interna", () => {

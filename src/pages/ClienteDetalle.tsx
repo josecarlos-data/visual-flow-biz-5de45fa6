@@ -1,5 +1,5 @@
 import { CompletarDatosVisita } from "@/components/CompletarDatosVisita";
-import { agruparMotivos, quitarMarcaInterna, etiquetaNoEfectiva, estadoRevision, bloquesCompletables } from "@/lib/resumenVisita";
+import { agruparMotivos, quitarMarcaInterna, etiquetaNoEfectiva, estadoRevision, bloquesCompletables, muestraEtiquetaEstado } from "@/lib/resumenVisita";
 import { useEffect, useMemo, useState } from "react";
 import { MODELOS_INSIGHTS } from "../../supabase/functions/_shared/modelosInsights";
 import { useIsMobile } from "@/hooks/use-mobile";
