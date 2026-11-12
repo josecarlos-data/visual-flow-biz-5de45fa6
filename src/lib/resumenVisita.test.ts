@@ -21,4 +21,12 @@ describe("resumenVisita", () => {
     expect(bloquesCompletables(true, bs)).toHaveLength(2);
     expect(bloquesCompletables(false, bs)).toHaveLength(0);
   });
+  it("etiqueta de estado: siempre en la app, en Gespromo solo si está validada", () => {
+    expect(muestraEtiquetaEstado("app", null)).toBe(true);
+    expect(muestraEtiquetaEstado("app", "CORRECTO")).toBe(true);
+    expect(muestraEtiquetaEstado("gespromo", "CORRECTO")).toBe(true);
+    expect(muestraEtiquetaEstado("gespromo", "NO CORRECTO")).toBe(true);
+    expect(muestraEtiquetaEstado("gespromo", null)).toBe(false);
+    expect(muestraEtiquetaEstado("gespromo", "pendiente")).toBe(false);
+  });
 });
