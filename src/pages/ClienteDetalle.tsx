@@ -1,3 +1,5 @@
+import { CompletarDatosVisita } from "@/components/CompletarDatosVisita";
+import { agruparMotivos, quitarMarcaInterna, etiquetaNoEfectiva, estadoRevision, bloquesCompletables } from "@/lib/resumenVisita";
 import { useEffect, useMemo, useState } from "react";
 import { MODELOS_INSIGHTS } from "../../supabase/functions/_shared/modelosInsights";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -952,11 +954,18 @@ const { campo, dir } = ordenProductos;
                   <CardContent className="space-y-2 p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex flex-wrap gap-1">
-                        {(bloques.length ? bloques.map((b) => b.motivo_key) : [v.motivo_key]).map((k, i) => (
-                          <Badge key={`${k}-${i}`} variant="secondary">{motivoNombre(k)}</Badge>
+                        {agruparMotivos(bloques.length ? bloques.map((b) => b.motivo_key) : [v.motivo_key]).map((g) => (
+                          <Badge key={String(g.key)} variant="secondary">{motivoNombre(g.key)}{g.n > 1 ? ` ×${g.n}` : ""}</Badge>
                         ))}
                       </div>
                       <span className="shrink-0 text-xs text-muted-foreground">{fechaCorta(v.fecha)}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                      {v.comercial_nombre && <span>{v.comercial_nombre}</span>}
+                      {v.tipo === "llamada" && <Badge variant="outline">Llamada</Badge>}
+                      {etiquetaNoEfectiva(v.resultado_visita) && <Badge variant="outline">{etiquetaNoEfectiva(v.resultado_visita)}</Badge>}
+                      {bloques.some((b) => !b.completo) && <Badge variant="outline" className="border-destructive/50 text-destructive">Incompleta</Badge>}
+                      <Badge variant={estadoRevision(v.validacion) === "No correcto" ? "destructive" : "outline"}>{estadoRevision(v.validacion)}</Badge>
                     </div>
                     {bloques.length ? (
                       bloques.map((b) => (
@@ -968,6 +977,9 @@ const { campo, dir } = ordenProductos;
                               {it.clase === "adjunto" ? <BotonAdjunto adjunto={it.adjunto} /> : it.valor}
                             </div>
                           ))}
+                          {bloquesCompletables(!!user && v.user_id === user.id, [b]).length > 0 && (
+                            <CompletarDatosVisita bloques={[b]} motivos={motivos} />
+                          )}
                           <MensajesFicha visitaId={v.id} bloqueId={b.id} hilo={mensajesFicha} />
                         </div>
 
@@ -986,7 +998,12 @@ const { campo, dir } = ordenProductos;
                         {documentosDe(v.campos).map((a) => <BotonAdjunto key={a.path} adjunto={a} />)}
                       </div>
                     )}
-                    {bloques.length === 0 && v.observaciones && <p className="whitespace-pre-wrap text-sm">{v.observaciones}</p>}
+                    {v.observaciones && (
+                      <p className="whitespace-pre-wrap text-sm">
+                        {bloques.length > 0 && <span className="text-muted-foreground">Observaciones: </span>}
+                        {quitarMarcaInterna(v.observaciones)}
+                      </p>
+                    )}
                     {bloques.length === 0 && (
                       <MensajesFicha visitaId={v.id} bloqueId={null} hilo={mensajesFicha} />
                     )}
@@ -1001,7 +1018,7 @@ const { campo, dir } = ordenProductos;
                             {v.transcripcion ? "Transcripción original" : "Texto original de Gespromo"}
                           </p>
                           <p className="whitespace-pre-wrap rounded-md border bg-muted/40 p-2 text-xs text-muted-foreground">
-                            {v.transcripcion || v.observaciones_original}
+                            {quitarMarcaInterna(v.transcripcion || v.observaciones_original)}
                           </p>
                           {(v.analisis_modelo || v.analisis_prompt_version) && (
                             <p className="text-[11px] text-muted-foreground">

@@ -72,6 +72,7 @@ export interface Visita {
   fecha: string;
   hora: string | null;
   tipo: string | null;
+  resultado_visita: string | null;
   validacion: string | null;
   nota_revision: string | null;
   revisado_por: string | null;
@@ -134,9 +135,10 @@ export interface ClienteVisible extends Cliente {
 }
 
 /** Listado de clientes visibles para el usuario, ordenado por ventas del año en curso. */
-export function useClientes(soloActivos = true, orden: OrdenClientes = "ventas") {
+export function useClientes(soloActivos = true, orden: OrdenClientes = "ventas", opciones?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["crm_clientes", soloActivos],
+    enabled: opciones?.enabled ?? true,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const SIZE = 1000;
