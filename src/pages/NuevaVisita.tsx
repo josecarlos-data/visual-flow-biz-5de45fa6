@@ -97,6 +97,11 @@ export default function NuevaVisita() {
       .then(({ data }) => setDiasAtrasMax(parseDiasAtras((data as { value?: string } | null)?.value)));
   }, []);
   const { data: clientes } = useClientes();
+  // Inactivos: solo se cargan al pulsar «Buscar también en inactivos» (comparte caché con el listado).
+  const [verInactivos, setVerInactivos] = useState(false);
+  const { data: todosClientes, isFetching: cargandoInactivos } = useClientes(false, "ventas", { enabled: verInactivos });
+  const [modoExterno, setModoExterno] = useState(false);
+  const [clienteExterno, setClienteExterno] = useState("");
   const { data: motivos } = useMotivos();
   const { data: catalogos } = useCatalogos();
 
@@ -151,9 +156,14 @@ export default function NuevaVisita() {
   const motivoDe = (key: string): Motivo | undefined => motivos?.find((m) => m.key === key);
 
   const cliente = useMemo(
-    () => clientes?.find((c) => String(c.cod_cliente) === codCliente),
-    [clientes, codCliente],
+    () =>
+      clientes?.find((c) => String(c.cod_cliente) === codCliente) ??
+      todosClientes?.find((c) => String(c.cod_cliente) === codCliente),
+    [clientes, todosClientes, codCliente],
   );
+  const externoTxt = !codCliente && modoExterno ? clienteExterno.trim() : "";
+  const nombreCliente = cliente?.cliente ?? externoTxt;
+  const hayCliente = !!codCliente || !!externoTxt;
 
   /**
    * El análisis se hizo con el nombre del cliente anterior en el prompt: si se cambia de
@@ -203,12 +213,12 @@ export default function NuevaVisita() {
 
   const opciones = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
-    const list = clientes ?? [];
+    const list = (verInactivos ? todosClientes : clientes) ?? [];
     if (!term) return list.slice(0, 30);
     return list
       .filter((c) => c.cliente.toLowerCase().includes(term) || String(c.cod_cliente).includes(term))
       .slice(0, 30);
-  }, [clientes, busqueda]);
+  }, [clientes, todosClientes, verInactivos, busqueda]);
 
   const actualizarBloque = (uid: string, patch: Partial<BloqueForm>) =>
     setBloques((bs) => bs.map((b) => (b.uid === uid ? { ...b, ...patch } : b)));
@@ -244,7 +254,8 @@ export default function NuevaVisita() {
   const datosBorrador = () => ({
     visitaId: visitaId.current,
     codCliente,
-    clienteNombre: cliente?.cliente ?? "",
+    clienteNombre: nombreCliente,
+    clienteExterno: externoTxt,
     fecha,
     tipo,
     resultado,
@@ -266,7 +277,7 @@ export default function NuevaVisita() {
     const t = setTimeout(() => guardarBorrador(user!.id, datosBorradorRef.current()), 500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [puedeAutoguardar, codCliente, fecha, tipo, resultado, transcripcion, textoAnalizado, observaciones, bloques, analisis, documentos, cliente]);
+  }, [puedeAutoguardar, codCliente, fecha, tipo, resultado, transcripcion, textoAnalizado, observaciones, bloques, analisis, documentos, cliente, externoTxt]);
 
   // Si el móvil manda la página al fondo o la descarga, se guarda al momento (sin esperar al retardo).
   useEffect(() => {
@@ -287,6 +298,8 @@ export default function NuevaVisita() {
     visitaId.current = b.visitaId;
     docsSubidosRef.current = null;
     setCodCliente(b.codCliente);
+    setClienteExterno(b.clienteExterno ?? "");
+    setModoExterno(!b.codCliente && !!b.clienteExterno);
     setClienteAnalizado(b.textoAnalizado !== null ? b.codCliente : "");
     setFecha(b.fecha);
     setTipo(b.tipo);
@@ -441,7 +454,7 @@ export default function NuevaVisita() {
       setConfirmarActualizar(perdidos);
       return;
     }
-    analizarTranscripcion(transcripcion, codCliente, cliente?.cliente ?? "");
+    analizarTranscripcion(transcripcion, codCliente, nombreCliente);
   };
 
   /** Aplica un dictado nuevo. En visitas no efectivas va además a Observaciones (sin bloques). */
@@ -588,8 +601,8 @@ export default function NuevaVisita() {
     });
 
   const guardar = async (guardarAsi = false) => {
-    if (!codCliente) {
-      toast({ title: "Faltan datos", description: "Selecciona un cliente.", variant: "destructive" });
+    if (!hayCliente) {
+      toast({ title: "Faltan datos", description: "Selecciona un cliente o escribe su nombre.", variant: "destructive" });
       return;
     }
     if (esEfectiva && !bloques.length) {
@@ -624,7 +637,7 @@ export default function NuevaVisita() {
     let docsSubidos: DocVisita[] = docsSubidosRef.current ?? [];
     if (documentos.length && !docsSubidosRef.current) {
       try {
-        docsSubidos = await subirDocumentos(documentos, user?.id ?? "", fecha, codCliente, (hecho, total) =>
+        docsSubidos = await subirDocumentos(documentos, user?.id ?? "", fecha, codCliente || "externo", (hecho, total) =>
           setSubiendoDocs({ hecho, total }),
         );
         docsSubidosRef.current = docsSubidos;
@@ -654,7 +667,8 @@ export default function NuevaVisita() {
     const { data: res, error } = await supabase.rpc("registrar_visita", {
       _id: visitaId.current,
       _visita: {
-        cod_cliente: Number(codCliente),
+        cod_cliente: codCliente ? Number(codCliente) : null,
+        cliente_externo: codCliente ? null : externoTxt,
         fecha,
         tipo,
         resultado_visita: resultado,
@@ -695,7 +709,7 @@ export default function NuevaVisita() {
       description: r.agenda_marcada ? "Marcada como realizada en tu agenda." : undefined,
     });
     const volverRaw = params.get("volver");
-    const volver = volverRaw && volverRaw.startsWith("/") && !volverRaw.startsWith("//") ? volverRaw : `/clientes/${codCliente}`;
+    const volver = volverRaw && volverRaw.startsWith("/") && !volverRaw.startsWith("//") ? volverRaw : codCliente ? `/clientes/${codCliente}` : "/visitas";
     navigate(volver);
   };
 
@@ -805,7 +819,7 @@ export default function NuevaVisita() {
             <AlertDialogAction
               onClick={() => {
                 setConfirmarActualizar(null);
-                analizarTranscripcion(transcripcion, codCliente, cliente?.cliente ?? "");
+                analizarTranscripcion(transcripcion, codCliente, nombreCliente);
               }}
             >
               Actualizar bloques
@@ -856,10 +870,25 @@ export default function NuevaVisita() {
         <div className="flex items-center justify-between gap-2 rounded-md border p-3">
           <div className="min-w-0">
             <p className="truncate font-medium">{cliente.cliente}</p>
-            <p className="text-xs text-muted-foreground">#{cliente.cod_cliente} · {cliente.localidad ?? "—"}</p>
+            <p className="text-xs text-muted-foreground">
+              #{cliente.cod_cliente} · {cliente.localidad ?? "—"}{!cliente.activo ? " · Inactivo" : ""}
+            </p>
           </div>
           <Button variant="ghost" size="sm" onClick={() => { setCodCliente(""); setBusqueda(""); }}>
             Cambiar
+          </Button>
+        </div>
+      ) : modoExterno ? (
+        <div className="space-y-2 rounded-md border p-3">
+          <p className="text-sm font-medium">Cliente que no está en ISI</p>
+          <Input
+            value={clienteExterno}
+            onChange={(e) => setClienteExterno(e.target.value)}
+            placeholder="Nombre del taller o empresa"
+            autoFocus
+          />
+          <Button variant="ghost" size="sm" onClick={() => { setModoExterno(false); setClienteExterno(""); }}>
+            Buscar en ISI
           </Button>
         </div>
       ) : (
@@ -878,13 +907,23 @@ export default function NuevaVisita() {
                 className="w-full rounded px-3 py-2 text-left text-sm hover:bg-accent"
               >
                 <span className="font-medium">{c.cliente}</span>
-                <span className="ml-2 text-xs text-muted-foreground">#{c.cod_cliente}</span>
+                <span className="ml-2 text-xs text-muted-foreground">#{c.cod_cliente}{!c.activo ? " · Inactivo" : ""}</span>
               </button>
             ))}
             {opciones.length === 0 && (
-              <p className="p-3 text-sm text-muted-foreground">Sin resultados.</p>
+              <div className="space-y-2 p-3 text-sm text-muted-foreground">
+                <p>{verInactivos && cargandoInactivos ? "Buscando en inactivos…" : "Sin resultados."}</p>
+                {!verInactivos && busqueda.trim() && (
+                  <Button size="sm" variant="outline" onClick={() => setVerInactivos(true)}>
+                    Buscar también en inactivos
+                  </Button>
+                )}
+              </div>
             )}
           </div>
+          <Button variant="link" size="sm" className="h-auto px-0" onClick={() => { setModoExterno(true); setClienteExterno(busqueda.trim()); }}>
+            Cliente que no está en ISI
+          </Button>
         </div>
       )}
 
@@ -981,7 +1020,7 @@ export default function NuevaVisita() {
           <div className="flex justify-center">
             <VoiceRecorder
               onAudio={(blob) => procesarVisita(blob)}
-              disabled={!codCliente || transcribiendo || extrayendo}
+              disabled={!hayCliente || transcribiendo || extrayendo}
               processing={transcribiendo}
               hasResult={transcripcion !== ""}
             />
@@ -993,7 +1032,7 @@ export default function NuevaVisita() {
           <DocumentosVisita
             documentos={documentos}
             onChange={setDocumentos}
-            clienteNombre={cliente?.cliente ?? ""}
+            clienteNombre={nombreCliente}
             onBloques={(nuevos) => {
               // El documento AÑADE: nunca borra lo que el comercial ya haya dictado o escrito.
               const propuestos: BloqueForm[] = nuevos
@@ -1044,7 +1083,7 @@ export default function NuevaVisita() {
                   <Button
                     className="w-full"
                     onClick={pedirCrearBloques}
-                    disabled={extrayendo || transcribiendo || !transcripcion.trim() || !codCliente}
+                    disabled={extrayendo || transcribiendo || !transcripcion.trim() || !hayCliente}
                   >
                     {extrayendo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
                     {textoAnalizado === null ? "Crear bloques" : "Actualizar bloques"}
@@ -1087,7 +1126,7 @@ export default function NuevaVisita() {
                   size="sm"
                   variant="outline"
                   disabled={extrayendo}
-                  onClick={() => analizarTranscripcion(transcripcion, codCliente, cliente?.cliente ?? "")}
+                  onClick={() => analizarTranscripcion(transcripcion, codCliente, nombreCliente)}
                 >
                   Reintentar el análisis
                 </Button>
@@ -1375,7 +1414,7 @@ export default function NuevaVisita() {
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 p-3 backdrop-blur md:static md:border-0 md:bg-transparent md:p-0">
         <div className="mx-auto flex max-w-3xl gap-2">
-          <Button className="flex-1" onClick={() => guardar()} disabled={saving || !codCliente || (esEfectiva && !bloques.length)}>
+          <Button className="flex-1" onClick={() => guardar()} disabled={saving || !hayCliente || (esEfectiva && !bloques.length)}>
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             {subiendoDocs
               ? `Subiendo documentos ${Math.min(subiendoDocs.hecho + 1, subiendoDocs.total)} de ${subiendoDocs.total}…`

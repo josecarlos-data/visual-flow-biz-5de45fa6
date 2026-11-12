@@ -13,6 +13,8 @@ export interface BorradorVisita {
   visitaId: string;
   codCliente: string;
   clienteNombre: string;
+  /** Nombre del cliente que no está en ISI (sin código). */
+  clienteExterno?: string;
   fecha: string;
   tipo: string;
   resultado: string;
