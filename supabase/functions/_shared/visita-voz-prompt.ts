@@ -261,13 +261,13 @@ export function sistemaExtraccion(motivos: MotivoDef[]) {
 /** Mensaje de usuario: lo variable va SIEMPRE después del system, nunca dentro de él. */
 const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
-/** «martes 10/11/2026 (2026-11-10)» a partir de una fecha AAAA-MM-DD; null si no es válida. */
+/** «martes 10/11/2026» a partir de una fecha AAAA-MM-DD; null si no es válida. */
 export function describirFechaVisita(fecha: string | null | undefined): string | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(fecha ?? ""));
   if (!m) return null;
   const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
   if (d.getUTCMonth() !== Number(m[2]) - 1) return null;
-  return `${DIAS_SEMANA[d.getUTCDay()]} ${m[3]}/${m[2]}/${m[1]} (${fecha})`;
+  return `${DIAS_SEMANA[d.getUTCDay()]} ${m[3]}/${m[2]}/${m[1]}`;
 }
 
 export function usuarioExtraccion(transcripcion: string, clienteNombre: string, fechaVisita?: string | null) {
