@@ -309,6 +309,13 @@
       "when": 1794390900497,
       "tag": "0043_0043_editar_bloque_revision",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1794505668960,
+      "tag": "0044_cerrar_visitas_tras_registro",
+      "breakpoints": true
     }
   ]
 }
