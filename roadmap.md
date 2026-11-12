@@ -96,3 +96,8 @@
 - [x] Regla general «Vale si… no es requisito» en el prompt; banco 11 casos × 5
 - [x] Si no llega al 100 %, frase fija de Promoción y medir mejora
 - [x] Guardar casos cortos y criterio de bloques esperados en scripts/bench-visita-voz
+
+## Decimales en bloques
+- [x] normalizarNumero respeta el punto decimal sin coma; pruebas
+- [x] CompletarBloqueDialog normaliza números antes de guardar
+- [x] Etiquetas legibles para marca/familia/descripción de referencia

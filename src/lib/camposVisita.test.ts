@@ -44,3 +44,14 @@ describe("formato", () => {
     ]);
   });
 });
+
+describe("presentarCampos · datos de referencia", () => {
+  it("coloca marca, familia y descripción debajo de la referencia con etiqueta legible", () => {
+    const d = [
+      { campo_key: "referencia", label: "Referencia", tipo: "referencia", sort_order: 1 },
+      { campo_key: "precio", label: "Precio", tipo: "numero", sort_order: 2 },
+    ] as unknown as MotivoCampo[];
+    const r = presentarCampos({ precio: "5", referencia: "R1", referencia_marca: "Sachs", referencia_familia: "Frenos", referencia_descripcion: "Pastillas" }, d);
+    expect(r.map((i) => i.label)).toEqual(["Referencia", "Descripción", "Marca", "Familia", "Precio"]);
+  });
+});

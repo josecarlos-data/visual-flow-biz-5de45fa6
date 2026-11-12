@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useCatalogos, type MotivoCampo, type VisitaBloque } from "@/hooks/useCrm";
 import { useInvalidarMensajes } from "@/hooks/useVisitaMensajes";
+import { normalizarValoresNumericos } from "@/lib/motivoCampos";
 
 const aTexto = (v: unknown) => (v == null ? "" : Array.isArray(v) ? JSON.stringify(v) : String(v));
 
@@ -45,7 +46,7 @@ export function CompletarBloqueDialog({
   const guardar = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.rpc((esRevisor ? "editar_bloque_revision" : "completar_bloque") as never, {
-        _bloque_id: bloque.id, _campos: valores, _updated_at: bloque.updated_at,
+        _bloque_id: bloque.id, _campos: normalizarValoresNumericos(activos, valores), _updated_at: bloque.updated_at,
       } as never);
       if (error) throw new Error(error.message);
       return data as unknown as { cambiados: number };

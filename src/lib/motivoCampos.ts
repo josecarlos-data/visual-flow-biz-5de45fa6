@@ -86,7 +86,11 @@ export const serializeMulti = (vals: string[]): string => vals.join(SEP_MULTI);
 export function normalizarNumero(v: string | undefined | null): string {
   const s = String(v ?? "").trim();
   if (!s) return "";
-  const limpio = s.replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+  const sinEspacios = s.replace(/\s/g, "");
+  // Con coma: formato español (puntos = miles, coma = decimal). Sin coma: el punto es el decimal.
+  const limpio = sinEspacios.includes(",")
+    ? sinEspacios.replace(/\./g, "").replace(",", ".")
+    : sinEspacios;
   const n = Number(limpio);
   if (!Number.isFinite(n)) return s;
   return String(n);
