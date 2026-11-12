@@ -271,10 +271,12 @@ export function describirFechaVisita(fecha: string | null | undefined): string |
 }
 
 export function usuarioExtraccion(transcripcion: string, clienteNombre: string, fechaVisita?: string | null) {
+  // La fecha va DETRÁS de la transcripción: delante, el banco de pruebas mostró que el modelo
+  // devolvía con más frecuencia cero bloques en narraciones cortas.
   const fecha = describirFechaVisita(fechaVisita);
   return (
-    (fecha ? `Fecha de la visita: ${fecha}\n` : "") +
     (clienteNombre ? `Cliente (ya seleccionado en la aplicación, no lo deduzcas): ${clienteNombre}\n\n` : "") +
-    `Transcripción de la nota de voz:\n"""\n${transcripcion}\n"""`
+    `Transcripción de la nota de voz:\n"""\n${transcripcion}\n"""` +
+    (fecha ? `\n\nFecha de la visita (solo para resolver fechas relativas como «el martes»): ${fecha}.` : "")
   );
 }
