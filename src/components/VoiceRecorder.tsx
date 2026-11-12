@@ -269,9 +269,9 @@ export function VoiceRecorder({ onAudio, disabled, processing, hasResult }: Prop
           </button>
           <p className="text-center text-sm text-muted-foreground">
             {disabled
-              ? "Selecciona primero un motivo de visita"
+              ? "Selecciona primero un cliente"
               : hasResult
-              ? "Vuelve a dictar para regenerar el informe"
+              ? "Vuelve a dictar para añadir o sustituir"
               : "Pulsa y cuenta cómo ha ido la visita"}
           </p>
         </>

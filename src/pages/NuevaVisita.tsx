@@ -216,6 +216,7 @@ export default function NuevaVisita() {
   /** Solo las visitas efectivas llevan bloques; el resto son intentos fallidos. */
   const esEfectiva = resultado === "efectiva";
   const requiereGeo = pideUbicacion(tipo, fecha);
+  const textoCambiadoAhora = calcTextoCambiado(transcripcion, textoAnalizado);
   const limitesFecha = limitesFechaVisita(diasAtrasMax, role === "admin");
   const hayCambios =
     transcripcion.trim().length > 0 ||
@@ -229,6 +230,95 @@ export default function NuevaVisita() {
     window.addEventListener("beforeunload", h);
     return () => window.removeEventListener("beforeunload", h);
   }, [hayCambios, saving]);
+
+  // ---------------------------------------------------------------- borrador
+
+  // Al abrir: si hay un borrador del usuario se pregunta; mientras tanto no se autoguarda (nunca se pisa).
+  useEffect(() => {
+    if (!user?.id || borradorRevisado || borradorEncontrado) return;
+    const b = leerBorrador(user.id);
+    if (b) setBorradorEncontrado(b);
+    else setBorradorRevisado(true);
+  }, [user?.id, borradorRevisado, borradorEncontrado]);
+
+  const datosBorrador = () => ({
+    visitaId: visitaId.current,
+    codCliente,
+    clienteNombre: cliente?.cliente ?? "",
+    fecha,
+    tipo,
+    resultado,
+    transcripcion,
+    textoAnalizado,
+    observaciones,
+    bloques,
+    analisis,
+    fotos: documentos.map((d) => d.nombre_original ?? d.nombre ?? d.file?.name ?? "documento"),
+  });
+  const datosBorradorRef = useRef(datosBorrador);
+  datosBorradorRef.current = datosBorrador;
+  const puedeAutoguardar = !!user?.id && borradorRevisado && hayCambios;
+  const puedeAutoguardarRef = useRef(puedeAutoguardar);
+  puedeAutoguardarRef.current = puedeAutoguardar;
+
+  useEffect(() => {
+    if (!puedeAutoguardar || guardadaRef.current) return;
+    const t = setTimeout(() => guardarBorrador(user!.id, datosBorradorRef.current()), 500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [puedeAutoguardar, codCliente, fecha, tipo, resultado, transcripcion, textoAnalizado, observaciones, bloques, analisis, documentos, cliente]);
+
+  // Si el móvil manda la página al fondo o la descarga, se guarda al momento (sin esperar al retardo).
+  useEffect(() => {
+    const volcar = () => {
+      if (!puedeAutoguardarRef.current || guardadaRef.current || !user?.id) return;
+      guardarBorrador(user.id, datosBorradorRef.current());
+    };
+    const alOcultar = () => { if (document.visibilityState === "hidden") volcar(); };
+    window.addEventListener("pagehide", volcar);
+    document.addEventListener("visibilitychange", alOcultar);
+    return () => {
+      window.removeEventListener("pagehide", volcar);
+      document.removeEventListener("visibilitychange", alOcultar);
+    };
+  }, [user?.id]);
+
+  const recuperarBorrador = (b: BorradorVisita) => {
+    visitaId.current = b.visitaId;
+    docsSubidosRef.current = null;
+    setCodCliente(b.codCliente);
+    setClienteAnalizado(b.textoAnalizado !== null ? b.codCliente : "");
+    setFecha(b.fecha);
+    setTipo(b.tipo);
+    setResultado(b.resultado);
+    setTranscripcion(b.transcripcion);
+    setTextoAnalizado(b.textoAnalizado);
+    setObservaciones(b.observaciones);
+    setBloques((b.bloques as BloqueForm[]).map((x) => ({ ...x, origen: x.origen ?? (x.manual ? "manual" : "voz") })));
+    setAnalisis(b.analisis ?? { modelo: null, version: null });
+    if (b.fotos?.length) {
+      toast({
+        title: "Vuelve a añadir los documentos",
+        description: `Las fotos no se guardan en el borrador: ${b.fotos.join(", ")}.`,
+      });
+    }
+    setBorradorEncontrado(null);
+    setBorradorRevisado(true);
+  };
+
+  const descartarBorrador = () => {
+    borrarBorrador(user?.id ?? "");
+    setBorradorEncontrado(null);
+    setBorradorRevisado(true);
+  };
+
+  const clienteEnlace = params.get("cliente");
+  const borradorEnConflicto = !!borradorEncontrado && !!clienteEnlace && clienteEnlace !== borradorEncontrado.codCliente;
+  const nombreClienteEnlace =
+    clientes?.find((c) => String(c.cod_cliente) === clienteEnlace)?.cliente ?? (clienteEnlace ? `#${clienteEnlace}` : "");
+  const nombreClienteBorrador = borradorEncontrado
+    ? borradorEncontrado.clienteNombre || (borradorEncontrado.codCliente ? `#${borradorEncontrado.codCliente}` : "sin cliente")
+    : "";
 
   const fechaLabel = fecha === hoyMadrid() ? "hoy" : fecha.split("-").reverse().join("/");
 
@@ -632,7 +722,126 @@ export default function NuevaVisita() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Seguir editando</AlertDialogCancel>
-            <AlertDialogAction onClick={() => navigate("/visitas")}>Salir sin guardar</AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => {
+                guardadaRef.current = true;
+                borrarBorrador(user?.id ?? "");
+                navigate("/visitas");
+              }}
+            >
+              Salir sin guardar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!borradorEncontrado}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tienes una visita sin guardar de {nombreClienteBorrador}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {borradorEncontrado?.fotos?.length
+                ? "Si la recuperas, tendrás que volver a añadir los documentos: las fotos no se guardan en el borrador."
+                : "Puedes seguir donde lo dejaste."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={descartarBorrador}>
+              {borradorEnConflicto ? `Descartarlo y empezar con ${nombreClienteEnlace}` : "Descartar"}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => borradorEncontrado && recuperarBorrador(borradorEncontrado)}>
+              {borradorEnConflicto ? `Recuperar el borrador de ${nombreClienteBorrador}` : "Recuperar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={dictadoPendiente !== null}
+        onOpenChange={(o) => {
+          // Cerrar sin elegir nunca pierde lo dictado: se añade.
+          if (!o && dictadoPendiente !== null) {
+            aplicarDictado(dictadoPendiente, "anadir");
+            setDictadoPendiente(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ya tenías texto dictado</AlertDialogTitle>
+            <AlertDialogDescription>¿Qué hago con lo que acabas de dictar? Los bloques se crean después, con el botón.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                if (dictadoPendiente !== null) aplicarDictado(dictadoPendiente, "sustituir");
+                setDictadoPendiente(null);
+              }}
+            >
+              Sustituir
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (dictadoPendiente !== null) aplicarDictado(dictadoPendiente, "anadir");
+                setDictadoPendiente(null);
+              }}
+            >
+              Añadir a lo dictado
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmarActualizar !== null} onOpenChange={(o) => !o && setConfirmarActualizar(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Se perderán tus cambios en {confirmarActualizar} bloque(s)</AlertDialogTitle>
+            <AlertDialogDescription>
+              Los bloques del dictado se vuelven a crear con el texto actual. Los de documentos y los añadidos a mano se conservan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmarActualizar(null);
+                analizarTranscripcion(transcripcion, codCliente, cliente?.cliente ?? "");
+              }}
+            >
+              Actualizar bloques
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmarGuardar} onOpenChange={setConfirmarGuardar}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Has cambiado el texto</AlertDialogTitle>
+            <AlertDialogDescription>
+              Los bloques no reflejan los últimos cambios del texto. Si los actualizas, revisa y pulsa Guardar otra vez.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => guardar(true)}>Guardar así</AlertDialogCancel>
+            <AlertDialogAction onClick={pedirCrearBloques}>Actualizar bloques</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmarNoEfectiva !== null} onOpenChange={(o) => !o && setConfirmarNoEfectiva(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Registrar como no efectiva?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tienes {bloquesNoVozConDatos(bloques)} bloque(s) de documentos o añadidos a mano. Una visita no efectiva se guarda sin bloques: esos bloques no se guardarán.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Volver</AlertDialogCancel>
+            <AlertDialogAction onClick={() => confirmarNoEfectiva && aplicarNoEfectiva(confirmarNoEfectiva)}>
+              Registrar como no efectiva
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -744,7 +953,7 @@ export default function NuevaVisita() {
               <Button
                 size="sm"
                 disabled={extrayendo || !transcripcion.trim()}
-                onClick={() => analizarTranscripcion(transcripcion, codCliente, cliente?.cliente ?? "")}
+                onClick={pedirCrearBloques}
               >
                 {extrayendo ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Wand2 className="mr-1 h-4 w-4" />}
                 Volver a analizar con este cliente
@@ -768,8 +977,7 @@ export default function NuevaVisita() {
       )}
 
       {/* Micrófono: elemento principal, sin Card */}
-      {esEfectiva && (
-        <div className="space-y-4 py-2">
+      <div className="space-y-4 py-2">
           <div className="flex justify-center">
             <VoiceRecorder
               onAudio={(blob) => procesarVisita(blob)}
@@ -778,6 +986,9 @@ export default function NuevaVisita() {
               hasResult={transcripcion !== ""}
             />
           </div>
+
+          {esEfectiva && (
+          <>
 
           <DocumentosVisita
             documentos={documentos}
@@ -793,6 +1004,7 @@ export default function NuevaVisita() {
                   valores: { ...b.campos },
                   meta: { ...(b.campos_meta ?? {}) },
                   manual: false,
+                  origen: "documento" as const,
                 }));
               if (!propuestos.length) return;
               setBloques((bs) => [...bs, ...propuestos]);
@@ -820,8 +1032,49 @@ export default function NuevaVisita() {
                 className="bg-background text-sm"
               />
               <p className="text-xs text-muted-foreground">
-                Léela mientras se preparan los bloques. Puedes corregirla: se guarda con la visita.
+                Léela y corrige nombres o jerga antes de crear los bloques. Se guarda con la visita.
               </p>
+              {(textoAnalizado === null || textoCambiadoAhora) && (
+                <div className="space-y-1">
+                  {textoCambiadoAhora && (
+                    <p className="text-xs font-medium text-amber-700 dark:text-amber-500">
+                      Has cambiado el texto: los bloques todavía no lo reflejan.
+                    </p>
+                  )}
+                  <Button
+                    className="w-full"
+                    onClick={pedirCrearBloques}
+                    disabled={extrayendo || transcribiendo || !transcripcion.trim() || !codCliente}
+                  >
+                    {extrayendo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                    {textoAnalizado === null ? "Crear bloques" : "Actualizar bloques"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {propuestaResultado && (
+            <div className="space-y-2 rounded-md border border-amber-400/70 bg-amber-50/60 p-3 text-sm dark:bg-amber-500/10">
+              <p>
+                Parece que no has podido tratar nada ({ETIQUETA_RESULTADO[propuestaResultado] ?? propuestaResultado}).
+                ¿Registrarla como no efectiva?
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    bloquesNoVozConDatos(bloques) > 0
+                      ? setConfirmarNoEfectiva(propuestaResultado)
+                      : aplicarNoEfectiva(propuestaResultado)
+                  }
+                >
+                  Sí
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setPropuestaResultado(null)}>
+                  No, es efectiva
+                </Button>
+              </div>
             </div>
           )}
 
@@ -834,27 +1087,7 @@ export default function NuevaVisita() {
                   size="sm"
                   variant="outline"
                   disabled={extrayendo}
-                  onClick={async () => {
-                    setExtrayendo(true);
-                    setErrorExtraccion(null);
-                    try {
-                      const { data, error } = await supabase.functions.invoke("visita-voz", {
-                        body: { transcripcion, cliente_nombre: cliente?.cliente ?? "" },
-                      });
-                      if (error) throw new Error(error.message);
-                      const res = data as { bloques?: { motivo_key: string; campos: Record<string, string>; campos_meta: Meta }[]; error?: string };
-                      if (res.error) throw new Error(res.error);
-                      const propuestos: BloqueForm[] = (res.bloques ?? [])
-                        .filter((b) => motivoDe(b.motivo_key))
-                        .map((b) => ({ uid: crypto.randomUUID(), motivoKey: b.motivo_key, valores: { ...b.campos }, meta: { ...(b.campos_meta ?? {}) }, manual: false }));
-                      setAvisosRef(await resolverReferencias(propuestos));
-                      if (propuestos.length) setBloques(propuestos);
-                    } catch (e) {
-                      setErrorExtraccion((e as Error).message);
-                    } finally {
-                      setExtrayendo(false);
-                    }
-                  }}
+                  onClick={() => analizarTranscripcion(transcripcion, codCliente, cliente?.cliente ?? "")}
                 >
                   Reintentar el análisis
                 </Button>
@@ -910,8 +1143,9 @@ export default function NuevaVisita() {
               </div>
             </SheetContent>
           </Sheet>
+          </>
+          )}
         </div>
-      )}
 
       {esEfectiva && (
         <Accordion type="multiple" value={bloquesAbiertos} onValueChange={setBloquesAbiertos} className="w-full space-y-2">
@@ -928,7 +1162,7 @@ export default function NuevaVisita() {
                 <Select
                   value={b.motivoKey}
                   onValueChange={(val) => {
-                    actualizarBloque(b.uid, { motivoKey: val, valores: {}, meta: {} });
+                    actualizarBloque(b.uid, { motivoKey: val, valores: {}, meta: {}, editado: true });
                     setZonaAFijada((prev) => {
                       if (!(b.uid in prev)) return prev;
                       const next = { ...prev };
@@ -991,7 +1225,7 @@ export default function NuevaVisita() {
                             valores={b.valores}
                             meta={b.meta[c.campo_key]}
                             catalogos={catalogos}
-                            onChange={(patch) => actualizarBloque(b.uid, { valores: { ...b.valores, ...patch } })}
+                            onChange={(patch) => actualizarBloque(b.uid, { valores: { ...b.valores, ...patch }, editado: true })}
                           />
                         ))}
                       </div>
@@ -1014,7 +1248,7 @@ export default function NuevaVisita() {
                               valores={b.valores}
                               meta={b.meta[c.campo_key]}
                               catalogos={catalogos}
-                              onChange={(patch) => actualizarBloque(b.uid, { valores: { ...b.valores, ...patch } })}
+                              onChange={(patch) => actualizarBloque(b.uid, { valores: { ...b.valores, ...patch }, editado: true })}
                             />
                           ))}
                         </CollapsibleContent>
@@ -1141,7 +1375,7 @@ export default function NuevaVisita() {
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 p-3 backdrop-blur md:static md:border-0 md:bg-transparent md:p-0">
         <div className="mx-auto flex max-w-3xl gap-2">
-          <Button className="flex-1" onClick={guardar} disabled={saving || !codCliente || (esEfectiva && !bloques.length)}>
+          <Button className="flex-1" onClick={() => guardar()} disabled={saving || !codCliente || (esEfectiva && !bloques.length)}>
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             {subiendoDocs
               ? `Subiendo documentos ${Math.min(subiendoDocs.hecho + 1, subiendoDocs.total)} de ${subiendoDocs.total}…`

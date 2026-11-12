@@ -431,6 +431,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       sessionStorage.removeItem(`auditoria_login_${uid}`);
       limpiarSesionId();
+      // Solo el cierre manual borra el borrador de visita; la expulsión por control de sesión lo conserva.
+      borrarBorrador(uid);
     } catch {
       // ignorado
     }
