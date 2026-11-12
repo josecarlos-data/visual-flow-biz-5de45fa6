@@ -39,7 +39,8 @@
  *   fechas relativas («el martes», «mañana»).
  * - 12/11/2026 — fase4.6: las condiciones «Vale si…» de la descripción del motivo son el criterio
  *   del revisor, no requisito para crear el bloque. Sin esto, gpt-6-luna dejaba sin bloques los
- *   dictados de oferta cortos (banco: 58 % → ver RESULTADOS-fase46.md).
+ *   dictados de oferta cortos. Además, Promoción lleva una descripción propia para la IA
+ *   (DESCRIPCION_IA). Banco de dictados cortos: 58 % → 95 % (solo regla) → 100 % (regla + Promoción).
  */
 export const VERSION_PROMPT = "fase4.6";
 
@@ -85,6 +86,17 @@ export function admiteIA(c: { is_active: boolean; visibilidad: string; tipo: str
 }
 
 /** Descripción de un campo para el modelo: la ayuda de la plantilla es la fuente. */
+/**
+ * Descripción de motivo que ve la IA. La de la plantilla («Vale si…») es el criterio del revisor y
+ * no se toca; solo Promoción lleva aquí cuándo usarlo, porque con la regla general sola el banco
+ * de dictados cortos se quedaba en 95 % (fallaba la promoción cuando va con una competencia).
+ */
+const DESCRIPCION_IA: Record<string, string> = {
+  promocion:
+    "Una oferta o promoción que el comercial presenta, deja o envía al cliente, aunque falten referencia, cantidad o precio.",
+};
+export const descripcionMotivoIA = (m: { key: string; descripcion: string | null }) => DESCRIPCION_IA[m.key] ?? m.descripcion ?? "";
+
 export function descripcionCampo(c: CampoDef): string {
   const partes = [`${c.label}.`];
   if (c.ayuda) partes.push(c.ayuda);
@@ -173,7 +185,7 @@ export function esquemaExtraccion(motivos: MotivoDef[]) {
     properties[`bloques_${m.key}`] = {
       type: "array",
       description:
-        `${m.nombre}. ${m.descripcion ?? ""} Añade un elemento por cada asunto distinto de este tipo que aparezca en la narración ` +
+        `${m.nombre}. ${descripcionMotivoIA(m)} Añade un elemento por cada asunto distinto de este tipo que aparezca en la narración ` +
         "(dos ofertas distintas = dos elementos). Deja la lista vacía si no hay ningún dato real de este tipo." + extra,
       items: esquemaBloque(m),
     };
@@ -189,7 +201,7 @@ export function esquemaExtraccion(motivos: MotivoDef[]) {
 /** System prompt: FIJO entre llamadas (prompt caching). Nada variable aquí. */
 export function sistemaExtraccion(motivos: MotivoDef[]) {
   const catalogo = motivos
-    .map((m) => `- ${m.key} (${m.nombre}): ${m.descripcion ?? ""}`)
+    .map((m) => `- ${m.key} (${m.nombre}): ${descripcionMotivoIA(m)}`)
     .join("\n");
   return (
     "Eres el asistente de un comercial de recambios de automoción. Recibes la transcripción de una nota de voz grabada tras una " +

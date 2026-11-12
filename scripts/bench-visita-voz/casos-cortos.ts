@@ -3,7 +3,6 @@
  *
  *   bun scripts/bench-visita-voz/casos-cortos.ts                       # gpt-6-luna, esfuerzo none, 5 ejecuciones
  *   CONF=gpt-6-luna/low REPS=3 bun scripts/bench-visita-voz/casos-cortos.ts
- *   VAR=promocion bun scripts/bench-visita-voz/casos-cortos.ts         # + frase fija de Promoción (no publicada)
  *
  * Criterio de «bloques esperados» por caso:
  *   - todos: deben aparecer todos esos motivos (y al menos `comp` bloques de competencia).
@@ -108,11 +107,12 @@ if (!CONF) throw new Error(`CONF desconocida: ${CONF_ID}`);
 const REPS = Number(process.env.REPS ?? 5);
 const VAR = process.env.VAR ?? "";
 
+// La descripción de Promoción para la IA ya está publicada en el prompt (DESCRIPCION_IA).
+// VAR=sin_promocion la retira para medir solo la regla general.
 let motivos = cargarMotivos();
-if (VAR === "promocion") {
-  motivos = motivos.map((m) => m.key === "promocion"
-    ? { ...m, descripcion: "Una oferta o promoción que el comercial presenta, deja o envía al cliente, aunque falten referencia, cantidad o precio." }
-    : m);
+if (VAR === "sin_promocion") {
+  const orig = new Map(motivos.map((m) => [m.key, m.descripcion]));
+  motivos = motivos.map((m) => (m.key === "promocion" ? { ...m, key: m.key, descripcion: orig.get(m.key) ?? null } : m));
 }
 const SIS = sistemaExtraccion(motivos);
 const ESQ = esquemaExtraccion(motivos);
