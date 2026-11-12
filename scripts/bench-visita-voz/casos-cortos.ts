@@ -105,15 +105,9 @@ const CONF_ID = process.env.CONF ?? "gpt-6-luna/none";
 const CONF = CONFS[CONF_ID];
 if (!CONF) throw new Error(`CONF desconocida: ${CONF_ID}`);
 const REPS = Number(process.env.REPS ?? 5);
-const VAR = process.env.VAR ?? "";
 
-// La descripción de Promoción para la IA ya está publicada en el prompt (DESCRIPCION_IA).
-// VAR=sin_promocion la retira para medir solo la regla general.
-let motivos = cargarMotivos();
-if (VAR === "sin_promocion") {
-  const orig = new Map(motivos.map((m) => [m.key, m.descripcion]));
-  motivos = motivos.map((m) => (m.key === "promocion" ? { ...m, key: m.key, descripcion: orig.get(m.key) ?? null } : m));
-}
+// La descripción de Promoción para la IA está en el propio prompt (DESCRIPCION_IA).
+const motivos = cargarMotivos();
 const SIS = sistemaExtraccion(motivos);
 const ESQ = esquemaExtraccion(motivos);
 
@@ -172,7 +166,7 @@ const pct = (n: number, d: number) => `${Math.round((100 * n) / Math.max(1, d))}
 const conContenido = filas.filter((f) => f.caso !== "f45:sin_contenido");
 const tiempos = filas.map((f) => f.ms).sort((a, b) => a - b);
 const lineas = [
-  `# Dictados cortos · ${VERSION_PROMPT}${VAR ? ` + ${VAR}` : ""} · ${CONF_ID} · ${REPS} ejecuciones · ${new Date().toISOString()}`,
+  `# Dictados cortos · ${VERSION_PROMPT} · ${CONF_ID} · ${REPS} ejecuciones · ${new Date().toISOString()}`,
   "",
   `- Bloques esperados: ${pct(filas.filter((f) => f.exito).length, filas.length)}`,
   `- Cero bloques (sin contar «no estaba»): ${pct(conContenido.filter((f) => f.cero).length, conContenido.length)}`,
