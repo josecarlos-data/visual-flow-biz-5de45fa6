@@ -276,29 +276,31 @@ export default function NuevaVisita() {
   };
 
   /**
-   * Extracción a partir de una transcripción ya existente: no vuelve a transcribir,
-   * así que sirve tanto para el primer análisis como para reanalizar tras cambiar de cliente.
+   * Extracción a partir de la transcripción (corregida o no por el comercial). Única vía:
+   * «Crear bloques», «Actualizar bloques», «Reintentar» y el cambio de cliente pasan por aquí.
+   * Solo sustituye los bloques de voz; los de documento y los manuales se conservan.
+   * La IA nunca cambia el resultado: si propone «no efectiva», se le pregunta al comercial.
    */
   const analizarTranscripcion = async (texto: string, cod: string, nombreCliente: string) => {
+    if (!texto.trim()) return;
     setExtrayendo(true);
     setErrorExtraccion(null);
     setAvisosRef([]);
+    setPropuestaResultado(null);
     try {
       const { data, error } = await supabase.functions.invoke("visita-voz", {
-        body: { transcripcion: texto, cliente_nombre: nombreCliente },
+        body: { transcripcion: texto, cliente_nombre: nombreCliente, fecha_visita: fecha },
       });
       if (error) throw new Error((await (error as { context?: Response }).context?.text?.()) || error.message);
       const res = data as {
         resultado_visita?: string;
-        bloques?: { motivo_key: string; campos: Record<string, string>; campos_meta: Meta }[];
+        bloques?: BloqueApi[];
         analisis_modelo?: string;
         analisis_prompt_version?: string;
         error?: string;
       };
       if (res.error) throw new Error(res.error);
       setAnalisis({ modelo: res.analisis_modelo ?? null, version: res.analisis_prompt_version ?? null });
-
-      if (res.resultado_visita && RESULTADOS.includes(res.resultado_visita)) setResultado(res.resultado_visita);
 
       const propuestos: BloqueForm[] = (res.bloques ?? [])
         .filter((b) => motivoDe(b.motivo_key))
@@ -308,26 +310,33 @@ export default function NuevaVisita() {
           valores: { ...b.campos },
           meta: { ...(b.campos_meta ?? {}) },
           manual: false,
+          origen: "voz" as const,
         }));
 
       const avisos = await resolverReferencias(propuestos);
       setAvisosRef(avisos);
       setRepreguntaHecha(false);
-      setBloques(propuestos.length ? propuestos : [nuevoBloque(motivosActivos[0]?.key ?? "")]);
+      setBloques((bs) => reemplazarBloquesVoz(bs, propuestos));
+      setTextoAnalizado(texto);
       setClienteAnalizado(cod);
       setAvisoCliente(false);
-      toast({
-        title: propuestos.length ? `${propuestos.length} bloque(s) propuestos` : "Sin datos suficientes",
-        description: propuestos.length
-          ? "Revísalos y corrige lo que haga falta antes de guardar."
-          : "No he identificado datos concretos: rellénalo a mano.",
-      });
+
+      const noEfectiva = res.resultado_visita && res.resultado_visita !== "efectiva" && RESULTADOS.includes(res.resultado_visita);
+      if (noEfectiva) {
+        setPropuestaResultado(res.resultado_visita!);
+      } else {
+        toast({
+          title: propuestos.length ? `${propuestos.length} bloque(s) propuestos` : "Sin datos suficientes",
+          description: propuestos.length
+            ? "Revísalos y corrige lo que haga falta antes de guardar."
+            : "No he identificado datos concretos: añade un bloque a mano.",
+        });
+      }
     } catch (e) {
       setErrorExtraccion((e as Error).message);
-      if (!bloques.length) setBloques([nuevoBloque(motivosActivos[0]?.key ?? "")]);
       toast({
         title: "No se ha podido analizar la nota",
-        description: "Tienes la transcripción completa; puedes rellenar la visita a mano.",
+        description: "Tienes la transcripción completa; puedes reintentarlo o rellenar la visita a mano.",
         variant: "destructive",
       });
     } finally {
@@ -335,11 +344,25 @@ export default function NuevaVisita() {
     }
   };
 
-  /** Graba una vez toda la visita: se pinta la transcripción y la extracción va por detrás. */
+  /** «Crear / Actualizar bloques»: si hay bloques de voz corregidos a mano, se pregunta antes. */
+  const pedirCrearBloques = () => {
+    const perdidos = vozEditadosQueSePierden(bloques);
+    if (perdidos > 0) {
+      setConfirmarActualizar(perdidos);
+      return;
+    }
+    analizarTranscripcion(transcripcion, codCliente, cliente?.cliente ?? "");
+  };
+
+  /** Aplica un dictado nuevo. En visitas no efectivas va además a Observaciones (sin bloques). */
+  const aplicarDictado = (texto: string, modo: "anadir" | "sustituir") => {
+    setTranscripcion((t) => unirDictado(t, texto, modo));
+    if (!esEfectiva) setObservaciones((o) => unirDictado(o, texto, "anadir"));
+  };
+
+  /** Dictar solo transcribe: los bloques se crean después, con el botón, sobre el texto ya revisado. */
   const procesarVisita = async (blob: Blob) => {
     setTranscribiendo(true);
-    setErrorExtraccion(null);
-    setAvisosRef([]);
     let texto: string | null = null;
     try {
       texto = await transcribirAudio(blob);
@@ -350,10 +373,17 @@ export default function NuevaVisita() {
     }
     setTranscribiendo(false);
     if (!texto) return;
+    if (esEfectiva && transcripcion.trim()) setDictadoPendiente(texto);
+    else aplicarDictado(texto, "anadir");
+  };
 
-    // La narración ya está en pantalla; la extracción corre en paralelo.
-    setTranscripcion(texto);
-    await analizarTranscripcion(texto, codCliente, cliente?.cliente ?? "");
+  /** Aceptar la propuesta «no efectiva» de la IA (tras confirmar si hay bloques que no se guardarían). */
+  const aplicarNoEfectiva = (res: string) => {
+    setResultado(res);
+    setBloques((bs) => bs.filter((b) => b.origen !== "voz"));
+    setObservaciones((o) => (o.trim() ? o : transcripcion));
+    setPropuestaResultado(null);
+    setConfirmarNoEfectiva(null);
   };
 
   /** Segunda tanda: el comercial contesta por voz a los campos que faltan de un bloque. */
