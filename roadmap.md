@@ -84,9 +84,10 @@
 - [x] cliente-insights: bloques Gespromo vacíos no se escriben; observaciones por fila sin bloques con contenido, una línea al final del grupo
 
 ## Registrar visita: dictar → corregir → crear bloques (fase4.5)
-- [ ] Crear bloques solo con botón; Actualizar bloques si cambia el texto; aviso al guardar
-- [ ] Añadir/Sustituir al volver a dictar; micrófono también en no efectiva
-- [ ] IA propone resultado sin cambiarlo; aviso «Registrar como no efectiva / Volver» si hay bloques de documento/manuales
-- [ ] Borrador único por usuario (3 días); preguntar si el enlace trae otro cliente; borrar solo en logout manual
-- [ ] fecha_visita en extracción; prompt fase4.5 sin bloques si no se trató nada
-- [ ] Tests utilidades + 2 narraciones en banco
+- [x] Crear bloques solo con botón; Actualizar bloques si cambia el texto; aviso al guardar
+- [x] Añadir/Sustituir al volver a dictar; micrófono también en no efectiva
+- [x] IA propone resultado sin cambiarlo; aviso «Registrar como no efectiva / Volver» si hay bloques de documento/manuales
+- [x] Borrador único por usuario (3 días); preguntar si el enlace trae otro cliente; borrar solo en logout manual
+- [x] fecha_visita en extracción; prompt fase4.5 sin bloques si no se trató nada
+- [x] Tests utilidades + 2 narraciones en banco
+- [ ] Extracción en narraciones cortas devuelve a menudo 0 bloques (también sin los cambios de fase4.5). Pendiente de decisión del usuario.
