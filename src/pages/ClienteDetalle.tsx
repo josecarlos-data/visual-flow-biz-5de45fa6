@@ -965,7 +965,9 @@ const { campo, dir } = ordenProductos;
                       {v.tipo === "llamada" && <Badge variant="outline">Llamada</Badge>}
                       {etiquetaNoEfectiva(v.resultado_visita) && <Badge variant="outline">{etiquetaNoEfectiva(v.resultado_visita)}</Badge>}
                       {bloques.some((b) => !b.completo) && <Badge variant="outline" className="border-destructive/50 text-destructive">Incompleta</Badge>}
-                      <Badge variant={estadoRevision(v.validacion) === "No correcto" ? "destructive" : "outline"}>{estadoRevision(v.validacion)}</Badge>
+                      {muestraEtiquetaEstado(v.origen, v.validacion) && (
+                        <Badge variant={estadoRevision(v.validacion) === "No correcto" ? "destructive" : "outline"}>{estadoRevision(v.validacion)}</Badge>
+                      )}
                     </div>
                     {bloques.length ? (
                       bloques.map((b) => (
@@ -998,7 +1000,7 @@ const { campo, dir } = ordenProductos;
                         {documentosDe(v.campos).map((a) => <BotonAdjunto key={a.path} adjunto={a} />)}
                       </div>
                     )}
-                    {v.observaciones && (
+                    {v.observaciones && (bloques.length === 0 || v.origen === "app") && (
                       <p className="whitespace-pre-wrap text-sm">
                         {bloques.length > 0 && <span className="text-muted-foreground">Observaciones: </span>}
                         {quitarMarcaInterna(v.observaciones)}

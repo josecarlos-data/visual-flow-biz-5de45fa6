@@ -143,7 +143,9 @@ export default function Visitas() {
                   )}
                   {v.tipo === "llamada" && <Badge variant="outline">Llamada</Badge>}
                   {incompleta && <Badge variant="outline" className="border-destructive/50 text-destructive">Incompleta</Badge>}
-                  <Badge variant={estado === "No correcto" ? "destructive" : "outline"}>{estado}</Badge>
+                  {muestraEtiquetaEstado(v.origen, v.validacion) && (
+                    <Badge variant={estado === "No correcto" ? "destructive" : "outline"}>{estado}</Badge>
+                  )}
                 </div>
                 {preview && (
                   <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{preview}</p>
