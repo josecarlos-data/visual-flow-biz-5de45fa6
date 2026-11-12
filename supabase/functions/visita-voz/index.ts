@@ -315,7 +315,7 @@ function valorValido(c: CampoDef, v: unknown): string | null {
   return s;
 }
 
-async function extraer(key: string, transcripcion: string, clienteNombre: string) {
+async function extraer(key: string, transcripcion: string, clienteNombre: string, fechaVisita: string | null) {
   const { motivos } = await cargarCatalogo();
   const schema = esquemaExtraccion(motivos);
 
@@ -323,7 +323,7 @@ async function extraer(key: string, transcripcion: string, clienteNombre: string
     key,
     sistemaExtraccion(motivos),
     // Lo variable va SIEMPRE después del system, nunca dentro de él.
-    usuarioExtraccion(transcripcion, clienteNombre),
+    usuarioExtraccion(transcripcion, clienteNombre, fechaVisita),
 
     "informe_visita",
     schema,
@@ -537,7 +537,7 @@ Deno.serve(async (req) => {
     if (body?.accion === "repreguntar") {
       return await repreguntar(key, transcripcion, String(body?.motivo_key ?? ""), (body?.campos ?? []) as string[]);
     }
-    return await extraer(key, transcripcion, String(body?.cliente_nombre ?? ""));
+    return await extraer(key, transcripcion, String(body?.cliente_nombre ?? ""), body?.fecha_visita ? String(body.fecha_visita) : null);
   } catch (err) {
     console.error("visita-voz error:", err);
     return json({ error: (err as Error).message }, 500);

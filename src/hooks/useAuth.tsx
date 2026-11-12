@@ -7,6 +7,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { registrarEvento } from "@/lib/auditoria";
 import { getDispositivoId, getSesionId, idEquipoCorto, limpiarSesionId } from "@/lib/dispositivo";
 import { toast } from "@/hooks/use-toast";
+import { borrarBorrador } from "@/lib/borradorVisita";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -431,6 +432,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       sessionStorage.removeItem(`auditoria_login_${uid}`);
       limpiarSesionId();
+      // Solo el cierre manual borra el borrador de visita; la expulsión por control de sesión lo conserva.
+      borrarBorrador(uid);
     } catch {
       // ignorado
     }

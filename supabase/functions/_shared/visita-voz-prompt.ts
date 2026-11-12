@@ -34,8 +34,11 @@
  *   extracción openai/gpt-5.6-luna → openai/gpt-6-luna; visión google/gemini-3.6-flash
  *   (retirado el 19/11/2026) → openai/gpt-6-luna, que leyó bien las 4 líneas de un
  *   albarán sintético.
+ * - 12/11/2026 — fase4.5: si no se pudo tratar nada con el cliente no se crea ningún bloque;
+ *   el mensaje de usuario lleva la fecha de la visita (con día de la semana) para resolver
+ *   fechas relativas («el martes», «mañana»).
  */
-export const VERSION_PROMPT = "fase4.4";
+export const VERSION_PROMPT = "fase4.5";
 
 /**
  * Extracción: clasificar y rellenar campos con reglas explícitas. No es razonamiento,
@@ -210,6 +213,9 @@ export function sistemaExtraccion(motivos: MotivoDef[]) {
     "DOS bloques competencia: uno con precio_competencia=78 y precio_rimosa=92, otro con precio_competencia=105 y " +
     "precio_rimosa=121, cada uno con su referencia y su resultado_venta.\n" +
     "- Un motivo solo se instancia si hay al menos un dato real en la narración. Nunca crees un bloque vacío por si acaso.\n" +
+    "- VISITA SIN CONTENIDO: si la narración dice que no se pudo tratar nada con el cliente (no estaba, el taller estaba cerrado, " +
+    "no le han atendido, vuelve otro día), resultado_visita es el que corresponda (cliente_ausente, cerrado o sin_acceso) y " +
+    "TODAS las listas de bloques van vacías. No crees seguimiento ni ningún otro bloque para contar que no estaba.\n" +
     "- Si el mismo motivo aparece dos veces con contenido distinto, devuelve dos elementos en su lista, nunca uno con los datos mezclados.\n\n" +
     "ALIAS Y NORMALIZACIÓN (usa siempre el nombre de catálogo, no el que suene en la grabación):\n" +
     "- 'LM', 'L.M.', 'LMR', 'Luis', 'Moleón' => Luis Moleón.\n" +
@@ -244,15 +250,33 @@ export function sistemaExtraccion(motivos: MotivoDef[]) {
     "exclusivo de los campos multiselect.\n" +
     "- Las referencias de producto se devuelven tal cual las dice el comercial; no las corrijas ni las aproximes, y nunca " +
     "conviertas una palabra suelta en referencia.\n" +
+    "- FECHAS: el mensaje indica la fecha de la visita. Las fechas relativas («el martes», «mañana», «la semana que viene») se " +
+    "resuelven a partir de ella: «el martes» es el próximo martes posterior a la fecha de la visita. Los campos de fecha van en " +
+    "formato AAAA-MM-DD. Si no se puede saber el día exacto, el campo va a null.\n" +
     "- Redacta los textos en español, en tercera persona, breve y concreto.\n" +
     "- Por cada campo relleno añade una evidencia con un fragmento literal de 5 a 10 palabras y tu nivel de confianza."
   );
 }
 
 /** Mensaje de usuario: lo variable va SIEMPRE después del system, nunca dentro de él. */
-export function usuarioExtraccion(transcripcion: string, clienteNombre: string) {
+const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+
+/** «martes 10/11/2026» a partir de una fecha AAAA-MM-DD; null si no es válida. */
+export function describirFechaVisita(fecha: string | null | undefined): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(fecha ?? ""));
+  if (!m) return null;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  if (d.getUTCMonth() !== Number(m[2]) - 1) return null;
+  return `${DIAS_SEMANA[d.getUTCDay()]} ${m[3]}/${m[2]}/${m[1]}`;
+}
+
+export function usuarioExtraccion(transcripcion: string, clienteNombre: string, fechaVisita?: string | null) {
+  // La fecha va DETRÁS de la transcripción: delante, el banco de pruebas mostró que el modelo
+  // devolvía con más frecuencia cero bloques en narraciones cortas.
+  const fecha = describirFechaVisita(fechaVisita);
   return (
     (clienteNombre ? `Cliente (ya seleccionado en la aplicación, no lo deduzcas): ${clienteNombre}\n\n` : "") +
-    `Transcripción de la nota de voz:\n"""\n${transcripcion}\n"""`
+    `Transcripción de la nota de voz:\n"""\n${transcripcion}\n"""` +
+    (fecha ? `\n\nFecha de la visita (solo para resolver fechas relativas como «el martes»): ${fecha}.` : "")
   );
 }
