@@ -37,8 +37,11 @@
  * - 12/11/2026 — fase4.5: si no se pudo tratar nada con el cliente no se crea ningún bloque;
  *   el mensaje de usuario lleva la fecha de la visita (con día de la semana) para resolver
  *   fechas relativas («el martes», «mañana»).
+ * - 12/11/2026 — fase4.6: las condiciones «Vale si…» de la descripción del motivo son el criterio
+ *   del revisor, no requisito para crear el bloque. Sin esto, gpt-6-luna dejaba sin bloques los
+ *   dictados de oferta cortos (banco: 58 % → ver RESULTADOS-fase46.md).
  */
-export const VERSION_PROMPT = "fase4.5";
+export const VERSION_PROMPT = "fase4.6";
 
 /**
  * Extracción: clasificar y rellenar campos con reglas explícitas. No es razonamiento,
@@ -212,6 +215,9 @@ export function sistemaExtraccion(motivos: MotivoDef[]) {
     "  Ejemplo con dos referencias: «la batería de 110 se la dan a 78 y nosotros a 92, y la de 140 a 105 frente a nuestros 121» => " +
     "DOS bloques competencia: uno con precio_competencia=78 y precio_rimosa=92, otro con precio_competencia=105 y " +
     "precio_rimosa=121, cada uno con su referencia y su resultado_venta.\n" +
+    "- La descripción de cada motivo indica de qué trata. Las condiciones del tipo \"Vale si…\" son el criterio con el que el " +
+    "revisor validará después: no son requisito para crear el bloque. Crea el bloque en cuanto haya un asunto real de ese " +
+    "motivo, aunque falten datos; los campos que no se digan van a null.\n" +
     "- Un motivo solo se instancia si hay al menos un dato real en la narración. Nunca crees un bloque vacío por si acaso.\n" +
     "- VISITA SIN CONTENIDO: si la narración dice que no se pudo tratar nada con el cliente (no estaba, el taller estaba cerrado, " +
     "no le han atendido, vuelve otro día), resultado_visita es el que corresponda (cliente_ausente, cerrado o sin_acceso) y " +

@@ -91,3 +91,8 @@
 - [x] fecha_visita en extracción; prompt fase4.5 sin bloques si no se trató nada
 - [x] Tests utilidades + 2 narraciones en banco
 - [ ] Extracción en narraciones cortas devuelve a menudo 0 bloques (también sin los cambios de fase4.5). Pendiente de decisión del usuario.
+
+## Extracción fiable en dictados cortos (fase4.6)
+- [ ] Regla general «Vale si… no es requisito» en el prompt; banco 11 casos × 5
+- [ ] Si no llega al 100 %, frase fija de Promoción y medir mejora
+- [ ] Guardar casos cortos y criterio de bloques esperados en scripts/bench-visita-voz
