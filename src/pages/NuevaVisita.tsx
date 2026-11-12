@@ -32,6 +32,15 @@ import { useClientes, useMotivos, useCatalogos, type Motivo, type MotivoCampo } 
 import { hoyMadrid, limitesFechaVisita, pideUbicacion, parseDiasAtras } from "@/lib/fechaVisita";
 import { camposVisibles, normalizarValoresNumericos } from "@/lib/motivoCampos";
 import { cn } from "@/lib/utils";
+import { borrarBorrador, guardarBorrador, leerBorrador, type BorradorVisita } from "@/lib/borradorVisita";
+import {
+  bloquesNoVozConDatos,
+  reemplazarBloquesVoz,
+  textoCambiado as calcTextoCambiado,
+  unirDictado,
+  vozEditadosQueSePierden,
+  type OrigenBloque,
+} from "@/lib/bloquesVoz";
 
 type Meta = Record<string, { cita?: string; confianza?: string }>;
 
@@ -41,7 +50,13 @@ interface BloqueForm {
   valores: Record<string, string>;
   meta: Meta;
   manual: boolean;
+  /** De dónde sale el bloque: solo los de voz se regeneran al actualizar el dictado. */
+  origen: OrigenBloque;
+  /** Bloque de voz corregido a mano por el comercial. */
+  editado?: boolean;
 }
+
+type BloqueApi = { motivo_key: string; campos: Record<string, string>; campos_meta: Meta };
 
 const nuevoBloque = (motivoKey: string): BloqueForm => ({
   uid: crypto.randomUUID(),
@@ -49,6 +64,7 @@ const nuevoBloque = (motivoKey: string): BloqueForm => ({
   valores: {},
   meta: {},
   manual: true,
+  origen: "manual",
 });
 
 const RESULTADOS = ["efectiva", "cliente_ausente", "cerrado", "sin_acceso"];
@@ -107,6 +123,21 @@ export default function NuevaVisita() {
   const [saving, setSaving] = useState(false);
   const [subiendoDocs, setSubiendoDocs] = useState<{ hecho: number; total: number } | null>(null);
   const [salirDialogo, setSalirDialogo] = useState(false);
+  /** Transcripción con la que se crearon los bloques (null = aún no se han creado). */
+  const [textoAnalizado, setTextoAnalizado] = useState<string | null>(null);
+  /** Dictado nuevo a la espera de «Añadir / Sustituir». */
+  const [dictadoPendiente, setDictadoPendiente] = useState<string | null>(null);
+  /** Confirmación antes de sustituir bloques de voz corregidos a mano. */
+  const [confirmarActualizar, setConfirmarActualizar] = useState<number | null>(null);
+  /** Guardar con el texto cambiado sin actualizar los bloques. */
+  const [confirmarGuardar, setConfirmarGuardar] = useState(false);
+  /** Resultado no efectivo que propone la IA; nunca se aplica sin el comercial. */
+  const [propuestaResultado, setPropuestaResultado] = useState<string | null>(null);
+  const [confirmarNoEfectiva, setConfirmarNoEfectiva] = useState<string | null>(null);
+  /** Borrador encontrado al abrir; mientras se decide, no se autoguarda nada. */
+  const [borradorEncontrado, setBorradorEncontrado] = useState<BorradorVisita | null>(null);
+  const [borradorRevisado, setBorradorRevisado] = useState(false);
+  const guardadaRef = useRef(false);
 
   const [detallesAbiertos, setDetallesAbiertos] = useState(false);
   const [chuletaAbierta, setChuletaAbierta] = useState(false);
@@ -436,7 +467,7 @@ export default function NuevaVisita() {
       );
     });
 
-  const guardar = async () => {
+  const guardar = async (guardarAsi = false) => {
     if (!codCliente) {
       toast({ title: "Faltan datos", description: "Selecciona un cliente.", variant: "destructive" });
       return;
@@ -460,6 +491,11 @@ export default function NuevaVisita() {
         toast({ title: "Campos obligatorios sin rellenar", description: faltan.join(", "), variant: "destructive" });
         return;
       }
+    }
+
+    if (esEfectiva && !guardarAsi && textoCambiadoAhora) {
+      setConfirmarGuardar(true);
+      return;
     }
 
     setSaving(true);
@@ -531,6 +567,8 @@ export default function NuevaVisita() {
       return;
     }
 
+    guardadaRef.current = true;
+    borrarBorrador(user?.id ?? "");
     const r = (res ?? {}) as { ya_existia?: boolean; agenda_marcada?: boolean };
     toast({
       title: r.ya_existia ? "La visita ya estaba guardada" : "Visita guardada",
