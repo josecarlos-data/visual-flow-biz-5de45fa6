@@ -102,6 +102,13 @@ const CASOS = [
       "He estado con Manolo en el taller. Le he presentado la oferta de baterías Varta y le interesa, pero quiere pensarlo. " +
       "Le llamo el martes para cerrar el pedido.",
   },
+  {
+    id: "fecha_relativa_explicita",
+    fecha: "2026-11-12",
+    narracion:
+      "Seguimiento con Manolo: le he presentado la oferta de baterías Varta, le interesa pero quiere pensarlo. " +
+      "Próxima acción: le llamo el martes para cerrar el pedido.",
+  },
 ];
 
 const motivos = cargarMotivos();
