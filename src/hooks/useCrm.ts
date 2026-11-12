@@ -72,6 +72,7 @@ export interface Visita {
   fecha: string;
   hora: string | null;
   tipo: string | null;
+  resultado_visita: string | null;
   validacion: string | null;
   nota_revision: string | null;
   revisado_por: string | null;

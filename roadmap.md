@@ -104,3 +104,11 @@
 
 ## Modelo de extracción
 - [x] Volver a openai/gpt-5.6-luna solo en extracción (visión sigue en gpt-6-luna); banco repetido
+
+## Cierre módulo visitas (versión estable para Rafael)
+- [x] Listado: motivos en línea agrupados, resultado/llamada, Incompleta, estado, sin marca interna
+- [x] Ficha: cabecera con comercial/resultado/estado; observaciones también con bloques
+- [x] Completar datos desde listado y ficha (propias, Pendiente/No correcto)
+- [x] Buscador: inactivos bajo demanda y «Cliente que no está en ISI»
+- [x] Permisos (0045; la 0044 quedó vacía por error): comercial no modifica/borra; solo admin borra; no admin solo origen app; revisor no corrige lo suyo
+- [ ] Pendiente (aplazado por decisión): visitas con cliente_externo visibles para el jefe de zona de la delegación del autor
