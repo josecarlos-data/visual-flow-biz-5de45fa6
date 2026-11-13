@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { CheckCircle2, Clock, XCircle, Search, ExternalLink, RefreshCw, Loader2, FileDown, X, Pencil } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { CheckCircle2, Clock, XCircle, Search, ExternalLink, RefreshCw, Loader2, FileDown, X, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,9 +14,10 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import {
-  useVisitasRevision, useRevisionMutations, useMotivos, useClientes,
+  useVisitasRevision, useComercialesRevision, pedirSiguienteRevision, claveRevision, REVISION_POR_PAGINA,
+  useRevisionMutations, useMotivos,
   useSituacionesMutations, useVisitaBloques, useBloqueMutations, useReanalizarVisita, fechaCorta, hoyISO,
-  type Visita, type VisitaBloque,
+  type FilaRevision, type FiltrosRevision, type VisitaBloque,
 } from "@/hooks/useCrm";
 import { useScrollRestore } from "@/hooks/useScrollRestore";
 import { useMensajesVisita, useMarcarLeida, useRespuestasNuevas, useInvalidarMensajes, enviarMensaje, ultimoDe } from "@/hooks/useVisitaMensajes";
@@ -67,36 +69,80 @@ const badgeImportado = <Badge variant="outline" className="gap-1 border-primary/
 
 export default function RevisionVisitas() {
   const [params, setParams] = useSearchParams();
-  const origen = (params.get("origen") ?? "app") as "app" | "gespromo" | "todas";
-  const { data: visitas, isLoading } = useVisitasRevision(origen);
+  const qc = useQueryClient();
+  const get = (k: string, def = "") => params.get(k) ?? def;
+  /** Cambiar cualquier filtro vuelve a la página 1. */
+  const setParam = (k: string, v: string | null) => {
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (!v || (k !== "origen" && (v === "todas" || v === "todos"))) next.delete(k);
+      else if (k === "origen" && v === "app") next.delete(k);
+      else next.set(k, v);
+      if (k !== "pagina") next.delete("pagina");
+      return next;
+    }, { replace: true });
+  };
+  const irAPagina = (n: number) => {
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (n <= 1) next.delete("pagina"); else next.set("pagina", String(n));
+      return next;
+    }, { replace: true });
+  };
+
+  const origen = (params.get("origen") ?? "app") as FiltrosRevision["origen"];
+  const estado = get("estado", "pendiente");
+  const q = get("q");
+  const motivoFiltro = get("motivo", "todos");
+  const comercialFiltro = get("comercial", "todos");
+  const soloDudas = get("dudas") === "1";
+  const soloRespuestas = get("respuestas") === "1";
+  const desde = get("desde");
+  const hasta = get("hasta");
+  const pagina = Math.max(1, Number.parseInt(get("pagina", "1"), 10) || 1);
+  const hayFiltros = ["estado", "q", "origen", "motivo", "comercial", "dudas", "respuestas", "desde", "hasta"].some((k) => params.get(k));
+
+  const filtros: FiltrosRevision = {
+    origen, estado, q,
+    motivo: motivoFiltro === "todos" ? null : motivoFiltro,
+    comercial: comercialFiltro === "todos" ? null : comercialFiltro,
+    dudas: soloDudas, respuestas: soloRespuestas,
+    desde: desde || null, hasta: hasta || null,
+    pagina,
+  };
+
+  // Buscador: espera 300 ms sin teclear antes de pedir al servidor.
+  const [texto, setTexto] = useState(q);
+  useEffect(() => { setTexto((t) => (t.trim() === q.trim() ? t : q)); }, [q]);
+  useEffect(() => {
+    if (texto.trim() === q.trim()) return;
+    const t = setTimeout(() => setParam("q", texto.trim() || null), 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [texto]);
+
+  const { data: lista, isLoading, isError, refetch, isFetching } = useVisitasRevision(filtros);
+  const filas = lista?.filas ?? [];
+  const total = lista?.total ?? 0;
+  const pendientes = lista?.pendientes ?? 0;
+  const paginaActual = lista?.pagina ?? pagina;
+  const paginas = Math.max(1, Math.ceil(total / REVISION_POR_PAGINA));
   useScrollRestore("revision", !isLoading);
   const { data: motivos } = useMotivos();
-  const { data: clientes } = useClientes(false, "alfabetico");
+  const { data: comerciales } = useComercialesRevision(origen);
   const { revisar } = useRevisionMutations();
   const { revisarBloque } = useBloqueMutations();
   const { guardar: guardarSituacion } = useSituacionesMutations();
   const reanalizar = useReanalizarVisita();
   const [editando, setEditando] = useState<VisitaBloque | null>(null);
 
-  const get = (k: string, def = "") => params.get(k) ?? def;
-  const setParam = (k: string, v: string | null) => {
-    const next = new URLSearchParams(params);
-    if (!v || (k !== "origen" && (v === "todas" || v === "todos"))) next.delete(k);
-    else if (k === "origen" && v === "app") next.delete(k);
-    else next.set(k, v);
-    setParams(next, { replace: true });
-  };
+  // Si la página pedida ya no existe (p. ej. tras validar las últimas), el servidor devuelve la última: se refleja en la URL.
+  useEffect(() => {
+    if (lista && !isFetching && lista.pagina !== pagina) irAPagina(lista.pagina);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lista?.pagina, pagina, isFetching]);
 
-  const estado = get("estado", "pendiente");
-  const q = get("q");
-  const motivoFiltro = get("motivo", "todos");
-  const soloDudas = get("dudas") === "1";
-  const soloRespuestas = get("respuestas") === "1";
-  const desde = get("desde");
-  const hasta = get("hasta");
-  const hayFiltros = ["estado", "q", "origen", "motivo", "comercial", "dudas", "respuestas", "desde", "hasta"].some((k) => params.get(k));
-
-  const [sel, setSel] = useState<Visita | null>(null);
+  const [sel, setSel] = useState<FilaRevision | null>(null);
   const [nota, setNota] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [justificar, setJustificar] = useState(false);
@@ -118,73 +164,36 @@ export default function RevisionVisitas() {
 
   const editaObs = !!sel && sel.origen !== "app";
 
-  const nombrePorCod = useMemo(() => {
-    const m = new Map<number, string>();
-    for (const c of clientes ?? []) m.set(c.cod_cliente, c.cliente);
-    return m;
-  }, [clientes]);
-
+  const nombreCliente = (v: FilaRevision) =>
+    v.cliente_nombre ?? (v.cod_cliente ? `Cliente ${v.cod_cliente}` : "Sin cliente");
   const nombreMotivo = (key: string | null) => motivos?.find((m) => m.key === key)?.nombre ?? key ?? "Sin motivo";
 
-  // Bloques de todas las visitas cargadas: los filtros por origen/motivo/confianza los miran.
-  const { data: bloquesMap } = useVisitaBloques((visitas ?? []).map((v) => v.id));
+  // Bloques solo de las visitas de la página visible.
+  const idsPagina = useMemo(() => filas.map((v) => v.id), [filas]);
+  const { data: bloquesMap } = useVisitaBloques(idsPagina);
   /** Reanalizar borra los bloques: se impide si hay revisiones o conversación que se perderían. */
   const reanalizarBloqueado = !!sel && (
     (bloquesMap?.get(sel.id) ?? []).some((b) => (b.validacion ?? "pendiente") !== "pendiente") ||
     (mensajes ?? []).length > 0
   );
-  const bloquesDe = (v: Visita) => bloquesMap?.get(v.id) ?? [];
-  const cargandoBloques = !bloquesMap;
+  const bloquesDe = (v: FilaRevision) => bloquesMap?.get(v.id) ?? [];
+  // Mientras la página de la visita abierta no tenga sus bloques cargados, el diálogo espera.
+  const cargandoBloques = !bloquesMap || (!!sel && !idsPagina.includes(sel.id));
   const dialogoRef = useRef<HTMLDivElement>(null);
-  const resumenMotivos = (v: Visita) => {
+  const motivosDe = (v: FilaRevision): (string | null)[] => {
     const bs = bloquesDe(v);
-    if (!bs.length) return nombreMotivo(v.motivo_key);
-    return bs.map((b) => nombreMotivo(b.motivo_key)).join(" + ");
+    if (bs.length) return bs.map((b) => b.motivo_key);
+    return v.motivos?.length ? v.motivos : [v.motivo_key];
   };
-  const motivosConEstado = (v: Visita) => {
+  const resumenMotivos = (v: FilaRevision) => motivosDe(v).map(nombreMotivo).join(" + ");
+  const motivosConEstado = (v: FilaRevision) => {
     const bs = bloquesDe(v);
-    if (!bs.length) return <>{nombreMotivo(v.motivo_key)}</>;
+    if (!bs.length) return <>{resumenMotivos(v)}</>;
     return <>{bs.map((b, i) => <span key={b.id}>{i > 0 && " + "}{nombreMotivo(b.motivo_key)} {marcaBloque(b.validacion)}</span>)}</>;
   };
-  const comercialFiltro = get("comercial", "todos");
-  const comerciales = useMemo(
-    () => [...new Set((visitas ?? []).map((v) => v.comercial_nombre).filter((x): x is string => !!x))].sort((a, b) => a.localeCompare(b, "es")),
-    [visitas],
-  );
-  const visitaImportada = (v: Visita) => bloquesDe(v).some(esExterno);
+  const visitaImportada = (v: FilaRevision) => bloquesDe(v).some(esExterno);
 
-  const filtradas = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    return (visitas ?? []).filter((v) => {
-      const val = v.validacion ?? "pendiente";
-      if (estado !== "todas" && val !== estado) return false;
-      if (desde && v.fecha < desde) return false;
-      if (hasta && v.fecha > hasta) return false;
-      if (comercialFiltro !== "todos" && v.comercial_nombre !== comercialFiltro) return false;
-
-      const bs = bloquesMap?.get(v.id) ?? [];
-      if (motivoFiltro !== "todos") {
-        const enBloques = bs.some((b) => b.motivo_key === motivoFiltro);
-        if (!enBloques && v.motivo_key !== motivoFiltro) return false;
-      }
-      if (soloDudas && !bs.some(tieneDudas)) return false;
-      if (soloRespuestas && !respuestasNuevas?.has(v.id)) return false;
-
-      if (!term) return true;
-      const nombre = v.cod_cliente ? nombrePorCod.get(v.cod_cliente) ?? "" : v.cliente_externo ?? "";
-      return (
-        nombre.toLowerCase().includes(term) ||
-        (v.comercial_nombre ?? "").toLowerCase().includes(term) ||
-        nombreMotivo(v.motivo_key).toLowerCase().includes(term)
-      );
-    });
-  }, [visitas, estado, q, motivoFiltro, comercialFiltro, soloDudas, soloRespuestas, respuestasNuevas, desde, hasta, bloquesMap, nombrePorCod, motivos]);
-
-  const pendientes = filtradas.filter((v) => (v.validacion ?? "pendiente") === "pendiente").length;
-
-
-
-  const abrir = (v: Visita) => {
+  const abrir = (v: FilaRevision) => {
     setSel(v);
     setNota("");
     setNuevaAlAbrir(!!respuestasNuevas?.has(v.id));
@@ -241,9 +250,6 @@ export default function RevisionVisitas() {
   /** Guarda solo lo cambiado. En visitas con bloques nunca escribe visitas.validacion. */
   const guardar = async (siguiente: boolean) => {
     if (!sel || cargandoBloques) return;
-    // La siguiente se decide ANTES de guardar: al guardar la lista se reordena.
-    const idx = filtradas.findIndex((v) => v.id === sel.id);
-    const sig = siguiente ? filtradas.slice(idx + 1)[0] ?? null : null;
     setGuardando(true);
     try {
       const bs = bloquesDe(sel);
@@ -274,7 +280,18 @@ export default function RevisionVisitas() {
         });
       }
       toast({ title: "Revisión guardada" });
-      if (sig) abrir(sig); else setSel(null);
+      if (!siguiente) { setSel(null); return; }
+      // La siguiente se pide DESPUÉS de guardar, con los mismos filtros y el cursor (fecha, id) de la guardada.
+      const res = await pedirSiguienteRevision(filtros, { fecha: sel.fecha, id: sel.id });
+      const sig = res.siguiente_id ? res.filas.find((v) => v.id === res.siguiente_id) ?? null : null;
+      if (!sig) {
+        setSel(null);
+        toast({ title: "No hay más visitas con estos filtros" });
+        return;
+      }
+      qc.setQueryData(claveRevision({ ...filtros, pagina: res.pagina }), res);
+      if (res.pagina !== paginaActual) irAPagina(res.pagina);
+      abrir(sig);
     } catch (e) {
       toast({ title: "No se ha podido guardar", description: (e as Error).message, variant: "destructive" });
     } finally {
@@ -290,7 +307,7 @@ export default function RevisionVisitas() {
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Revisión de visitas</h1>
         <p className="text-muted-foreground">
           Valida, corrige y completa las visitas registradas por el equipo comercial.{" "}
-          {filtradas.length} visita{filtradas.length === 1 ? "" : "s"} · {pendientes} pendiente{pendientes === 1 ? "" : "s"} de revisar.
+          {total.toLocaleString("es-ES")} visita{total === 1 ? "" : "s"} · {pendientes.toLocaleString("es-ES")} pendiente{pendientes === 1 ? "" : "s"} de revisar.
         </p>
       </div>
 
@@ -302,7 +319,7 @@ export default function RevisionVisitas() {
         </Tabs>
         <div className="relative sm:w-72">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-8" placeholder="Cliente, comercial o motivo…" value={q} onChange={(e) => setParam("q", e.target.value)} />
+          <Input className="pl-8" placeholder="Cliente, comercial o motivo…" value={texto} onChange={(e) => setTexto(e.target.value)} />
         </div>
       </div>
 
@@ -337,7 +354,7 @@ export default function RevisionVisitas() {
               <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos los comerciales</SelectItem>
-                {comerciales.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                {(comerciales ?? []).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -361,9 +378,9 @@ export default function RevisionVisitas() {
           </label>
 
           <div className="ml-auto flex items-center gap-3 pb-1.5">
-            <span className="text-sm text-muted-foreground">{filtradas.length} resultado{filtradas.length === 1 ? "" : "s"}</span>
+            <span className="text-sm text-muted-foreground">{total.toLocaleString("es-ES")} resultado{total === 1 ? "" : "s"}</span>
             {hayFiltros && (
-              <Button variant="ghost" size="sm" onClick={() => setParams(new URLSearchParams(), { replace: true })}>
+              <Button variant="ghost" size="sm" onClick={() => { setTexto(""); setParams(new URLSearchParams(), { replace: true }); }}>
                 <X className="mr-1 h-3.5 w-3.5" /> Limpiar filtros
               </Button>
             )}
@@ -374,17 +391,22 @@ export default function RevisionVisitas() {
 
       {isLoading ? (
         <div className="space-y-2">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-20" />)}</div>
-      ) : filtradas.length === 0 ? (
+      ) : isError ? (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-3 py-10 text-center text-sm text-muted-foreground">
+            No se ha podido cargar la lista.
+            <Button size="sm" variant="outline" onClick={() => refetch()}>Reintentar</Button>
+          </CardContent>
+        </Card>
+      ) : filas.length === 0 ? (
         <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">No hay visitas en este estado.</CardContent></Card>
       ) : (
-        <div className="space-y-2">
-          {filtradas.map((v) => (
+        <div className={`space-y-2 transition-opacity ${isFetching ? "opacity-60" : ""}`}>
+          {filas.map((v) => (
             <Card key={v.id} className="transition-colors hover:bg-accent/40">
               <CardContent className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
                 <button type="button" className="min-w-0 flex-1 text-left" onClick={() => abrir(v)}>
-                  <p className="truncate font-medium">
-                    {v.cod_cliente ? nombrePorCod.get(v.cod_cliente) ?? `Cliente ${v.cod_cliente}` : v.cliente_externo ?? "Sin cliente"}
-                  </p>
+                  <p className="truncate font-medium">{nombreCliente(v)}</p>
                   <p className="truncate text-xs text-muted-foreground">
                     {fechaCorta(v.fecha)}{v.hora ? ` · ${v.hora.slice(0, 5)}` : ""} · {motivosConEstado(v)}
                     {` · ${v.comercial_nombre ?? "Sin comercial"}`}
@@ -408,6 +430,24 @@ export default function RevisionVisitas() {
         </div>
       )}
 
+      {!isLoading && !isError && total > REVISION_POR_PAGINA && (
+        <nav className="flex items-center justify-between gap-2" aria-label="Paginación">
+          <Button
+            variant="outline" size="sm" disabled={paginaActual <= 1 || isFetching}
+            onClick={() => { irAPagina(paginaActual - 1); window.scrollTo({ top: 0 }); }}
+          >
+            <ChevronLeft className="mr-1 h-4 w-4" /> Anterior
+          </Button>
+          <span className="text-sm text-muted-foreground">Página {paginaActual} de {paginas}</span>
+          <Button
+            variant="outline" size="sm" disabled={paginaActual >= paginas || isFetching}
+            onClick={() => { irAPagina(paginaActual + 1); window.scrollTo({ top: 0 }); }}
+          >
+            Siguiente <ChevronRight className="ml-1 h-4 w-4" />
+          </Button>
+        </nav>
+      )}
+
       <Dialog open={!!sel} onOpenChange={(o) => !o && cerrar()}>
         <DialogContent ref={dialogoRef} className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader><DialogTitle>Revisar visita</DialogTitle></DialogHeader>
@@ -423,9 +463,7 @@ export default function RevisionVisitas() {
           {sel && !cargandoBloques && (
             <div className="space-y-4">
               <div className="rounded-md border p-3 text-sm">
-                <p className="font-medium">
-                  {sel.cod_cliente ? nombrePorCod.get(sel.cod_cliente) ?? `Cliente ${sel.cod_cliente}` : sel.cliente_externo ?? "Sin cliente"}
-                </p>
+                <p className="font-medium">{nombreCliente(sel)}</p>
                 <p className="text-xs text-muted-foreground">
                   {fechaCorta(sel.fecha)}{sel.hora ? ` · ${sel.hora.slice(0, 5)}` : ""} · {resumenMotivos(sel)}
                   {sel.comercial_nombre ? ` · ${sel.comercial_nombre}` : ""}
@@ -520,7 +558,7 @@ export default function RevisionVisitas() {
                           {
                             id: sel.id,
                             transcripcion: sel.transcripcion!,
-                            cliente_nombre: sel.cod_cliente ? nombrePorCod.get(sel.cod_cliente) ?? "" : "",
+                            cliente_nombre: sel.cod_cliente ? sel.cliente_nombre ?? "" : "",
                           },
                           {
                             onSuccess: (n) => toast({ title: `Reanalizada: ${n} bloque(s)` }),

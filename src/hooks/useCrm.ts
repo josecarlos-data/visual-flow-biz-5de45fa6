@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { CatalogoMap, OpcionesDef } from "@/lib/motivoCampos";
 
@@ -619,22 +619,95 @@ export function useVisitas(limit = 200) {
   });
 }
 
-/** Visitas registradas por comerciales pendientes de revisar o ya validadas. */
-/**
- * Visitas para la pantalla de revisión.
- * `origen`: "app" (registradas en la app), "gespromo" (importadas) o "todas".
- * El filtro se aplica en la consulta para que el límite no se coma resultados.
- */
-export function useVisitasRevision(origen: "app" | "gespromo" | "todas" = "app", limit = 1000) {
+/* ---------- Revisión de visitas: lista paginada en servidor ---------- */
+
+export const REVISION_POR_PAGINA = 50;
+
+export interface FiltrosRevision {
+  origen: "app" | "gespromo" | "todas";
+  estado: string;
+  q: string;
+  motivo: string | null;
+  comercial: string | null;
+  dudas: boolean;
+  respuestas: boolean;
+  desde: string | null;
+  hasta: string | null;
+  pagina: number;
+}
+
+/** Fila de la lista: la visita completa más el nombre del cliente y las claves de motivo de sus bloques. */
+export interface FilaRevision extends Visita {
+  cliente_nombre: string | null;
+  motivos: (string | null)[];
+}
+
+export interface PaginaRevision {
+  filas: FilaRevision[];
+  total: number;
+  pendientes: number;
+  pagina: number;
+  por_pagina: number;
+  siguiente_id: string | null;
+}
+
+const argsRevision = (f: FiltrosRevision) => ({
+  _origen: f.origen,
+  _estado: f.estado,
+  _q: f.q.trim() || undefined,
+  _motivo: f.motivo ?? undefined,
+  _comercial: f.comercial ?? undefined,
+  _dudas: f.dudas,
+  _respuestas: f.respuestas,
+  _desde: f.desde ?? undefined,
+  _hasta: f.hasta ?? undefined,
+  _pagina: f.pagina,
+  _por_pagina: REVISION_POR_PAGINA,
+});
+
+async function pedirRevision(args: Record<string, unknown>): Promise<PaginaRevision> {
+  const { data, error } = await supabase.rpc("visitas_revision_lista", args as never);
+  if (error) throw error;
+  const r = (data ?? {}) as Partial<PaginaRevision>;
+  return {
+    filas: (r.filas ?? []) as FilaRevision[],
+    total: r.total ?? 0,
+    pendientes: r.pendientes ?? 0,
+    pagina: r.pagina ?? 1,
+    por_pagina: r.por_pagina ?? REVISION_POR_PAGINA,
+    siguiente_id: r.siguiente_id ?? null,
+  };
+}
+
+export const claveRevision = (f: FiltrosRevision) => ["crm_visitas_revision", f] as const;
+
+/** Una página de la lista de revisión; filtros, contadores y orden (fecha desc, id desc) los resuelve el servidor. */
+export function useVisitasRevision(f: FiltrosRevision) {
   return useQuery({
-    queryKey: ["crm_visitas_revision", origen, limit],
+    queryKey: claveRevision(f),
+    queryFn: () => pedirRevision(argsRevision(f)),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * «Guardar y siguiente»: se pide DESPUÉS de guardar. Devuelve la página que contiene
+ * la primera visita posterior a (fecha, id) con los mismos filtros, y su id en siguiente_id.
+ */
+export function pedirSiguienteRevision(f: FiltrosRevision, tras: { fecha: string; id: string }) {
+  return pedirRevision({ ...argsRevision(f), _tras_fecha: tras.fecha, _tras_id: tras.id });
+}
+
+/** Comerciales con visitas del origen elegido, para el desplegable. */
+export function useComercialesRevision(origen: FiltrosRevision["origen"]) {
+  return useQuery({
+    queryKey: ["crm_visitas_revision_comerciales", origen],
     queryFn: async () => {
-      let query = supabase.from("visitas").select("*");
-      if (origen !== "todas") query = query.eq("origen", origen);
-      const { data, error } = await query.order("fecha", { ascending: false }).limit(limit);
+      const { data, error } = await supabase.rpc("visitas_revision_comerciales", { _origen: origen });
       if (error) throw error;
-      return (data ?? []) as unknown as Visita[];
+      return ((data ?? []) as string[]).filter(Boolean);
     },
+    staleTime: 5 * 60 * 1000,
   });
 }
 
