@@ -1,88 +1,51 @@
-# Cierre del módulo de visitas (versión estable para Rafael)
+# Revisión de visitas: lista completa con paginación en servidor
 
-## 1. Diagnóstico propio (leído en el repo y en la base)
+## Diagnóstico propio (comprobado hoy)
 
-**Permisos hoy, con llamada directa (comercial):**
-- `visitas` UPDATE: permitido sobre las suyas (`user_id = auth.uid()`). El trigger `visitas_guard_validacion` solo frena cambios de validación y, si ya hay algo validado, de fecha/cliente/tipo/resultado. En una visita **pendiente** puede cambiar cliente, fecha (dentro del límite), resultado, observaciones, coordenadas…
-- `visitas` DELETE: permitido sobre las suyas si nada está validado.
-- `visitas` INSERT: permitido con cualquier `origen`; `visitas_guard_alta` sale en cuanto `origen <> 'app'`, así que con `origen='gespromo'` se salta límite de fecha y bloqueo.
-- `visita_bloques` INSERT/UPDATE/DELETE: permitido en sus visitas (`puede_editar_bloque` incluye al dueño). Puede añadir, borrar o reescribir bloques sin pasar por `completar_bloque`.
-- `editar_bloque_revision`: usa `puede_editar_bloque`, que incluye al dueño → un director/jefe puede corregir bloques de **su propia** visita. Además puede hacerlo también con UPDATE directo.
+- `useVisitasRevision` lee `visitas` con `.limit(1000)` ordenado por fecha; todos los filtros, los contadores y el desplegable Comercial se calculan en el navegador sobre esas 1.000.
+- Datos reales: **gespromo 26.234 visitas (12.091 pendientes)**, app 59 (42 pendientes). Con «gespromo» o «todas» se ve menos del 4 % y «N visitas · M pendientes» sale muy corto.
+- Además se cargan los bloques de las 1.000 visitas (tandas de 300) y **todos** los clientes solo para pintar nombres y buscar.
+- Hay visitas gespromo con fecha futura (hasta 03/12/2026); el orden por fecha desc las pone arriba. No es un fallo de esta entrega, solo lo señalo.
+- Recalcular cabecera (punto 5): el trigger `trg_visita_bloques_agregado` salta en alta, cambio de validación y borrado. **Hueco**: si se borra el último bloque, `count(*) = 0` devuelve NULL y la cabecera **no se toca**, queda con el estado del bloque borrado. Alta y cambio sí recalculan bien.
+- Índices: existen `visitas_validacion_idx (validacion, fecha desc)`, `fecha desc` (dos veces, duplicado) y `idx_visita_bloques_visita_id`. Con ~26.000 filas bastan; no propongo índices nuevos. El duplicado de fecha no lo toco (fuera de alcance).
 
-**Quién escribe directamente hoy (no puede romperse):**
-- `registrar_visita` (SECURITY INVOKER) inserta visita y bloques con la identidad del comercial.
-- La versión **publicada** antigua inserta visita y bloques directamente (por eso `visita_alta_directa_bloqueada` sigue en false).
-- Revisión (`useRevisionMutations`, `useBloqueMutations`) y `useReanalizarVisita` (borra e inserta bloques): solo revisores.
-- Importadores de bloques/Gespromo: admin.
-- Ninguna pantalla actualiza ni borra visitas como comercial.
+## Comparación con tu propuesta
 
-**Pantallas:**
-- Listado: motivos en columna derecha; vista previa usa `observaciones || transcripcion`, y la transcripción lleva la marca «[Respuesta a los datos que faltaban]» que añade NuevaVisita.
-- Ficha: la cabecera solo tiene motivos y fecha; las observaciones se ocultan si hay bloques.
-- `useClientes(false)` ya pagina de 1.000 en 1.000 (hasta 30 páginas) y el listado de Visitas ya lo carga; el buscador de registro usa `useClientes()` (activos).
-- Visitas con `cliente_externo`: el comercial las ve (son suyas), admin y director también. **El jefe de zona no**: su regla de lectura filtra por `cod_cliente` de su delegación y un código vacío nunca cumple. Tampoco salen en la ficha, ni en el análisis IA ni en KPIs por cliente.
+1. RPC de lista: de acuerdo, con un cambio: **SECURITY INVOKER** en vez de DEFINER. Así la RLS de `visitas` (y de `clientes`, `visita_bloques`) actúa tal cual y ve exactamente lo mismo que hoy sin reescribir permisos. Coste: con 26.000 filas la política es asumible (medido en la prueba; si superara ~1 s me detengo y lo explico).
+   - Motivo: igual que propones (algún bloque, o `motivo_key` si no hay bloques).
+   - q: nombre de cliente / `cliente_externo`, comercial y **nombre** del motivo (como hoy), sin distinguir acentos con `normalizar_texto`.
+   - Dudas: `campos_meta` de algún bloque con `confianza` baja o media, ignorando `_origen`, igual que `tieneDudas`.
+   - Respuestas nuevas: llamar a `revision_respuestas_nuevas` dentro. Matiz: hoy tiene tope de 1.000; dentro de la RPC uso una subconsulta equivalente sin tope en lugar de la función con límite, o la llamo con 1000 y lo documento. Propongo lo primero (misma regla, sin tope).
+   - Devuelve también el nombre del cliente y los motivos, para no cargar todos los clientes.
+2. Desplegable Comercial: de acuerdo; `visitas_revision_comerciales(_origen)`, INVOKER, `distinct comercial_nombre`.
+3. Front: de acuerdo. `pagina` en la URL, filtro nuevo → página 1, espera de 300 ms en el buscador, paginador «‹ Anterior · Página X de Y · Siguiente ›» que en móvil cabe en una línea. Bloques solo de las 50 de la página.
+4. «Guardar y siguiente»: tu propuesta de «primera de la siguiente página» falla en Pendientes, porque al guardar la visita desaparece y todo se corre una posición (se saltaría una). Propongo decidir la siguiente **por posición en el orden** (fecha desc, id), no por página: la RPC acepta un cursor opcional `_tras (fecha, id)` y devuelve la siguiente visita que cumple los filtros y en qué página cae. Funciona igual en Pendientes y en Todas, y la lista salta a esa página.
+5. Cabecera: incluir el arreglo del borrado del último bloque.
+6. Índices: ninguno nuevo, justificado arriba.
 
-## 2. Comparación con la propuesta de Claude
+## Plan final
 
-| Punto | Claude | Mi postura |
-|---|---|---|
-| Motivos en línea con contador, resultado/llamada, «Incompleta», estado | De acuerdo | Igual. «Incompleta» = algún bloque con `completo = false`. Estado: el de la visita (`validacion`). |
-| Quitar marca interna | En la vista previa | También en «Ver texto original» de la ficha. Solo al mostrar; no se toca el dato ni la IA. |
-| Ficha: cabecera y observaciones con bloques | De acuerdo | Igual, en dos líneas en móvil. |
-| Completar datos desde listado y ficha | Bloques no validados | `completar_bloque` hoy admite Pendiente **y** No correcto (solo bloquea Correcto). Propongo lo mismo que Avisos: Pendiente y No correcto, solo visitas propias. |
-| Buscador de inactivos | `clientes_visibles(false)` al pulsar | Reutilizar `useClientes(false)` con carga activada solo al pulsar: comparte caché con el listado y ya pagina bien. Añadir opción `enabled` al hook. |
-| Cliente fuera de ISI | Enviar `cliente_externo` | De acuerdo. Además señalo el hueco del jefe de zona (ver punto abierto). |
-| Comercial no modifica ni borra visita | Cerrar UPDATE/DELETE | De acuerdo, y **falta cerrar `visita_bloques`**: si no, puede borrar o reescribir bloques directamente. |
-| Solo origen 'app' para no admin | Completar trigger 0042 | De acuerdo; las cargas sin identidad (servicio) siguen pasando. |
-| Revisor no corrige lo suyo | En `editar_bloque_revision` | También en la regla de UPDATE de bloques, si no lo hace por la vía directa. |
-| Riesgo de publicación | No mencionado | Cerrar INSERT de bloques al comercial rompería la versión publicada antigua. Lo ato al ajuste `visita_alta_directa_bloqueada`: mientras esté en false, el comercial puede insertar bloques en sus visitas pendientes; con true, solo dentro de `registrar_visita`. |
+**Una migración (0046):**
+- `visitas_revision_lista(_origen, _estado, _q, _motivo, _comercial, _dudas, _respuestas, _desde, _hasta, _pagina, _por_pagina default 50, _tras_fecha, _tras_id)` → `jsonb { filas, total, pendientes, pagina }`. INVOKER, `search_path = public`, `_por_pagina` limitado a 1–100. Sale vacía si el usuario no puede revisar (`puede_revisar_visitas`).
+- `visitas_revision_comerciales(_origen)` → lista de nombres.
+- `recalcular_validacion_visita()`: CREATE OR REPLACE (misma firma, trigger intacto); si ya no quedan bloques, la cabecera vuelve a `pendiente` solo si estaba derivada de bloques. Nota: esto cambia una regla de permisos/estado existente; si prefieres no tocarla en esta entrega, la dejo anotada en el roadmap.
+- `REVOKE ... FROM PUBLIC, anon` y `GRANT EXECUTE ... TO authenticated` en las dos nuevas.
 
-## 3. Plan final
+**Pantalla (sin tocar el diálogo de revisión):**
+- `useCrm.ts`: `useVisitasRevision` pasa a llamar a la RPC con filtros y página; nuevo `useComercialesRevision`.
+- `RevisionVisitas.tsx`: quita el filtrado local, `useClientes` y el cálculo de comerciales; añade página en la URL, espera en el buscador, paginador y nueva lógica de «Guardar y siguiente».
 
-### A. Listado de Visitas (`Visitas.tsx`), móvil primero
-- Título y, debajo, una línea: fecha · hora · comercial · ruta.
-- Debajo, insignias en línea con salto: motivos agrupados («Promoción / Oferta ×2»); si no es efectiva, su resultado en vez de «Visita»; «Llamada» si el tipo es llamada; «Incompleta»; estado «Pendiente / Correcto / No correcto».
-- Vista previa sin la marca interna.
-- En visitas propias con bloques Pendiente o No correcto: botón «Completar datos» (abre `CompletarBloqueDialog` modo comercial; si hay varios bloques, elige cuál). El botón no navega a la ficha.
+**No se toca:** diálogo de revisión, registro de visitas, reglas de 0045.
 
-### B. Ficha, pestaña Visitas (`ClienteDetalle.tsx`)
-- Cabecera: motivos + fecha, y debajo comercial · tipo/resultado · estado.
-- Observaciones visibles también con bloques.
-- «Completar datos» en cada bloque propio Pendiente o No correcto.
-- Marca interna fuera del «Ver texto original».
+## Pruebas (identidades simuladas, transacción que se deshace)
 
-### C. Buscador al registrar (`NuevaVisita.tsx`, solo el buscador)
-- Sin resultados: botón «Buscar también en inactivos» → activa la carga de todos y busca de nuevo; marca «Inactivo» en esos resultados.
-- Opción «Cliente que no está en ISI»: campo de nombre, se envía como `cliente_externo` sin código. Sin coordenadas de cliente ni cierre de agenda (ya lo hace `registrar_visita`). El borrador guarda también ese nombre.
+- Origen «gespromo», estado todas: `total` = `count(*)` de gespromo (26.234) y aparecen visitas anteriores a las 1.000 más recientes (última página con fechas de 2025).
+- Pendientes gespromo = 12.091; filtros de motivo, comercial, fechas, dudas, q (con y sin acentos) coinciden con la consulta directa equivalente.
+- Admin, director, jefe de zona (solo su delegación) y comercial: mismo total que `select count(*)` con su identidad sobre la tabla.
+- Cursor: en Pendientes, guardar la última de la página 1 devuelve la que antes era la 51.
+- Borrar el último bloque de una visita CORRECTO → cabecera vuelve a pendiente; alta y cambio siguen recalculando.
+- `anon` no puede ejecutar las funciones.
+- Tiempo de respuesta de la lista medido con origen «todas».
 
-### D. Migración única 0044
-- `visitas` UPDATE: quitar al dueño; quedan admin, director y jefe de zona en su ámbito (como hoy).
-- `visitas` DELETE: solo admin.
-- `visitas_guard_alta`: usuario no admin con `origen <> 'app'` → «Solo se pueden registrar visitas desde la app.»
-- `visita_bloques` UPDATE/DELETE: admin, o revisor con alcance sobre la visita **y que no sea suya**. El comercial solo cambia datos con `completar_bloque`.
-- `visita_bloques` INSERT: admin; revisor sobre visitas ajenas (reanalizar); dueño solo dentro de `registrar_visita` (marca `crm.registrar_visita = '1'`) o mientras `visita_alta_directa_bloqueada` sea false, y solo si `COALESCE(validacion, 'pendiente') = 'pendiente'`.
-- `registrar_visita`: hoy (0042, línea 150) apaga la marca justo después de insertar la visita y **antes** de los bloques (línea 163), así que con la regla nueva y el ajuste en true fallaría. `CREATE OR REPLACE` con la misma firma, copiando la definición vigente y cambiando solo eso: la marca se apaga después de insertar los bloques y también antes del `RETURN` anticipado de la línea 159 (el de la línea 87 ocurre antes de encenderla). `REVOKE` y `GRANT EXECUTE` explícitos como en 0042. Al terminar, diff contra 0042 con las líneas que cambian.
-- `editar_bloque_revision`: «No puedes corregir bloques de tus propias visitas» salvo admin. Misma firma; `CREATE OR REPLACE` y `GRANT EXECUTE` explícito a authenticated.
-- Todas las reglas con `(SELECT public.is_approved(auth.uid())) AND (…)`, permisivas.
-- Antes de escribirla compruebo que los triggers que actualizan la visita desde los bloques (`recalcular_validacion_visita`) y `completar_bloque` siguen funcionando sin el UPDATE del dueño.
-
-### E. Cliente fuera de ISI y jefe de zona (aplazado)
-No se cambia ahora: esas visitas las ven el comercial autor, el director y el admin. Se anota como pendiente en `roadmap.md`.
-
-### F. Pruebas (identidades simuladas, transacción deshecha)
-- Comercial: borrar su visita, cambiar cliente, insertar `origen='gespromo'`, borrar/reescribir un bloque directamente → rechazado. `completar_bloque` en bloque suyo pendiente → permitido. `registrar_visita` con dos bloques → sigue funcionando. Con el ajuste en false, alta directa con bloque → entra.
-- Con `visita_alta_directa_bloqueada = true`: comercial `registrar_visita` con dos bloques → visita y dos bloques guardados; comercial inserta un bloque directamente en su visita pendiente → rechazado.
-- Con el ajuste en false: `registrar_visita` con `cliente_externo` y un bloque → se guarda.
-- Admin: borrar visita y alta `gespromo` → permitido.
-- Director: corregir bloque de visita suya (RPC y directo) → rechazado; de otro comercial → permitido. Reanalizar visita ajena → permitido.
-- Visita con `cliente_externo` → se guarda y sale en el listado del comercial y del director.
-- Tests de las utilidades nuevas (agrupar motivos, quitar marca).
-
-### Al terminar
-Ficheros cambiados, confirmación de una sola migración nueva (0044), diff de `registrar_visita` frente a 0042 y lista de lo no probado en pantalla.
-
-### No se toca
-Extracción por voz y prompt, análisis IA, conversación, registro salvo el buscador, importador Gespromo.
-
-### Qué no podré probar en pantalla
-Sin cuentas reales: el aspecto en el móvil con sesión, el diálogo desde listado y ficha, y el buscador de inactivos con datos reales.
+## Al terminar
+Ficheros cambiados, confirmación de una sola migración nueva y lo no probado en pantalla.
