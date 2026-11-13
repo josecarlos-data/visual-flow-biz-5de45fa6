@@ -3849,6 +3849,7 @@ export type Database = {
           visita_id: string
         }[]
       }
+      revision_respuestas_nuevas_ids: { Args: never; Returns: string[] }
       ruta_clientes: {
         Args: { _ruta: string; _solo_activos?: boolean }
         Returns: {
@@ -3909,6 +3910,10 @@ export type Database = {
         }[]
       }
       verificar_sesion: { Args: { _sesion_id: string }; Returns: Json }
+      visitas_revision_comerciales: {
+        Args: { _origen?: string }
+        Returns: string[]
+      }
       visitas_revision_datos: {
         Args: never
         Returns: {
@@ -3919,6 +3924,24 @@ export type Database = {
           problema: string
           titulo: string
         }[]
+      }
+      visitas_revision_lista: {
+        Args: {
+          _comercial?: string
+          _desde?: string
+          _dudas?: boolean
+          _estado?: string
+          _hasta?: string
+          _motivo?: string
+          _origen?: string
+          _pagina?: number
+          _por_pagina?: number
+          _q?: string
+          _respuestas?: boolean
+          _tras_fecha?: string
+          _tras_id?: string
+        }
+        Returns: Json
       }
     }
     Enums: {
