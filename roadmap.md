@@ -112,3 +112,5 @@
 - [x] Buscador: inactivos bajo demanda y «Cliente que no está en ISI»
 - [x] Permisos (0045; la 0044 quedó vacía por error): comercial no modifica/borra; solo admin borra; no admin solo origen app; revisor no corrige lo suyo
 - [ ] Pendiente (aplazado por decisión): visitas con cliente_externo visibles para el jefe de zona de la delegación del autor
+
+- [ ] Revisión de visitas paginada: 0046 aplicada y probada; pendiente arreglo de lentitud (motivo/dudas/búsqueda) y pantalla — espera aprobación de 0047.
