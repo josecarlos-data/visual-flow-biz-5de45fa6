@@ -330,6 +330,13 @@
       "when": 1794575799190,
       "tag": "0046_revision_visitas_paginada",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1794576696467,
+      "tag": "0047_revision_visitas_filtros_rapidos",
+      "breakpoints": true
     }
   ]
 }

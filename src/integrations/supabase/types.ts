@@ -3850,6 +3850,10 @@ export type Database = {
         }[]
       }
       revision_respuestas_nuevas_ids: { Args: never; Returns: string[] }
+      revision_visitas_filtro_bloques: {
+        Args: { _dudas?: boolean; _motivo?: string }
+        Returns: string[]
+      }
       ruta_clientes: {
         Args: { _ruta: string; _solo_activos?: boolean }
         Returns: {
