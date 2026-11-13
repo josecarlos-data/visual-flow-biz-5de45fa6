@@ -337,6 +337,13 @@
       "when": 1794576696467,
       "tag": "0047_revision_visitas_filtros_rapidos",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1794577317658,
+      "tag": "0048_revision_visitas_busqueda_rapida",
+      "breakpoints": true
     }
   ]
 }
