@@ -19,16 +19,16 @@
    - Devuelve también el nombre del cliente y los motivos, para no cargar todos los clientes.
 2. Desplegable Comercial: de acuerdo; `visitas_revision_comerciales(_origen)`, INVOKER, `distinct comercial_nombre`.
 3. Front: de acuerdo. `pagina` en la URL, filtro nuevo → página 1, espera de 300 ms en el buscador, paginador «‹ Anterior · Página X de Y · Siguiente ›» que en móvil cabe en una línea. Bloques solo de las 50 de la página.
-4. «Guardar y siguiente»: tu propuesta de «primera de la siguiente página» falla en Pendientes, porque al guardar la visita desaparece y todo se corre una posición (se saltaría una). Propongo decidir la siguiente **por posición en el orden** (fecha desc, id), no por página: la RPC acepta un cursor opcional `_tras (fecha, id)` y devuelve la siguiente visita que cumple los filtros y en qué página cae. Funciona igual en Pendientes y en Todas, y la lista salta a esa página.
+4. «Guardar y siguiente»: tu propuesta de «primera de la siguiente página» falla en Pendientes, porque al guardar la visita desaparece y todo se corre una posición (se saltaría una). Propongo decidir la siguiente **por posición en el orden** (fecha desc, id desc), pidiéndola **después** de guardar, no por página: la RPC acepta un cursor opcional `_tras (fecha, id)` y devuelve la siguiente visita que cumple los filtros y en qué página cae. Funciona igual en Pendientes y en Todas, y la lista salta a esa página.
 5. Cabecera: incluir el arreglo del borrado del último bloque.
 6. Índices: ninguno nuevo, justificado arriba.
 
 ## Plan final
 
 **Una migración (0046):**
-- `visitas_revision_lista(_origen, _estado, _q, _motivo, _comercial, _dudas, _respuestas, _desde, _hasta, _pagina, _por_pagina default 50, _tras_fecha, _tras_id)` → `jsonb { filas, total, pendientes, pagina }`. INVOKER, `search_path = public`, `_por_pagina` limitado a 1–100. Sale vacía si el usuario no puede revisar (`puede_revisar_visitas`).
+- `visitas_revision_lista(_origen, _estado, _q, _motivo, _comercial, _dudas, _respuestas, _desde, _hasta, _pagina, _por_pagina default 50, _tras_fecha, _tras_id)` → `jsonb { filas, total, pendientes, pagina }`. Cada fila lleva la visita completa (todas las columnas del tipo Visita: observaciones, transcripcion, campos, etc.) más nombre del cliente y motivos; el diálogo no cambia ni hace consultas nuevas. Orden único de lista y cursor: `fecha desc, id desc`. INVOKER, `search_path = public`, `_por_pagina` limitado a 1–100. Sale vacía si el usuario no puede revisar (`puede_revisar_visitas`).
 - `visitas_revision_comerciales(_origen)` → lista de nombres.
-- `recalcular_validacion_visita()`: CREATE OR REPLACE (misma firma, trigger intacto); si ya no quedan bloques, la cabecera vuelve a `pendiente` solo si estaba derivada de bloques. Nota: esto cambia una regla de permisos/estado existente; si prefieres no tocarla en esta entrega, la dejo anotada en el roadmap.
+- `recalcular_validacion_visita()`: CREATE OR REPLACE (misma firma, trigger intacto); si ya no quedan bloques, la cabecera vuelve a `pendiente` **solo si `visitas.origen = 'app'`**. En Gespromo no se toca (conserva la validación original).
 - `REVOKE ... FROM PUBLIC, anon` y `GRANT EXECUTE ... TO authenticated` en las dos nuevas.
 
 **Pantalla (sin tocar el diálogo de revisión):**
@@ -44,8 +44,11 @@
 - Admin, director, jefe de zona (solo su delegación) y comercial: mismo total que `select count(*)` con su identidad sobre la tabla.
 - Cursor: en Pendientes, guardar la última de la página 1 devuelve la que antes era la 51.
 - Borrar el último bloque de una visita CORRECTO → cabecera vuelve a pendiente; alta y cambio siguen recalculando.
+- Borrar el último bloque de una visita Gespromo deja la cabecera igual.
+- Respuestas nuevas: con director y jefe de zona, el filtro devuelve exactamente los mismos ids que `revision_respuestas_nuevas`; si no coinciden, me detengo y lo explico.
+- `puede_revisar_visitas` deja entrar a los mismos roles que hoy ven la pantalla de Revisión (contrastado con la ruta y el menú); si alguno la pierde, me detengo.
 - `anon` no puede ejecutar las funciones.
 - Tiempo de respuesta de la lista medido con origen «todas».
 
 ## Al terminar
-Ficheros cambiados, confirmación de una sola migración nueva y lo no probado en pantalla.
+Ficheros cambiados, confirmación de una sola migración (0046), tiempos medidos con origen «todas» y lo no probado en pantalla.
