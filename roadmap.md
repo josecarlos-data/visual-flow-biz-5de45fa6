@@ -113,4 +113,6 @@
 - [x] Permisos (0045; la 0044 quedó vacía por error): comercial no modifica/borra; solo admin borra; no admin solo origen app; revisor no corrige lo suyo
 - [ ] Pendiente (aplazado por decisión): visitas con cliente_externo visibles para el jefe de zona de la delegación del autor
 
-- [ ] Revisión de visitas paginada: 0046 aplicada y probada; pendiente arreglo de lentitud (motivo/dudas/búsqueda) y pantalla — 0047 aprobada (motivo y dudas independientes; pruebas de combinaciones con admin, director y jefe).
+- [x] Revisión de visitas paginada: migraciones 0046, 0047 y 0048 aplicadas (no habrá más migraciones de rendimiento en esta entrega); pantalla paginada terminada (lista, contadores y filtros en servidor, paginador, «Guardar y siguiente» con cursor tras guardar). Solo comprobado que compila; sin probar en pantalla.
+- [ ] Revisión: búsqueda lenta por nombre de comercial (≈7 s medido con «jose carlos», admin/director, con la 0047; sin medición limpia con la 0048). Otros tiempos parciales por encima de 2 s: motivo como jefe de zona 2,5 s (0047), dudas como director 2,5 s (0048).
+- [ ] Revisión: comparación visita a visita 0046 frente a 0048 (motivo, dudas, búsqueda por cliente/externo/comercial/motivo con y sin acentos, motivo+dudas, motivo+dudas+búsqueda; admin, director y jefe de zona) sin completar. Solo hay coincidencias parciales.
