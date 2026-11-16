@@ -1,82 +1,21 @@
-# Panel de KPI por motivo de visita
+# Build 1 (cierre): 0050 de rendimiento y pantalla /kpi
 
-## 1. Datos pedidos (consulta agregada, solo lectura)
+## 1. Migración 0050 (única de rendimiento)
+- Cambiar solo la función base de cálculo de KPI usada por kpi_resumen y kpi_detalle:
+  - resolver nombre de vendedor y delegación una sola vez por código de Gespromo (tabla temporal/CTE agrupada), no por bloque;
+  - quitar la delegación por fila y filtrar por zona al final.
+- kpi_resumen y kpi_detalle siguen SECURITY DEFINER con search_path fijo, misma firma y misma respuesta.
+- Medir el resumen anual: si queda por debajo de 5 s, se acepta; si no, detenerse y explicarlo sin proponer 0051.
 
-Bloques por mes, origen, motivo y validación (entre paréntesis: cliente+día distintos).
+## 2. Pruebas acordadas (transacción revertida, identidades simuladas)
+- Un total anual por rol: admin, director, jefe de zona, comercial.
+- Bautista (código 23) obtiene total mayor que cero en octubre.
+- Nada más.
 
-**Octubre 2026 — app (7 bloques):** competencia 1 NO CORRECTO + 1 pendiente; gestion_cobro 1 CORRECTO; gsmart 1 NO CORRECTO; revision_seguimiento 1 NO CORRECTO; seguimiento 2 NO CORRECTO + 1 pendiente.
+## 3. Pantalla /kpi
+- Página con selector de año y mes, tarjetas por línea KPI (objetivo, conseguido, bonus) y detalle.
+- El resumen se pide una vez por año (clave de caché por año, staleTime de varios minutos); cambiar de mes filtra en cliente sin nueva consulta.
+- Ruta en App.tsx con los roles de la sección; el menú ya existe.
 
-**Octubre 2026 — Gespromo (CORRECTO / pendiente / NO CORRECTO):**
-- promocion 591 (546) / 39 / 1
-- revision_seguimiento 401 (388) / 4 / 1
-- competencia 214 (165) / 26 / 3
-- informacion_potencial 64 (62) / 59 / 2
-- gsmart 55 / 2 / 0
-- viaje_incentivo 28 / 7 / 0
-- seguimiento 26 / 221 / 1; incidencia 14 / 9 / 0
-- inactivos: alta_reapertura 7/8, gestion_cobro 3/3, visita_partner 3/0; sin motivo 4 pendientes
-
-**Noviembre 2026 — app:** solo 2 CORRECTO (revision_seguimiento 1, seguimiento 1); pendientes: revision_seguimiento 15 (11), competencia 8 (6), promocion 8 (5), informacion_potencial 6, incidencia 2, gsmart 1, seguimiento 4.
-
-**Noviembre 2026 — Gespromo CORRECTO:** promocion 94 (91), revision_seguimiento 74 (71), competencia 35 (26), informacion_potencial 11 (+15 pendientes), gsmart 7, viaje_incentivo 4.
-
-**Quién validó los CORRECTO de octubre:** todos, app y Gespromo, figuran como José Carlos (el único CORRECTO de app es gestion_cobro, motivo inactivo). Los CORRECTO de noviembre no tienen validador (veredicto importado con revisado_por vacío).
-
-**Claves reales:** competencia, promocion, revision_seguimiento, gsmart, viaje_incentivo, informacion_potencial. Sin línea: seguimiento, incidencia.
-
-### Decisiones que te corresponden
-A. **¿Cuenta Gespromo?**
-- A1. Sí, app + Gespromo (hoy es casi todo el volumen; sin él los KPI de octubre/noviembre salen a cero).
-- A2. Solo app (KPI reflejaría la adopción de la app; cero en octubre).
-- A3. Ajuste editable «origenes que cuentan» (por defecto ambos), para cambiarlo sin migración.
-
-B. **Validaciones de octubre a nombre de José Carlos:**
-- B1. Contar como válidas (parecen el veredicto importado de Gespromo, no pruebas).
-- B2. Empezar a contar en noviembre 2026 (cambiar el «contar desde» inicial).
-- B3. Excluir solo los bloques de app de octubre (los 7 son pruebas: ninguno de una línea KPI es CORRECTO, así que en la práctica B3 = B1).
-
-Nota: los bloques app de octubre no afectan a ninguna línea (no hay CORRECTO en motivos con línea). La decisión real es A.
-
-## 2. Mi diagnóstico y comparación con la propuesta de Claude
-
-| Punto | Claude | Mío | Final |
-|---|---|---|---|
-| Tablas | kpi_lineas + kpi_linea_motivos | Igual; regla_conteo con CHECK en 3 valores; umbral por defecto = 2×objetivo en el trigger si viene vacío | Igual + defaults |
-| Fecha de referencia | visitas.fecha | Igual; validación case-insensitive como en 0046 (`upper(validacion)='CORRECTO'`) | Igual |
-| Conteo «cliente y día» | por motivo | clave = (comercial, motivo, cod_cliente o cliente_externo normalizado, día/mes/bloque); motivo por separado y suma | Igual |
-| Comercial | user_id | Gespromo usa `vendedor`/`comercial_nombre`; el comercial se identifica por user_id si existe, si no por nombre de vendedor enlazado al perfil | Clave «comercial» = user_id o vendedor |
-| RPC | una agregada | `kpi_resumen(desde, hasta)` SECURITY INVOKER: la RLS de visitas ya limita (comercial: lo suyo; jefe: su delegación; director/admin: todo). Así el jefe de zona ve su zona sin lógica nueva | INVOKER, jefe = su zona vía RLS existente |
-| Pendientes | contados | sí, por línea; NO CORRECTO ni suman ni salen como pendientes | Igual |
-| Detalle | lista de visitas | `kpi_detalle(linea, comercial, mes)` INVOKER, paginada (máx. 200), con estado y enlace | Igual |
-| «Contar desde» | ajuste | `app_settings.kpi_contar_desde = '2026-10'`, editable director/admin desde Ajustes (lo audita el trigger existente) | Igual |
-| Edición | pestaña en /admin/objetivos | Igual, sin tocar lo actual; auditoría con auditar_cambio como plantillas | Igual |
-| Acceso | fila en dashboards | dashboards key `kpi_visitas`, ruta `/kpi`; asignable en user_dashboard_access; admin siempre | Igual |
-| Datos iniciales | 4 líneas | Insertadas en la misma migración (backfill de tabla nueva) | Igual |
-
-Riesgo: la RLS de visitas sobre ~26.000 Gespromo puede hacer lenta la vista anual del jefe. Índice nuevo `visita_bloques(motivo_key, visita_id)` solo si la medida supera 2 s; si no, no se crea.
-
-## 3. Decisiones tomadas
-- A3: ajuste `kpi_origenes` = app,gespromo. B1: octubre cuenta, `kpi_contar_desde` = 2026-10.
-
-## 4. Enlace Gespromo -> perfil
-Las visitas Gespromo de oct/nov no tienen user_id; el nombre es «NN - Nombre». El NN es el código de vendedor: NN -> `clientes.cod_vendedor` -> nombre de vendedor -> `profiles.employee_code` (comparación normalizada, sin acentos ni mayúsculas). Si no enlaza, la fila sale como «sin usuario» con su nombre Gespromo (nunca se pierde).
-Estado actual: enlazan 23 J. Antonio Bautista y 31 Rafael Cardenas. Sin usuario: 21 Mari Angeles Galvez, 22 Alfonso Cozar, 32 Manuel Salas, 48 Manuel Villarejo.
-
-## 5. Build 1 (ahora)
-**Migración única 0049:**
-- `kpi_lineas`, `kpi_linea_motivos`: GRANT, RLS permisiva (lectura aprobados, escritura director/admin), auditoría.
-- Ajustes `kpi_contar_desde`, `kpi_origenes`.
-- `kpi_resumen(anio)` SECURITY DEFINER, `search_path` fijo, REVOKE PUBLIC/anon, GRANT EXECUTE authenticated. Reglas dentro: comercial solo filas suyas (user_id o código enlazado a su perfil); jefe de zona comerciales de su delegación; director/admin todo; no aprobado vacío. Solo agregados por comercial, mes y línea: conseguidos, pendientes, objetivo, umbral, bonus.
-- `kpi_detalle` con las mismas reglas, solo datos mínimos (id visita, fecha, cliente, estado); la pantalla llega en Build 2.
-- Fila `kpi_visitas` en dashboards y las 4 líneas iniciales.
-
-**Pantalla /kpi** (móvil primero) e ítem de menú: comercial con mes actual/anterior y tarjeta por línea; director/admin/jefe con tabla anual mes x comercial, totales y marca «sin usuario».
-
-**Pruebas:** un total por rol (admin, director, jefe, comercial) simulado en transacción revertida; comprobar que el comercial enlazado (Rafael o Bautista) con Gespromo en octubre tiene total mayor que cero.
-
-**Paradas:** si la migración necesita otro enfoque o la tabla anual pasa de 2 s, me detengo y lo explico. No habrá migraciones de rendimiento encadenadas.
-
-**Créditos estimados Build 1:** 8-12. Si pasara de 10, recortaría primero la marca visual de bonus/importe en la tabla anual (los datos ya vienen en la RPC).
-
-## 6. Build 2 (después)
-Detalle por línea con enlaces y pestaña «Líneas KPI» en /admin/objetivos. Al final de Build 1 anotaré esto en roadmap.md.
+## Entrega
+- Ficheros cambiados, confirmación de que las únicas migraciones nuevas son 0049 y 0050, totales por rol, tiempo medido y lo no probado en pantalla.
