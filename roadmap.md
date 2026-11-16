@@ -116,3 +116,7 @@
 - [x] Revisión de visitas paginada: migraciones 0046, 0047 y 0048 aplicadas (no habrá más migraciones de rendimiento en esta entrega); pantalla paginada terminada (lista, contadores y filtros en servidor, paginador, «Guardar y siguiente» con cursor tras guardar). Solo comprobado que compila; sin probar en pantalla.
 - [ ] Revisión: búsqueda lenta por nombre de comercial (≈7 s medido con «jose carlos», admin/director, con la 0047; sin medición limpia con la 0048). Otros tiempos parciales por encima de 2 s: motivo como jefe de zona 2,5 s (0047), dudas como director 2,5 s (0048).
 - [ ] Revisión: comparación visita a visita 0046 frente a 0048 (motivo, dudas, búsqueda por cliente/externo/comercial/motivo con y sin acentos, motivo+dudas, motivo+dudas+búsqueda; admin, director y jefe de zona) sin completar. Solo hay coincidencias parciales.
+
+## Panel KPI por motivo de visita
+- [ ] Build 1: migración 0049 (tablas, ajustes, kpi_resumen/kpi_detalle DEFINER, dashboard, 4 líneas) + pantalla /kpi + menú
+- [ ] Build 2: detalle por línea y pestaña «Líneas KPI» en /admin/objetivos
