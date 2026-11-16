@@ -55,21 +55,28 @@ Nota: los bloques app de octubre no afectan a ninguna línea (no hay CORRECTO en
 
 Riesgo: la RLS de visitas sobre ~26.000 Gespromo puede hacer lenta la vista anual del jefe. Índice nuevo `visita_bloques(motivo_key, visita_id)` solo si la medida supera 2 s; si no, no se crea.
 
-## 3. Plan final (Build)
+## 3. Decisiones tomadas
+- A3: ajuste `kpi_origenes` = app,gespromo. B1: octubre cuenta, `kpi_contar_desde` = 2026-10.
 
-**Migración única (0049):**
-- `kpi_lineas`, `kpi_linea_motivos` con GRANT (select a authenticated aprobados; escritura director/admin vía RLS), RLS permisiva, auditoría.
-- Ajuste `kpi_contar_desde` (y `kpi_origenes` si eliges A3).
-- RPCs `kpi_resumen` y `kpi_detalle`, SECURITY INVOKER, `search_path` fijo, REVOKE PUBLIC/anon, GRANT EXECUTE authenticated.
-- Fila en dashboards y las 4 líneas iniciales.
+## 4. Enlace Gespromo -> perfil
+Las visitas Gespromo de oct/nov no tienen user_id; el nombre es «NN - Nombre». El NN es el código de vendedor: NN -> `clientes.cod_vendedor` -> nombre de vendedor -> `profiles.employee_code` (comparación normalizada, sin acentos ni mayúsculas). Si no enlaza, la fila sale como «sin usuario» con su nombre Gespromo (nunca se pierde).
+Estado actual: enlazan 23 J. Antonio Bautista y 31 Rafael Cardenas. Sin usuario: 21 Mari Angeles Galvez, 22 Alfonso Cozar, 32 Manuel Salas, 48 Manuel Villarejo.
 
-**Pantallas:**
-- `/kpi` (móvil primero): comercial con mes actual/anterior, tarjeta por línea con barra, conseguidos, pendientes y bonus.
-- Director/admin/jefe: tabla anual mes × comercial con totales anuales y bonus.
-- Detalle por línea con enlaces a las visitas.
-- Pestaña «Líneas KPI» en /admin/objetivos.
-- Ítem en el menú.
+## 5. Build 1 (ahora)
+**Migración única 0049:**
+- `kpi_lineas`, `kpi_linea_motivos`: GRANT, RLS permisiva (lectura aprobados, escritura director/admin), auditoría.
+- Ajustes `kpi_contar_desde`, `kpi_origenes`.
+- `kpi_resumen(anio)` SECURITY DEFINER, `search_path` fijo, REVOKE PUBLIC/anon, GRANT EXECUTE authenticated. Reglas dentro: comercial solo filas suyas (user_id o código enlazado a su perfil); jefe de zona comerciales de su delegación; director/admin todo; no aprobado vacío. Solo agregados por comercial, mes y línea: conseguidos, pendientes, objetivo, umbral, bonus.
+- `kpi_detalle` con las mismas reglas, solo datos mínimos (id visita, fecha, cliente, estado); la pantalla llega en Build 2.
+- Fila `kpi_visitas` en dashboards y las 4 líneas iniciales.
 
-**Pruebas:** totales por rol (admin, director, comercial y jefe) con identidades simuladas en transacción revertida; test unitario de la regla de umbral por defecto. Sin cuentas reales y sin tocar registro ni revisión.
+**Pantalla /kpi** (móvil primero) e ítem de menú: comercial con mes actual/anterior y tarjeta por línea; director/admin/jefe con tabla anual mes x comercial, totales y marca «sin usuario».
 
-**Créditos estimados del Build:** 15–25.
+**Pruebas:** un total por rol (admin, director, jefe, comercial) simulado en transacción revertida; comprobar que el comercial enlazado (Rafael o Bautista) con Gespromo en octubre tiene total mayor que cero.
+
+**Paradas:** si la migración necesita otro enfoque o la tabla anual pasa de 2 s, me detengo y lo explico. No habrá migraciones de rendimiento encadenadas.
+
+**Créditos estimados Build 1:** 8-12. Si pasara de 10, recortaría primero la marca visual de bonus/importe en la tabla anual (los datos ya vienen en la RPC).
+
+## 6. Build 2 (después)
+Detalle por línea con enlaces y pestaña «Líneas KPI» en /admin/objetivos. Al final de Build 1 anotaré esto en roadmap.md.
