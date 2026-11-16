@@ -351,6 +351,13 @@
       "when": 1794817655385,
       "tag": "0049_kpi_visitas",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1794818793890,
+      "tag": "0050_kpi_base_rapida",
+      "breakpoints": true
     }
   ]
 }
