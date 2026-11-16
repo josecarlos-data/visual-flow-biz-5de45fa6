@@ -755,6 +755,75 @@ export type Database = {
         }
         Relationships: []
       }
+      kpi_linea_motivos: {
+        Row: {
+          linea_id: string
+          motivo_key: string
+        }
+        Insert: {
+          linea_id: string
+          motivo_key: string
+        }
+        Update: {
+          linea_id?: string
+          motivo_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kpi_linea_motivos_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "kpi_lineas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kpi_linea_motivos_motivo_key_fkey"
+            columns: ["motivo_key"]
+            isOneToOne: false
+            referencedRelation: "motivos_visita"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
+      kpi_lineas: {
+        Row: {
+          activo: boolean
+          created_at: string
+          id: string
+          importe_bonus: number | null
+          nombre: string
+          objetivo_mes: number
+          orden: number
+          regla_conteo: string
+          umbral_bonus: number | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          id?: string
+          importe_bonus?: number | null
+          nombre: string
+          objetivo_mes: number
+          orden?: number
+          regla_conteo?: string
+          umbral_bonus?: number | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          id?: string
+          importe_bonus?: number | null
+          nombre?: string
+          objetivo_mes?: number
+          orden?: number
+          regla_conteo?: string
+          umbral_bonus?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       motivo_campos: {
         Row: {
           ayuda: string | null
@@ -3324,6 +3393,64 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_approved: { Args: { _user_id: string }; Returns: boolean }
+      kpi_ambito: {
+        Args: { _uid: string }
+        Returns: {
+          delegacion: string
+          jefe: boolean
+          todo: boolean
+        }[]
+      }
+      kpi_base: {
+        Args: { _desde: string; _hasta: string }
+        Returns: {
+          bloque_id: string
+          cliente: string
+          correcto: boolean
+          delegacion: string
+          fecha: string
+          linea_id: string
+          mes: number
+          motivo_key: string
+          regla: string
+          user_id: string
+          vendedor: string
+          visita_id: string
+        }[]
+      }
+      kpi_detalle: {
+        Args: {
+          _anio: number
+          _linea_id: string
+          _mes: number
+          _vendedor: string
+        }
+        Returns: {
+          cod_cliente: string
+          correcto: boolean
+          fecha: string
+          motivo_key: string
+          visita_id: string
+        }[]
+      }
+      kpi_resumen: {
+        Args: { _anio: number }
+        Returns: {
+          bonus: boolean
+          conseguidos: number
+          importe_bonus: number
+          linea: string
+          linea_id: string
+          mes: number
+          objetivo: number
+          orden: number
+          pendientes: number
+          sin_usuario: boolean
+          umbral: number
+          user_id: string
+          vendedor: string
+        }[]
+      }
       marcar_envio_recomendado: {
         Args: { _envio_id: string }
         Returns: undefined
