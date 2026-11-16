@@ -37,6 +37,7 @@ const MisRevisiones = lazy(() => import("./pages/MisRevisiones"));
 const AdminSituaciones = lazy(() => import("./pages/AdminSituaciones"));
 const AdminObjetivos = lazy(() => import("./pages/AdminObjetivos"));
 const Objetivos = lazy(() => import("./pages/Objetivos"));
+const KpiVisitas = lazy(() => import("./pages/KpiVisitas"));
 const Documentos = lazy(() => import("./pages/Documentos"));
 const ActividadInterna = lazy(() => import("./pages/ActividadInterna"));
 const CodigoAlta = lazy(() => import("./pages/CodigoAlta"));
@@ -272,6 +273,7 @@ const App = () => (
                 <Route path="/admin/situaciones" element={<ProtectedRoute adminOnly allowedRoles={["director_comercial"]}><AdminSituaciones /></ProtectedRoute>} />
                 <Route path="/admin/objetivos" element={<ProtectedRoute adminOnly allowedRoles={["director_comercial"]}><AdminObjetivos /></ProtectedRoute>} />
                 <Route path="/objetivos" element={<ProtectedRoute dashboardKey="objetivos"><Objetivos /></ProtectedRoute>} />
+                <Route path="/kpi" element={<ProtectedRoute dashboardKey="kpi_visitas"><KpiVisitas /></ProtectedRoute>} />
                 <Route path="/documentos" element={<ProtectedRoute dashboardKey="documentos"><Documentos /></ProtectedRoute>} />
                 <Route path="/actividad-interna" element={<ProtectedRoute dashboardKey="actividad_interna"><ActividadInterna /></ProtectedRoute>} />
 
