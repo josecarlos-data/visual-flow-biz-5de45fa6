@@ -118,5 +118,6 @@
 - [ ] Revisión: comparación visita a visita 0046 frente a 0048 (motivo, dudas, búsqueda por cliente/externo/comercial/motivo con y sin acentos, motivo+dudas, motivo+dudas+búsqueda; admin, director y jefe de zona) sin completar. Solo hay coincidencias parciales.
 
 ## Panel KPI por motivo de visita
-- [ ] Build 1: migración 0049 (tablas, ajustes, kpi_resumen/kpi_detalle DEFINER, dashboard, 4 líneas) + pantalla /kpi + menú
+- [x] Build 1: migración 0049 aplicada (tablas, ajustes, kpi_resumen/kpi_detalle DEFINER, dashboard, 4 líneas)
+- [ ] Build 1 DETENIDO: kpi_resumen supera el tiempo (>40 s) por calcular la delegación de cada bloque; cálculo por comercial en consulta aparte ≈2,2 s. Requiere 0050 con aprobación. Pantalla /kpi sin hacer.
 - [ ] Build 2: detalle por línea y pestaña «Líneas KPI» en /admin/objetivos
