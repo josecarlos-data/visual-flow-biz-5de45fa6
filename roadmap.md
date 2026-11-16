@@ -119,5 +119,8 @@
 
 ## Panel KPI por motivo de visita
 - [x] Build 1: migración 0049 aplicada (tablas, ajustes, kpi_resumen/kpi_detalle DEFINER, dashboard, 4 líneas)
-- [ ] Build 1 DETENIDO: kpi_resumen supera el tiempo (>40 s) por calcular la delegación de cada bloque; cálculo por comercial en consulta aparte ≈2,2 s. Requiere 0050 con aprobación. Pantalla /kpi sin hacer.
+- [x] Build 1: 0050 (nombre/delegación una vez por comercial; también acelera kpi_detalle). Resumen anual ≈0,05–1,1 s
+- [x] Build 1: pantalla /kpi — comercial: mes actual/anterior en tarjetas; gestores: tabla anual mes × comercial con «sin usuario» y selector de año. Sin probar en pantalla
+- [ ] Jefe de zona MZ obtiene 0 en el resumen (su delegación no casa con la de los comerciales con datos); revisar
+- [ ] Dar acceso al panel KPI a los usuarios (hoy solo admin lo tiene)
 - [ ] Build 2: detalle por línea y pestaña «Líneas KPI» en /admin/objetivos
