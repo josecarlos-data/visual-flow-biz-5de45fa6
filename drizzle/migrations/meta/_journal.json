@@ -358,6 +358,13 @@
       "when": 1794818793890,
       "tag": "0050_kpi_base_rapida",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1795016443437,
+      "tag": "0051_kpi_en_objetivos",
+      "breakpoints": true
     }
   ]
 }

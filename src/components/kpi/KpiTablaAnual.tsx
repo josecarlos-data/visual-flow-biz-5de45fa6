@@ -1,107 +1,15 @@
 import { useMemo, useState } from "react";
-import { Gauge, Trophy } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
 import { useKpiLineas, useKpiResumen, type KpiFila } from "@/hooks/useKpiVisitas";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-const MESES_LARGOS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
-const eur = (n: number) => n.toLocaleString("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
-
-export default function KpiVisitas() {
-  const { role } = useAuth();
-  const gestor = role === "admin" || role === "director_comercial" || role === "jefe_de_zona";
-  return (
-    <div className="mx-auto max-w-6xl space-y-4 p-3 md:p-6">
-      <h1 className="flex items-center gap-2 text-xl font-semibold">
-        <Gauge className="h-5 w-5 text-primary" /> KPI visitas
-      </h1>
-      {gestor ? <VistaGestor /> : <VistaComercial />}
-    </div>
-  );
-}
-
-/* ---------- Comercial: mes actual y anterior ---------- */
-function VistaComercial() {
-  const hoy = new Date();
-  const actual = { anio: hoy.getFullYear(), mes: hoy.getMonth() + 1 };
-  const anterior = actual.mes === 1 ? { anio: actual.anio - 1, mes: 12 } : { anio: actual.anio, mes: actual.mes - 1 };
-  const [sel, setSel] = useState<"actual" | "anterior">("actual");
-  const p = sel === "actual" ? actual : anterior;
-
-  const lineas = useKpiLineas();
-  const resActual = useKpiResumen(actual.anio);
-  const resAnterior = useKpiResumen(anterior.anio, anterior.anio !== actual.anio);
-  const res = p.anio === actual.anio ? resActual : resAnterior;
-
-  const filas = (res.data ?? []).filter((f) => f.mes === p.mes);
-  const cargando = lineas.isLoading || res.isLoading;
-  const error = lineas.error || res.error;
-
-  return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-2">
-        {(["anterior", "actual"] as const).map((k) => {
-          const q = k === "actual" ? actual : anterior;
-          return (
-            <button
-              key={k}
-              onClick={() => setSel(k)}
-              className={`rounded-md border px-3 py-2 text-sm capitalize transition-colors ${sel === k ? "border-primary bg-primary text-primary-foreground" : "bg-card text-foreground"}`}
-            >
-              {MESES_LARGOS[q.mes - 1]} {q.anio}
-            </button>
-          );
-        })}
-      </div>
-      {cargando && <Skeleton className="h-48 w-full" />}
-      {error && <Card><CardContent className="p-4 text-sm text-destructive">No se pudieron cargar los KPI: {(error as Error).message}</CardContent></Card>}
-      {!cargando && !error && (lineas.data ?? []).map((l) => {
-        const f = filas.find((x) => x.linea_id === l.id);
-        const ok = f?.conseguidos ?? 0;
-        const pend = f?.pendientes ?? 0;
-        const umbral = l.umbral_bonus ?? l.objetivo_mes * 2;
-        const pct = l.objetivo_mes > 0 ? Math.min(100, (ok / l.objetivo_mes) * 100) : 0;
-        return (
-          <Card key={l.id}>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-start justify-between gap-2 text-base">
-                <span>{l.nombre}</span>
-                {ok >= umbral && <Badge className="shrink-0 gap-1"><Trophy className="h-3 w-3" /> Bonus</Badge>}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Progress value={pct} />
-              <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-                <Dato label="Conseguidos" valor={ok} fuerte />
-                <Dato label="Pendientes de validar" valor={pend} />
-                <Dato label="Objetivo" valor={l.objetivo_mes} />
-                <Dato label="Bonus desde" valor={umbral} extra={l.importe_bonus ? eur(Number(l.importe_bonus)) : undefined} />
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
-  );
-}
-
-function Dato({ label, valor, fuerte, extra }: { label: string; valor: number; fuerte?: boolean; extra?: string }) {
-  return (
-    <div className="rounded-md bg-muted/50 p-2">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={fuerte ? "text-lg font-semibold" : "text-lg"}>{valor}{extra && <span className="ml-1 text-xs text-muted-foreground">({extra})</span>}</div>
-    </div>
-  );
-}
 
 /* ---------- Gestor: tabla anual mes × comercial ---------- */
-function VistaGestor() {
+export function KpiTablaAnual() {
   const anioActual = new Date().getFullYear();
   const [anio, setAnio] = useState(anioActual);
   const [lineaSel, setLineaSel] = useState("todas");

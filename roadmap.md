@@ -123,4 +123,5 @@
 - [x] Build 1: pantalla /kpi — comercial: mes actual/anterior en tarjetas; gestores: tabla anual mes × comercial con «sin usuario» y selector de año. Sin probar en pantalla
 - [ ] Jefe de zona MZ obtiene 0 en el resumen (su delegación no casa con la de los comerciales con datos); revisar
 - [ ] Dar acceso al panel KPI a los usuarios (hoy solo admin lo tiene)
-- [ ] Build 2: detalle por línea y pestaña «Líneas KPI» en /admin/objetivos
+- [x] KPI dentro de Objetivos (0051): interruptor kpi_visible_para, kpi_visible(), /kpi → /objetivos, tarjetas/tabla en Objetivos, pestaña «Líneas KPI», ajustes kpi_* en Parámetros generales
+- [ ] Build 2: detalle por línea con trazabilidad (validación individual/heredada, semana ISO, lo que no cuenta)

@@ -2,13 +2,19 @@ import { useMemo, useState } from "react";
 import { Target } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAvanceV2 } from "@/hooks/useObjetivosV2";
+import { useKpiVisible } from "@/hooks/useKpiVisitas";
+import { KpiTarjetasMes } from "@/components/kpi/KpiTarjetasMes";
+import { KpiTablaAnual } from "@/components/kpi/KpiTablaAnual";
 import { ObjetivoV2Card } from "@/components/ObjetivoV2Card";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function Objetivos() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  // El bloque KPI solo se pinta si el servidor lo permite (kpi_visible_para).
+  const { data: kpiVisible } = useKpiVisible();
+  const gestorKpi = role === "admin" || role === "director_comercial";
   const [vendedorSel, setVendedorSel] = useState("todos");
   const { data, isLoading, error } = useAvanceV2();
 
@@ -22,7 +28,7 @@ export default function Objetivos() {
     .sort((x, y) => Number(x.estado === "cerrado") - Number(y.estado === "cerrado"));
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 p-3 md:p-6">
+    <div className={`mx-auto space-y-4 p-3 md:p-6 ${kpiVisible && gestorKpi ? "max-w-6xl" : "max-w-3xl"}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="flex items-center gap-2 text-xl font-semibold">
           <Target className="h-5 w-5 text-primary" /> Objetivos
@@ -38,6 +44,14 @@ export default function Objetivos() {
         )}
       </div>
 
+      {kpiVisible === true && (
+        <section className="space-y-2">
+          <h2 className="text-base font-semibold">{gestorKpi ? "KPI de visitas" : "KPI del mes"}</h2>
+          {gestorKpi ? <KpiTablaAnual /> : <KpiTarjetasMes />}
+        </section>
+      )}
+
+      {kpiVisible === true && <h2 className="pt-2 text-base font-semibold">Objetivos de venta</h2>}
       {isLoading && <Skeleton className="h-64 w-full" />}
       {error && (
         <Card><CardContent className="p-6 text-sm text-destructive">

@@ -14,6 +14,10 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/hooks/useAuth";
+import { useKpiVisible } from "@/hooks/useKpiVisitas";
+import { LineasKpiAdmin } from "@/components/kpi/LineasKpiAdmin";
 import { supabase } from "@/integrations/supabase/client";
 import { eur, pct } from "@/lib/format";
 import { metaDesde } from "@/lib/objetivosV2";
@@ -54,6 +58,24 @@ const PASOS = ["Tipo", "Periodo", "Atribución", "Meta de grupo", "Excepciones",
 const ESTADOS: Record<string, string> = { borrador: "Borrador", activo: "Activo", cerrado: "Cerrado", archivado: "Archivado" };
 
 export default function AdminObjetivos() {
+  const { role } = useAuth();
+  const { data: kpiVisible } = useKpiVisible();
+  // Admin siempre; director solo si kpi_visible_para es 'gestores' o 'todos' (kpi_visible lo decide en servidor).
+  const verLineasKpi = role === "admin" || kpiVisible === true;
+  if (!verLineasKpi) return <ObjetivosVenta />;
+  return (
+    <Tabs defaultValue="objetivos" className="p-4 md:p-6">
+      <TabsList>
+        <TabsTrigger value="objetivos">Objetivos</TabsTrigger>
+        <TabsTrigger value="kpi">Líneas KPI</TabsTrigger>
+      </TabsList>
+      <TabsContent value="objetivos" className="-mx-4 md:-mx-6"><ObjetivosVenta /></TabsContent>
+      <TabsContent value="kpi"><LineasKpiAdmin /></TabsContent>
+    </Tabs>
+  );
+}
+
+function ObjetivosVenta() {
   const { data: avance, isLoading } = useAvanceV2();
   const { data: sinCodigo } = useSinCodigo();
   const { duplicar, guardar } = useObjetivosV2Mutations();

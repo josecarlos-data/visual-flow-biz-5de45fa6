@@ -2231,6 +2231,54 @@ export type Database = {
           },
         ]
       }
+      visita_bloques_bak_20261118: {
+        Row: {
+          campos: Json | null
+          campos_meta: Json | null
+          completo: boolean | null
+          created_at: string | null
+          id: string | null
+          motivo_key: string | null
+          nota_revision: string | null
+          orden: number | null
+          revisado_en: string | null
+          revisado_por: string | null
+          updated_at: string | null
+          validacion: string | null
+          visita_id: string | null
+        }
+        Insert: {
+          campos?: Json | null
+          campos_meta?: Json | null
+          completo?: boolean | null
+          created_at?: string | null
+          id?: string | null
+          motivo_key?: string | null
+          nota_revision?: string | null
+          orden?: number | null
+          revisado_en?: string | null
+          revisado_por?: string | null
+          updated_at?: string | null
+          validacion?: string | null
+          visita_id?: string | null
+        }
+        Update: {
+          campos?: Json | null
+          campos_meta?: Json | null
+          completo?: boolean | null
+          created_at?: string | null
+          id?: string | null
+          motivo_key?: string | null
+          nota_revision?: string | null
+          orden?: number | null
+          revisado_en?: string | null
+          revisado_por?: string | null
+          updated_at?: string | null
+          validacion?: string | null
+          visita_id?: string | null
+        }
+        Relationships: []
+      }
       visita_lecturas: {
         Row: {
           leido_en: string
@@ -3451,6 +3499,7 @@ export type Database = {
           vendedor: string
         }[]
       }
+      kpi_visible: { Args: never; Returns: boolean }
       marcar_envio_recomendado: {
         Args: { _envio_id: string }
         Returns: undefined

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Save, SlidersHorizontal } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -12,6 +13,9 @@ export default function AppSettingsCard() {
   const [anios, setAnios] = useState("3");
   const [diasAtras, setDiasAtras] = useState("7");
   const [altaBloqueada, setAltaBloqueada] = useState(false);
+  const [kpiDesde, setKpiDesde] = useState("2026-10");
+  const [kpiOrigenes, setKpiOrigenes] = useState("app,gespromo");
+  const [kpiVisible, setKpiVisible] = useState("admin");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -20,11 +24,14 @@ export default function AppSettingsCard() {
       const { data } = await supabase
         .from("app_settings" as never)
         .select("key, value")
-        .in("key", ["anios_cliente_activo", "visita_dias_atras_max", "visita_alta_directa_bloqueada"]);
+        .in("key", ["anios_cliente_activo", "visita_dias_atras_max", "visita_alta_directa_bloqueada", "kpi_contar_desde", "kpi_origenes", "kpi_visible_para"]);
       for (const r of (data ?? []) as { key: string; value: string }[]) {
         if (r.key === "anios_cliente_activo") setAnios(r.value);
         if (r.key === "visita_dias_atras_max") setDiasAtras(r.value);
         if (r.key === "visita_alta_directa_bloqueada") setAltaBloqueada(r.value === "true");
+        if (r.key === "kpi_contar_desde") setKpiDesde(r.value);
+        if (r.key === "kpi_origenes") setKpiOrigenes(r.value);
+        if (r.key === "kpi_visible_para") setKpiVisible(r.value);
       }
       setLoading(false);
     })();
@@ -41,6 +48,15 @@ export default function AppSettingsCard() {
       toast({ title: "Valor no válido", description: "Los días atrás deben ser un número entero entre 0 y 365.", variant: "destructive" });
       return;
     }
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(kpiDesde)) {
+      toast({ title: "Valor no válido", description: "El mes inicial del KPI debe tener formato AAAA-MM.", variant: "destructive" });
+      return;
+    }
+    const origenes = kpiOrigenes.split(",").map((x) => x.trim()).filter(Boolean);
+    if (origenes.length === 0 || origenes.some((o) => o !== "app" && o !== "gespromo")) {
+      toast({ title: "Valor no válido", description: "Orígenes del KPI: app, gespromo o ambos separados por coma.", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     const { error } = await supabase
       .from("app_settings" as never)
@@ -48,6 +64,9 @@ export default function AppSettingsCard() {
         { key: "anios_cliente_activo", value: String(n) },
         { key: "visita_dias_atras_max", value: String(d) },
         { key: "visita_alta_directa_bloqueada", value: altaBloqueada ? "true" : "false" },
+        { key: "kpi_contar_desde", value: kpiDesde },
+        { key: "kpi_origenes", value: origenes.join(",") },
+        { key: "kpi_visible_para", value: kpiVisible },
       ] as never, { onConflict: "key" } as never);
     setSaving(false);
     if (error) {
@@ -64,7 +83,7 @@ export default function AppSettingsCard() {
           <SlidersHorizontal className="h-4 w-4" /> Parámetros generales
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3 lg:flex-row lg:items-end">
+      <CardContent className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
         <div className="flex-1 space-y-1.5">
           <Label htmlFor="anios-activo">Años para considerar activo a un cliente</Label>
           <Input
@@ -101,6 +120,24 @@ export default function AppSettingsCard() {
             <Label htmlFor="alta-bloqueada">Visitas solo desde «Registrar visita»</Label>
           </div>
           <p className="text-xs text-muted-foreground">Actívalo cuando todos usen la versión nueva: bloquea las altas por otras vías.</p>
+        </div>
+        <div className="flex-1 space-y-1.5">
+          <Label htmlFor="kpi-desde">KPI visitas: contar desde (AAAA-MM)</Label>
+          <Input id="kpi-desde" value={kpiDesde} disabled={loading} onChange={(e) => setKpiDesde(e.target.value)} className="sm:max-w-[160px]" />
+          <Label htmlFor="kpi-origenes">Orígenes que cuentan</Label>
+          <Input id="kpi-origenes" value={kpiOrigenes} disabled={loading} onChange={(e) => setKpiOrigenes(e.target.value)} className="sm:max-w-[200px]" />
+        </div>
+        <div className="flex-1 space-y-1.5">
+          <Label>KPI visitas: quién lo ve</Label>
+          <Select value={kpiVisible} onValueChange={setKpiVisible} disabled={loading}>
+            <SelectTrigger className="sm:max-w-[220px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="admin">Solo administradores</SelectItem>
+              <SelectItem value="gestores">Admin y director</SelectItem>
+              <SelectItem value="todos">Todos (con acceso a Objetivos)</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">Se aplica en el servidor, no solo en pantalla.</p>
         </div>
         <Button onClick={save} disabled={saving || loading} className="gap-2">
           <Save className="h-4 w-4" /> Guardar
