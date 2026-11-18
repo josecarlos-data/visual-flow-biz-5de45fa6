@@ -3499,6 +3499,18 @@ export type Database = {
           vendedor: string
         }[]
       }
+      kpi_trazabilidad: {
+        Args: {
+          _anio: number
+          _incluir_excluidos?: boolean
+          _linea_id: string
+          _mes: number
+          _pagina?: number
+          _tamano?: number
+          _vendedor: string
+        }
+        Returns: Json
+      }
       kpi_visible: { Args: never; Returns: boolean }
       marcar_envio_recomendado: {
         Args: { _envio_id: string }

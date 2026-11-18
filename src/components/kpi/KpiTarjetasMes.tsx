@@ -5,6 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { KpiDetalleDialog } from "@/components/kpi/KpiDetalleDialog";
+import type { KpiCelda } from "@/hooks/useKpiVisitas";
 
 const MESES_LARGOS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 const eur = (n: number) => n.toLocaleString("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
@@ -16,6 +19,7 @@ export function KpiTarjetasMes() {
   const anterior = actual.mes === 1 ? { anio: actual.anio - 1, mes: 12 } : { anio: actual.anio, mes: actual.mes - 1 };
   const [sel, setSel] = useState<"actual" | "anterior">("actual");
   const p = sel === "actual" ? actual : anterior;
+  const [celda, setCelda] = useState<KpiCelda | null>(null);
 
   const lineas = useKpiLineas();
   const resActual = useKpiResumen(actual.anio);
@@ -70,10 +74,16 @@ export function KpiTarjetasMes() {
                 <Dato label="Objetivo" valor={objetivo} />
                 <Dato label="Bonus desde" valor={umbral} extra={importe ? eur(Number(importe)) : undefined} />
               </div>
+              {f && (
+                <Button size="sm" variant="outline" onClick={() => setCelda({ linea_id: l.id, linea: l.nombre, anio: p.anio, mes: p.mes, vendedor: f.vendedor })}>
+                  Ver detalle
+                </Button>
+              )}
             </CardContent>
           </Card>
         );
       })}
+      <KpiDetalleDialog celda={celda} onClose={() => setCelda(null)} />
     </div>
   );
 }

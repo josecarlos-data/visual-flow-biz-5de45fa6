@@ -14,7 +14,7 @@ export default function Objetivos() {
   const { user, role } = useAuth();
   // El bloque KPI solo se pinta si el servidor lo permite (kpi_visible_para).
   const { data: kpiVisible } = useKpiVisible();
-  const gestorKpi = role === "admin" || role === "director_comercial";
+  const gestorKpi = role === "admin" || role === "director_comercial" || role === "jefe_de_zona";
   const [vendedorSel, setVendedorSel] = useState("todos");
   const { data, isLoading, error } = useAvanceV2();
 

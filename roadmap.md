@@ -124,4 +124,5 @@
 - [ ] Jefe de zona MZ obtiene 0 en el resumen (su delegación no casa con la de los comerciales con datos); revisar
 - [ ] Dar acceso al panel KPI a los usuarios (hoy solo admin lo tiene)
 - [x] KPI dentro de Objetivos (0051): interruptor kpi_visible_para, kpi_visible(), /kpi → /objetivos, tarjetas/tabla en Objetivos, pestaña «Líneas KPI», ajustes kpi_* en Parámetros generales
-- [ ] Build 2: detalle por línea con trazabilidad (validación individual/heredada, semana ISO, lo que no cuenta)
+- [x] Build 2: kpi_trazabilidad (0052; 0053 y 0054 corrigen errores de la propia función), detalle por celda/tarjeta, CSV, visita en solo lectura, jefe de zona ve tabla anual. Sin probar en pantalla
+- [ ] La asignación de comercial de excluidos está duplicada en kpi_trazabilidad y kpi_base: mantener sincronizadas

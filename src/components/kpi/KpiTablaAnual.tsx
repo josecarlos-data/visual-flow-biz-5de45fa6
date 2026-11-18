@@ -4,6 +4,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { KpiDetalleDialog } from "@/components/kpi/KpiDetalleDialog";
+import type { KpiCelda } from "@/hooks/useKpiVisitas";
+import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -15,6 +18,13 @@ export function KpiTablaAnual() {
   const [lineaSel, setLineaSel] = useState("todas");
   const lineas = useKpiLineas();
   const res = useKpiResumen(anio);
+  const [celda, setCelda] = useState<KpiCelda | null>(null);
+  const { toast } = useToast();
+  const abrir = (vendedor: string, mes: number) => {
+    const l = (lineas.data ?? []).find((x) => x.id === lineaSel);
+    if (!l) { toast({ title: "Elige una línea", description: "Para ver el detalle, filtra primero por una línea KPI." }); return; }
+    setCelda({ linea_id: l.id, linea: l.nombre, anio, mes, vendedor });
+  };
 
   const { comerciales, celdas } = useMemo(() => {
     const filas = (res.data ?? []).filter((f) => lineaSel === "todas" || f.linea_id === lineaSel);
@@ -51,7 +61,7 @@ export function KpiTablaAnual() {
           </SelectContent>
         </Select>
       </div>
-      <p className="text-xs text-muted-foreground">Conseguidos (validados correctos); entre paréntesis, pendientes de validar. ★ = bonus alcanzado en alguna línea.</p>
+      <p className="text-xs text-muted-foreground">Conseguidos (validados correctos); entre paréntesis, pendientes de validar. ★ = bonus alcanzado en alguna línea. Pulsa una celda (con una línea elegida) para ver el detalle.</p>
 
       {res.isLoading && <Skeleton className="h-64 w-full" />}
       {res.error && <Card><CardContent className="p-4 text-sm text-destructive">No se pudieron cargar los KPI: {(res.error as Error).message}</CardContent></Card>}
@@ -81,7 +91,7 @@ export function KpiTablaAnual() {
                       {MESES.map((_, i) => {
                         const m = c.meses.get(i + 1);
                         return (
-                          <TableCell key={i} className="text-right tabular-nums whitespace-nowrap">
+                          <TableCell key={i} className={`text-right tabular-nums whitespace-nowrap ${m ? "cursor-pointer hover:bg-muted" : ""}`} onClick={m ? () => abrir(v, i + 1) : undefined}>
                             {m ? <>{m.ok}{m.pend > 0 && <span className="text-xs text-muted-foreground"> ({m.pend})</span>}{m.bonus && <span className="text-primary"> ★</span>}</> : <span className="text-muted-foreground">·</span>}
                           </TableCell>
                         );
@@ -102,6 +112,7 @@ export function KpiTablaAnual() {
           </CardContent>
         </Card>
       )}
+      <KpiDetalleDialog celda={celda} onClose={() => setCelda(null)} />
     </div>
   );
 }

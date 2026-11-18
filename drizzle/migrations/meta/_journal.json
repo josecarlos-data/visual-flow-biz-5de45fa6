@@ -365,6 +365,27 @@
       "when": 1795016443437,
       "tag": "0051_kpi_en_objetivos",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1795017328393,
+      "tag": "0052_kpi_trazabilidad",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1795017385172,
+      "tag": "0053_kpi_trazabilidad_sin_tabla_temporal",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1795017447505,
+      "tag": "0054_kpi_trazabilidad_nombre_regla",
+      "breakpoints": true
     }
   ]
 }

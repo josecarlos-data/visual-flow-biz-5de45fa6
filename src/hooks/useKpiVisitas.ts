@@ -137,3 +137,48 @@ export function useBorrarLineaKpi() {
     onSuccess: () => qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("kpi_") }),
   });
 }
+
+export interface KpiTrazaFila {
+  clave?: string;
+  fecha: string;
+  semana_iso: string;
+  cod_cliente: number | null;
+  cliente: string | null;
+  motivo: string;
+  bloques?: number;
+  origen: string;
+  estado: string;
+  tipo_validacion?: string;
+  motivo_exclusion?: string;
+  revisor: string | null;
+  revisado_en: string | null;
+  visitas: string[];
+}
+export interface KpiTraza {
+  regla: string;
+  resumen: { bloques: number; unidades: number; conseguidos: number; pendientes: number; por_tipo: Record<string, number> };
+  total: number;
+  filas: KpiTrazaFila[];
+  excluidos?: KpiTrazaFila[];
+  excluidos_por_motivo?: Record<string, number>;
+}
+export interface KpiCelda { linea_id: string; linea: string; anio: number; mes: number; vendedor: string }
+
+export async function pedirTrazabilidad(c: KpiCelda, excluidos: boolean, pagina: number, tamano: number): Promise<KpiTraza | null> {
+  // Tipos generados aún sin la función nueva en algunos entornos: llamada sin tipar.
+  const { data, error } = await (supabase.rpc as unknown as (f: string, a: Record<string, unknown>) => Promise<{ data: unknown; error: Error | null }>)(
+    "kpi_trazabilidad",
+    { _linea_id: c.linea_id, _anio: c.anio, _mes: c.mes, _vendedor: c.vendedor, _incluir_excluidos: excluidos, _pagina: pagina, _tamano: tamano },
+  );
+  if (error) throw error;
+  return (data ?? null) as KpiTraza | null;
+}
+
+export function useKpiTrazabilidad(c: KpiCelda | null, excluidos: boolean, pagina: number, tamano = 25) {
+  return useQuery({
+    queryKey: ["kpi_traza", c, excluidos, pagina, tamano],
+    enabled: !!c,
+    staleTime: 5 * 60 * 1000,
+    queryFn: () => pedirTrazabilidad(c!, excluidos, pagina, tamano),
+  });
+}
