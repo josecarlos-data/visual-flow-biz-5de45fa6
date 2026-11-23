@@ -373,9 +373,13 @@ export default function NuevaVisita() {
     form.append("audio", blob, "nota.wav");
     const { data, error } = await supabase.functions.invoke("visita-voz", { body: form });
     if (error) throw new Error((await (error as { context?: Response }).context?.text?.()) || error.message);
-    const res = data as { transcripcion?: string; error?: string };
+    const res = data as { transcripcion?: string; error?: string; sin_voz?: boolean; aviso?: string };
     if (res.error) throw new Error(res.error);
-    return res.transcripcion ?? null;
+    if (res.sin_voz) {
+      toast({ title: "No se ha oído nada", description: res.aviso ?? "Vuelve a dictar.", variant: "destructive" });
+      return null;
+    }
+    return res.transcripcion?.trim() ? res.transcripcion : null;
   };
 
   /**
@@ -495,9 +499,14 @@ export default function NuevaVisita() {
     const motivo = bloque && motivoDe(bloque.motivoKey);
     if (!bloque || !motivo) return;
     setRespondiendo(uid);
+    let sinVoz = false;
     try {
       const texto = await transcribirAudio(blob);
-      if (!texto) return;
+      // Sin voz: se deja la repregunta abierta para que pueda volver a contestar.
+      if (!texto) {
+        sinVoz = true;
+        return;
+      }
       const faltan = pendientesDe(bloque).map((c) => c.campo_key);
       const { data, error } = await supabase.functions.invoke("visita-voz", {
         body: { accion: "repreguntar", transcripcion: texto, motivo_key: bloque.motivoKey, campos: faltan },
@@ -519,7 +528,7 @@ export default function NuevaVisita() {
       toast({ title: "No se ha podido usar la respuesta", description: (e as Error).message, variant: "destructive" });
     } finally {
       setRespondiendo(null);
-      setRepreguntaHecha(true);
+      if (!sinVoz) setRepreguntaHecha(true);
     }
   };
 

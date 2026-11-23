@@ -262,8 +262,10 @@ async function chatJson(
 // ---------------------------------------------------------------- acciones
 
 async function transcribir(key: string, audio: File) {
+  // Grabación vacía o sin voz no son fallos del servicio: se responde 200 con `sin_voz`
+  // para que la pantalla avise al comercial sin tratarlo como error de la función.
   if (audio.size < 2048) {
-    return json({ error: "La grabación está vacía. Vuelve a grabar hablando más cerca del micrófono." }, 400);
+    return json({ transcripcion: "", sin_voz: true, aviso: "La grabación está vacía. Vuelve a grabar hablando más cerca del micrófono." });
   }
   const upstream = new FormData();
   upstream.append("model", MODELO_TRANSCRIPCION);
@@ -286,7 +288,11 @@ async function transcribir(key: string, audio: File) {
   }
   const { text } = await tr.json();
   if (!String(text ?? "").trim()) {
-    return json({ error: "No se ha detectado voz en la grabación. Inténtalo de nuevo." }, 400);
+    return json({
+      transcripcion: "",
+      sin_voz: true,
+      aviso: "No se ha oído ninguna voz en la grabación. Comprueba que el micrófono no está silenciado ni lo usa otra aplicación y vuelve a dictar.",
+    });
   }
   return json({ transcripcion: sanear(text, "transcripcion") });
 }
