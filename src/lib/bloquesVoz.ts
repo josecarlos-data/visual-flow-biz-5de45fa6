@@ -29,3 +29,13 @@ export function unirDictado(previo: string, nuevo: string, modo: "anadir" | "sus
 /** El texto ha cambiado desde la última extracción (null = aún no se han creado bloques). */
 export const textoCambiado = (actual: string, analizado: string | null) =>
   analizado !== null && actual.trim() !== analizado.trim();
+
+/** Guarda un valor que solo puede consumirse una vez (p. ej. un dictado pendiente de Añadir/Sustituir). */
+export function crearPendienteUnaVez<T>() {
+  let valor: T | null = null;
+  return {
+    poner: (v: T) => { valor = v; },
+    /** Devuelve el valor y lo vacía; las llamadas siguientes devuelven null. */
+    consumir: (): T | null => { const v = valor; valor = null; return v; },
+  };
+}

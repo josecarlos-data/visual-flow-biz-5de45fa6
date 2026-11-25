@@ -128,3 +128,4 @@
 - [ ] La asignación de comercial de excluidos está duplicada en kpi_trazabilidad y kpi_base: mantener sincronizadas
 
 - [x] NuevaVisita: botón «Escribir» para escribir/pegar el texto de la visita
+- [x] Dictado pendiente se aplica una sola vez (Añadir/Sustituir)

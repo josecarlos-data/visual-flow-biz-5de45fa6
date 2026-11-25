@@ -26,3 +26,20 @@ describe("bloquesVoz", () => {
     expect(textoCambiado("hola2", "hola")).toBe(true);
   });
 });
+
+describe("dictado pendiente se aplica una sola vez", async () => {
+  const { crearPendienteUnaVez, unirDictado } = await import("./bloquesVoz");
+  // Simula la pantalla: botón y, a continuación, el cierre del diálogo (que añade si queda algo).
+  const simular = (previo: string, nuevo: string, boton: "anadir" | "sustituir" | null) => {
+    const p = crearPendienteUnaVez<string>();
+    p.poner(nuevo);
+    let texto = previo;
+    const resolver = (modo: "anadir" | "sustituir") => { const v = p.consumir(); if (v !== null) texto = unirDictado(texto, v, modo); };
+    if (boton) resolver(boton);
+    resolver("anadir");
+    return texto;
+  };
+  it("Añadir no duplica", () => expect(simular("hola", "nuevo", "anadir")).toBe(unirDictado("hola", "nuevo", "anadir")));
+  it("Sustituir deja solo lo nuevo, una vez", () => expect(simular("hola", "nuevo", "sustituir")).toBe("nuevo"));
+  it("Cerrar sin elegir añade una vez", () => expect(simular("hola", "nuevo", null)).toBe(unirDictado("hola", "nuevo", "anadir")));
+});

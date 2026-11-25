@@ -40,6 +40,7 @@ import {
   unirDictado,
   vozEditadosQueSePierden,
   type OrigenBloque,
+  crearPendienteUnaVez,
 } from "@/lib/bloquesVoz";
 
 type Meta = Record<string, { cita?: string; confianza?: string }>;
@@ -136,6 +137,7 @@ export default function NuevaVisita() {
   const [textoAnalizado, setTextoAnalizado] = useState<string | null>(null);
   /** Dictado nuevo a la espera de «Añadir / Sustituir». */
   const [dictadoPendiente, setDictadoPendiente] = useState<string | null>(null);
+  const dictadoPendienteRef = useRef(crearPendienteUnaVez<string>());
   /** Confirmación antes de sustituir bloques de voz corregidos a mano. */
   const [confirmarActualizar, setConfirmarActualizar] = useState<number | null>(null);
   /** Guardar con el texto cambiado sin actualizar los bloques. */
@@ -473,6 +475,13 @@ export default function NuevaVisita() {
     if (!esEfectiva) setObservaciones((o) => unirDictado(o, texto, "anadir"));
   };
 
+  /** Aplica el dictado pendiente exactamente una vez (botón y cierre del diálogo pueden llegar seguidos). */
+  const resolverDictadoPendiente = (modo: "anadir" | "sustituir") => {
+    const texto = dictadoPendienteRef.current.consumir();
+    if (texto !== null) aplicarDictado(texto, modo);
+    setDictadoPendiente(null);
+  };
+
   /** Dictar solo transcribe: los bloques se crean después, con el botón, sobre el texto ya revisado. */
   const procesarVisita = async (blob: Blob) => {
     setTranscribiendo(true);
@@ -486,7 +495,10 @@ export default function NuevaVisita() {
     }
     setTranscribiendo(false);
     if (!texto) return;
-    if (esEfectiva && transcripcion.trim()) setDictadoPendiente(texto);
+    if (esEfectiva && transcripcion.trim()) {
+      dictadoPendienteRef.current.poner(texto);
+      setDictadoPendiente(texto);
+    }
     else aplicarDictado(texto, "anadir");
   };
 
@@ -789,30 +801,25 @@ export default function NuevaVisita() {
         open={dictadoPendiente !== null}
         onOpenChange={(o) => {
           // Cerrar sin elegir nunca pierde lo dictado: se añade.
-          if (!o && dictadoPendiente !== null) {
-            aplicarDictado(dictadoPendiente, "anadir");
-            setDictadoPendiente(null);
-          }
+          if (!o) resolverDictadoPendiente("anadir");
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Ya tenías texto dictado</AlertDialogTitle>
+            <AlertDialogTitle>Ya tenías texto</AlertDialogTitle>
             <AlertDialogDescription>¿Qué hago con lo que acabas de dictar? Los bloques se crean después, con el botón.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel
               onClick={() => {
-                if (dictadoPendiente !== null) aplicarDictado(dictadoPendiente, "sustituir");
-                setDictadoPendiente(null);
+                resolverDictadoPendiente("sustituir");
               }}
             >
               Sustituir
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (dictadoPendiente !== null) aplicarDictado(dictadoPendiente, "anadir");
-                setDictadoPendiente(null);
+                resolverDictadoPendiente("anadir");
               }}
             >
               Añadir a lo dictado
