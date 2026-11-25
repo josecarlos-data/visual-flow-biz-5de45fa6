@@ -126,3 +126,5 @@
 - [x] KPI dentro de Objetivos (0051): interruptor kpi_visible_para, kpi_visible(), /kpi → /objetivos, tarjetas/tabla en Objetivos, pestaña «Líneas KPI», ajustes kpi_* en Parámetros generales
 - [x] Build 2: kpi_trazabilidad (0052; 0053 y 0054 corrigen errores de la propia función), detalle por celda/tarjeta, CSV, visita en solo lectura, jefe de zona ve tabla anual. Sin probar en pantalla
 - [ ] La asignación de comercial de excluidos está duplicada en kpi_trazabilidad y kpi_base: mantener sincronizadas
+
+- [x] NuevaVisita: botón «Escribir» para escribir/pegar el texto de la visita

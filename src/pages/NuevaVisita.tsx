@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Save, Loader2, Wand2, FileText, Plus, Trash2, Lightbulb, AlertTriangle, Mic, ChevronDown } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Wand2, FileText, Plus, Trash2, Lightbulb, AlertTriangle, Mic, ChevronDown, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -113,6 +113,10 @@ export default function NuevaVisita() {
   const [bloques, setBloques] = useState<BloqueForm[]>([]);
   const [observaciones, setObservaciones] = useState("");
   const [transcripcion, setTranscripcion] = useState("");
+  /** Caja de texto abierta con «Escribir» (texto escrito o pegado en lugar de dictado). */
+  const [escribiendo, setEscribiendo] = useState(false);
+  const textoRef = useRef<HTMLTextAreaElement>(null);
+  const observacionesRef = useRef<HTMLTextAreaElement>(null);
   const [documentos, setDocumentos] = useState<DocVisita[]>([]);
   useEffect(() => { docsSubidosRef.current = null; }, [documentos]);
   const [analisis, setAnalisis] = useState<{ modelo: string | null; version: string | null }>({ modelo: null, version: null });
@@ -320,6 +324,7 @@ export default function NuevaVisita() {
   };
 
   const descartarBorrador = () => {
+    setEscribiendo(false);
     borrarBorrador(user?.id ?? "");
     setBorradorEncontrado(null);
     setBorradorRevisado(true);
@@ -464,6 +469,7 @@ export default function NuevaVisita() {
   /** Aplica un dictado nuevo. En visitas no efectivas va además a Observaciones (sin bloques). */
   const aplicarDictado = (texto: string, modo: "anadir" | "sustituir") => {
     setTranscripcion((t) => unirDictado(t, texto, modo));
+    setEscribiendo(false);
     if (!esEfectiva) setObservaciones((o) => unirDictado(o, texto, "anadir"));
   };
 
@@ -1034,6 +1040,24 @@ export default function NuevaVisita() {
               hasResult={transcripcion !== ""}
             />
           </div>
+          <div className="flex justify-center">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!hayCliente || transcribiendo || extrayendo}
+              onClick={() => {
+                const destino = esEfectiva ? textoRef : observacionesRef;
+                if (esEfectiva) setEscribiendo(true);
+                setTimeout(() => {
+                  destino.current?.focus();
+                  destino.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                }, 0);
+              }}
+            >
+              <Pencil className="mr-1 h-4 w-4" /> Escribir
+            </Button>
+          </div>
 
           {esEfectiva && (
           <>
@@ -1063,10 +1087,10 @@ export default function NuevaVisita() {
             }}
           />
 
-          {transcripcion && (
+          {(transcripcion || escribiendo) && (
             <div className="space-y-2 rounded-md border bg-muted/40 p-3">
               <div className="flex items-center gap-2 text-sm font-medium">
-                <FileText className="h-4 w-4" /> Lo que he entendido
+                <FileText className="h-4 w-4" /> {escribiendo ? "Texto de la visita" : "Lo que he entendido"}
                 {extrayendo && (
                   <Badge variant="secondary" className="gap-1">
                     <Loader2 className="h-3 w-3 animate-spin" /> rellenando campos…
@@ -1074,7 +1098,9 @@ export default function NuevaVisita() {
                 )}
               </div>
               <Textarea
+                ref={textoRef}
                 rows={6}
+                placeholder="Escribe o pega lo que has hablado con el cliente"
                 value={transcripcion}
                 onChange={(e) => setTranscripcion(e.target.value)}
                 className="bg-background text-sm"
@@ -1413,6 +1439,7 @@ export default function NuevaVisita() {
         <div className="space-y-2">
           <Label className="text-sm">Observaciones</Label>
           <Textarea
+            ref={observacionesRef}
             rows={3}
             placeholder="¿Qué ha pasado? (cliente ausente, taller cerrado…)"
             value={observaciones}
