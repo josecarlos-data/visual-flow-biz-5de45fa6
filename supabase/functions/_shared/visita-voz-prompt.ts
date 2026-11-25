@@ -10,8 +10,10 @@
  *   `campos_meta` con cita literal completa y confianza. Modelo openai/gpt-5.6-sol.
  * - fase4.2 (08/08/2026) — Tras probar con tres narraciones reales:
  *   · Modelo de extracción a openai/gpt-5.6-luna (+ temperature 0 si el modelo lo admite).
- *   · Regla imperativa: competidor o precio ajeno => SIEMPRE bloque `competencia`
- *     ADEMÁS del bloque de seguimiento/revisión que corresponda.
+ *   · (fase4.7) `competencia` solo con un dato de comparación (precio, referencia comparada,
+ *     venta ganada/perdida frente a él); competidores solo nombrados => informacion_potencial.
+ *     Va ADEMÁS del bloque de seguimiento/revisión que corresponda.
+ *   · (fase4.7) Precio no dicho => null (0 solo si dice que no lo consiguió); contacto solo personas.
  *   · Citas acortadas a 5-10 palabras (antes frase completa).
  *   · System prompt fijo y cacheado, idéntico entre llamadas (prompt caching).
  *   · Transcripción con vocabulario del sector en el parámetro `prompt`.
@@ -42,7 +44,7 @@
  *   dictados de oferta cortos. Además, Promoción lleva una descripción propia para la IA
  *   (DESCRIPCION_IA). Banco de dictados cortos: 58 % → 95 % (solo regla) → 100 % (regla + Promoción).
  */
-export const VERSION_PROMPT = "fase4.6";
+export const VERSION_PROMPT = "fase4.7";
 
 /**
  * Extracción: clasificar y rellenar campos con reglas explícitas. No es razonamiento,
@@ -179,7 +181,7 @@ export function esquemaExtraccion(motivos: MotivoDef[]) {
   for (const m of motivos) {
     const extra =
       m.key === "competencia"
-        ? " OBLIGATORIO: si en la narración hay un competidor nombrado o un precio de otro proveedor, esta lista NO puede quedar vacía." +
+        ? " Solo con un dato concreto de comparación frente a ese competidor (un precio, una referencia o producto comparado, o una venta ganada o perdida frente a él). Si solo se nombran competidores o proveedores, esta lista va vacía." +
           " Una comparativa por referencia y precio: si compara varias referencias, devuelve un elemento por cada una, nunca uno agrupado."
         : "";
     properties[`bloques_${m.key}`] = {
@@ -212,9 +214,15 @@ export function sistemaExtraccion(motivos: MotivoDef[]) {
     "Si es una oferta nueva, es promocion.\n" +
     "- seguimiento es el cajón de último recurso: SOLO se instancia si no has creado ningún otro bloque. Si ya hay al menos un " +
     "bloque de otro motivo, no añadas seguimiento salvo que quede contenido concreto que no encaje en ninguno de ellos; en ese " +
-    "caso el bloque recoge únicamente ese contenido sobrante, nunca un resumen de lo ya repartido.\n" +
-    "- COMPETENCIA, REGLA IMPERATIVA: si en la narración aparece un competidor nombrado (Luis Moleón, Grupo Peña, Eurorecambios, etc.) o un precio " +
-    "de otro proveedor, creas SIEMPRE un bloque competencia con competidor, precio_rimosa, precio_competencia y resultado_venta. " +
+    "caso el bloque recoge únicamente ese contenido sobrante, nunca un resumen de lo ya repartido. «Va a comparar», «hacer " +
+    "seguimiento», «le llamo la semana que viene» son la próxima acción del bloque al que acompañan (por ejemplo la promocion): " +
+    "no son contenido sobrante y no crean seguimiento.\n" +
+    "- COMPETENCIA: creas un bloque competencia solo si hay al menos un dato concreto de comparación frente a ese competidor: un " +
+    "precio (suyo o nuestro), una referencia o producto comparado, o una venta ganada o perdida frente a él. Rellena competidor, " +
+    "precio_rimosa, precio_competencia y resultado_venta con lo que se diga. Si solo se nombran competidores o proveedores con " +
+    "los que trabaja el cliente («Competidor Eurorecambios, Lomeña, Cotocar», «el aceite lo compra a CEPSA»), NO se crea ningún " +
+    "bloque competencia: van a informacion_potencial (proveedor_principal si se dice cuál es el principal; si no, los nombres en " +
+    "observaciones). " +
     "Va ADEMÁS del bloque de seguimiento o de revisión que corresponda: no son excluyentes, la misma situación genera los dos. " +
     "Los precios de la comparativa nunca se quedan solo dentro de un texto libre como motivo_perdida; van a sus campos numéricos " +
     "del bloque competencia.\n" +
@@ -258,6 +266,10 @@ export function sistemaExtraccion(motivos: MotivoDef[]) {
     "observaciones.\n" +
     "- potencial_estimado solo si el comercial da una cifra anual explícita. Nunca lo calcules.\n\n" +
     "REGLAS DE CONTENIDO:\n" +
+    "- PRECIOS (por encima de cualquier ayuda de campo): si el comercial no dice un precio, el campo de precio va a null. Solo " +
+    "pones 0 si dice expresamente que no lo ha conseguido. Nunca inventes un 0.\n" +
+    "- PERSONA DE CONTACTO o «quién te ha atendido»: solo nombres de persona. Nunca el nombre del taller, de una red de talleres " +
+    "o de una marca (p. ej. «Taller AD»); eso va a observaciones.\n" +
     "- El cliente YA viene dado por la aplicación: no lo deduzcas de la transcripción ni lo devuelvas.\n" +
     "- No inventes: si la narración no dice nada de un campo, ese campo va a null.\n" +
     "- En los campos con lista de opciones: si el valor que dice el comercial no está en la lista, deja el campo a null y anota el " +

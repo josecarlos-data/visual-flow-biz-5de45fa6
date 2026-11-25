@@ -5,7 +5,10 @@
     "cliente": "Cliente de prueba",
     "narracion": "Revisión plan de choque.\nOfertar Icer con queso, le quedan 4 de la 151831066 y 2 de la 151194066.\nNo quieres pedir hasta quedar a cero porque está sacando todo el material que tenía Larry.\nCaída en Rother, Wabco, Knorr.\nAdemás de tener vehículos en garantía, a veces repara en taller y el no lleva la pieza. No tiene rapell con ningun proveedor y va consultando a los que tiene cuando necesita.\nVuelvo a decirle el movimiento que tenia con nosotros en 2024 y me dice que ira consultando.\n\nServicio otros recambios.\nNo tiene un horario fijo con ninguno, cuando hace un pedido, el cuadra con el proveedor cuando le llega el material, si no en el mismo dia, se lo entregan al dia siguiente como máximo.",
     "esperado": {
-      "motivos": ["revision_seguimiento", "promocion"],
+      "motivos": [
+        "revision_seguimiento",
+        "promocion"
+      ],
       "competencia_bloques": 0,
       "seguimiento_permitido": false,
       "notas": "Revisión del plan de choque + oferta de Icer con referencias 151831066 y 151194066. No hay competidor con precio: sin bloque competencia."
@@ -17,7 +20,9 @@
     "cliente": "Cliente de prueba",
     "narracion": "Compras de febrero 0\nAccesos 2\nLo tiene puesto en favoritos y ya le he dicho como ponerlo en el móvil. Porque ella por las tardes no esta en el taller. Ella de despiece grafico no sabe, y cruces tampoco, para ella es mas cómodo que le demos referencia cuando es algo complicado.\nComprar sabe hacerlo, le damos algunas referencias.\nTema ofertas y campañas lo sabe.\nTambién sabe que todas las compras de gsmart tienen el 1% mas de descuento.\nLes traslado cifra viaje, proyección y abono, en cuanto les saldría el viaje a día de hoy, para los tres.\nMe dicen que ellos van al viaje.\nLa única que maneja GSMART es ella, es autónoma para todo menos despieces y cruces. Jose Maria no maneja GSMART, no tiene tiempo de pararse.",
     "esperado": {
-      "motivos": ["gsmart"],
+      "motivos": [
+        "gsmart"
+      ],
       "competencia_bloques": 0,
       "seguimiento_permitido": true,
       "notas": "Formación/uso de GSMart. El viaje-incentivo no tiene motivo propio: puede caer en seguimiento como contenido sobrante."
@@ -29,10 +34,38 @@
     "cliente": "Cliente de prueba",
     "narracion": "Información importante potencial.\nPersonas de contacto Eugenio, que es quien autoriza las compras y Juan que es el mecánico que se encarga de gestionar el material que se necesita.\nTienen 11 camiones: 5 SCANIA, 4 FORD, 1 MAN, 1 RENAULT.\nTienen 15 pisos móviles.\nEjes: MERCEDES, SMB, BPW.\nTienen 9 mecánicos.\nTrabajan todo tipo de mecánica y carrocería.\nLos que más demandan son: sistemas de adblue, válvula de disparo, pulmones, cojinetes de suspensión, pilotos, pastillas, discos.\nEl aceite lo compran a CEPSA.\nCompetencia: Bahía.\nCompran las baterías a Autorecambios Alboran, marca DIPART.\nDe 240 AH: 194,70 euros.\nDe 180 AH: 159,85 euros.\nDe 70 AH: 57,50 euros.\nLas de 75 AH son las que más consumen.",
     "esperado": {
-      "motivos": ["informacion_potencial", "competencia"],
+      "motivos": [
+        "informacion_potencial",
+        "competencia"
+      ],
       "competencia_bloques": 3,
       "seguimiento_permitido": false,
       "notas": "Tres baterías con tres precios de Autorecambios Alboran = TRES bloques competencia (240 AH 194,70 / 180 AH 159,85 / 70 AH 57,50). Este es el caso que fase4.2 resumía en uno."
     }
+  },
+  {
+    "id": "real-rafael-20261125",
+    "etiqueta": "Real Rafael (Gespromo pegado)",
+    "cliente": "Cliente de prueba",
+    "narracion": "Revisión anticongelante, ha comprado un bidon de 200L.\nDoy ppto de 10w40 y 15w40 en 200L. Toma nota en papel, va a comparar, hacer seguimiento inmediato porque tiene los bidones vacíos.\nTaller AD.\nTodo tipo de trabajos. Tacógrafo, mecánica, electricidad...\nTrabajan camion, furgoneta y turismo.\n3 mecánicos.\nTiene coche taller.\nTiene Texa.\nHace plataformas.\nCompetidor Eurorecambios, Lomeña, Cotocar.",
+    "esperado": {
+      "motivos": [
+        "revision_seguimiento",
+        "promocion",
+        "informacion_potencial"
+      ],
+      "competencia_bloques": 0,
+      "promocion_bloques": 2,
+      "prohibidos": [
+        "seguimiento",
+        "competencia"
+      ],
+      "sin_precio_cero": true,
+      "contacto_prohibido": [
+        "taller ad"
+      ],
+      "seguimiento_permitido": false
+    },
+    "notas": "Caso real. Competidores solo nombrados: sin bloque competencia, van a observaciones de informacion_potencial. Seguimiento es la próxima acción de la promoción. Precios no dichos: null, nunca 0. «Taller AD» no es persona."
   }
 ]

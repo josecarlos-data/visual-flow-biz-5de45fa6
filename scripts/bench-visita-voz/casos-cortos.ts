@@ -5,7 +5,9 @@
  *   CONF=gpt-6-luna/low REPS=3 bun scripts/bench-visita-voz/casos-cortos.ts
  *
  * Criterio de «bloques esperados» por caso:
- *   - todos: deben aparecer todos esos motivos (y al menos `comp` bloques de competencia).
+ *   - todos: deben aparecer todos esos motivos; `comp`/`promociones` exactos si se declaran (también 0).
+ *   - prohibidos: motivos que no deben aparecer.
+ *   PROMPT=fase4.6 compara con la copia guardada del prompt anterior.
  *   - alguno: basta con uno de esos motivos.
  *   - cero: ningún bloque y resultado no efectivo.
  * Un bloque cuenta si tiene al menos un campo válido con el mismo filtro que visita-voz (valorValido).
@@ -16,13 +18,11 @@ import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import {
   admiteIA,
-  esquemaExtraccion,
-  sistemaExtraccion,
-  usuarioExtraccion,
-  VERSION_PROMPT,
   type CampoDef,
   type MotivoDef,
 } from "../../supabase/functions/_shared/visita-voz-prompt.ts";
+import * as P46 from "./prompt-fase4.6.ts";
+import * as P47 from "../../supabase/functions/_shared/visita-voz-prompt.ts";
 
 const DIR = import.meta.dir;
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -75,14 +75,18 @@ function cargarMotivos(): MotivoDef[] {
 
 // ------------------------------------------------------------------ casos
 
-interface Caso { id: string; narracion: string; fecha?: string; todos?: string[]; alguno?: string[]; cero?: boolean; comp?: number }
+interface Caso { id: string; narracion: string; fecha?: string; todos?: string[]; alguno?: string[]; cero?: boolean; comp?: number; prohibidos?: string[]; promociones?: number; sinPrecioCero?: boolean; contactoProhibido?: string[] }
+
+/** PROMPT=fase4.6 usa la copia guardada; por defecto, el prompt publicado del repositorio. */
+const P = process.env.PROMPT === "fase4.6" ? P46 : P47;
+const { esquemaExtraccion, sistemaExtraccion, usuarioExtraccion, VERSION_PROMPT } = P;
 
 const narraciones = JSON.parse(readFileSync(join(DIR, "narraciones.json"), "utf8")) as {
-  etiqueta: string; narracion: string; esperado: { motivos: string[]; competencia_bloques: number };
+  etiqueta: string; narracion: string; esperado: { motivos: string[]; competencia_bloques: number; prohibidos?: string[]; promocion_bloques?: number; sin_precio_cero?: boolean; contacto_prohibido?: string[] };
 }[];
 
 export const CASOS: Caso[] = [
-  ...narraciones.map((n) => ({ id: `bench:${n.etiqueta}`, narracion: n.narracion, todos: n.esperado.motivos, comp: n.esperado.competencia_bloques })),
+  ...narraciones.map((n) => ({ id: `bench:${n.etiqueta}`, narracion: n.narracion, todos: n.esperado.motivos, comp: n.esperado.competencia_bloques, prohibidos: n.esperado.prohibidos, promociones: n.esperado.promocion_bloques, sinPrecioCero: n.esperado.sin_precio_cero, contactoProhibido: n.esperado.contacto_prohibido })),
   { id: "f45:sin_contenido", fecha: "2026-11-12", narracion: "No estaba, vuelvo mañana.", cero: true },
   { id: "f45:fecha_relativa", fecha: "2026-11-12", narracion: "He estado con Manolo en el taller. Le he presentado la oferta de baterías Varta y le interesa, pero quiere pensarlo. Le llamo el martes para cerrar el pedido.", alguno: ["promocion", "seguimiento", "revision_seguimiento"] },
   { id: "f45:fecha_explicita", fecha: "2026-11-12", narracion: "Seguimiento con Manolo: le he presentado la oferta de baterías Varta, le interesa pero quiere pensarlo. Próxima acción: le llamo el martes para cerrar el pedido.", alguno: ["promocion", "seguimiento", "revision_seguimiento"] },
@@ -154,9 +158,22 @@ for (const k of CASOS) for (let rep = 0; rep < REPS; rep++) trabajo.push(async (
   const exito = k.cero
     ? kept.length === 0 && r.salida.resultado_visita !== "efectiva"
     : k.todos
-      ? k.todos.every((x) => set.has(x)) && (!k.comp || kept.filter((x) => x === "competencia").length >= k.comp)
-      : (k.alguno ?? []).some((x) => set.has(x));
-  filas.push({ caso: k.id, ms: r.ms, exito, cero: kept.length === 0, crudos, motivos: kept, salida: r.salida,
+      ? k.todos.every((x) => set.has(x)) &&
+        // Conteo EXACTO cuando el caso lo declara, también con 0.
+        (k.comp === undefined || kept.filter((x) => x === "competencia").length === k.comp) &&
+        (k.promociones === undefined || kept.filter((x) => x === "promocion").length === k.promociones) &&
+        (k.prohibidos ?? []).every((x) => !set.has(x))
+      : (k.alguno ?? []).some((x) => set.has(x)) && (k.prohibidos ?? []).every((x) => !set.has(x));
+  // Precios a 0 no dichos y contactos que no son personas, sobre la salida cruda.
+  let extraOk = true;
+  for (const m of motivos) for (const it of (r.salida[`bloques_${m.key}`] ?? []) as { campos?: Record<string, unknown> }[]) {
+    for (const [ck, v] of Object.entries(it?.campos ?? {})) {
+      if (k.sinPrecioCero && ck.startsWith("precio") && v !== null && Number(v) === 0) extraOk = false;
+      if (k.contactoProhibido && /contacto|atendid|persona/.test(ck) && typeof v === "string" &&
+        k.contactoProhibido.some((x) => v.toLowerCase().includes(x))) extraOk = false;
+    }
+  }
+  filas.push({ caso: k.id, ms: r.ms, exito: exito && extraOk, cero: kept.length === 0, crudos, motivos: kept, salida: r.salida,
     coste: (r.uso.prompt_tokens ?? 0) * CONF.pin + (r.uso.completion_tokens ?? 0) * CONF.pout });
 });
 let i = 0;
@@ -183,5 +200,5 @@ const lineas = [
 ];
 const cero = conContenido.find((f) => f.cero);
 if (cero) lineas.push("", `Salida cruda de un cero (${cero.caso}):`, "```json", JSON.stringify(cero.salida), "```");
-writeFileSync(join(DIR, "RESULTADOS-cortos.md"), lineas.join("\n") + "\n");
+writeFileSync(join(DIR, `RESULTADOS-cortos-${VERSION_PROMPT}.md`), lineas.join("\n") + "\n");
 console.log(lineas.join("\n"));
