@@ -386,6 +386,13 @@
       "when": 1795017447505,
       "tag": "0054_kpi_trazabilidad_nombre_regla",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1795594678379,
+      "tag": "0055_proteger_copia_visita_bloques",
+      "breakpoints": true
     }
   ]
 }
