@@ -1,17 +1,17 @@
-# Dictados cortos · fase4.7 · gpt-5.6-luna/none · 5 ejecuciones · 2026-11-25T10:33:45.746Z
+# Dictados cortos · fase4.7 · gpt-5.6-luna/none · 5 ejecuciones · 2026-11-25T10:50:56.124Z
 
-- Bloques esperados: 90 %
+- Bloques esperados: 93 %
 - Cero bloques (sin contar «no estaba»): 0 %
 - Cero bloques por bloques descartados (no por listas vacías): 0
-- Latencia media 2.9 s · p90 5.3 s
-- Coste medio por extracción: 0.01225 créditos
+- Latencia media 3.3 s · p90 6.7 s
+- Coste medio por extracción: 0.01279 créditos
 
 | Caso | Esperados | Cero | Motivos (1ª ejecución) |
 |---|---|---|---|
 | bench:Icer / plan de choque | 5/5 | 0/5 | promocion, revision_seguimiento, informacion_potencial |
-| bench:GSMart + viaje | 5/5 | 0/5 | gsmart, viaje_incentivo |
-| bench:Potencial + competencia (3 baterías) | 0/5 | 0/5 | informacion_potencial |
-| bench:Real Rafael (Gespromo pegado) | 4/5 | 0/5 | promocion, informacion_potencial |
+| bench:GSMart + viaje | 5/5 | 0/5 | gsmart, viaje_incentivo, informacion_potencial |
+| bench:Potencial + competencia (3 baterías) | 5/5 | 0/5 | competencia, informacion_potencial |
+| bench:Real Rafael (Gespromo pegado) | 1/5 | 0/5 | promocion, revision_seguimiento, informacion_potencial |
 | f45:sin_contenido | 5/5 | 5/5 |  |
 | f45:fecha_relativa | 5/5 | 0/5 | promocion |
 | f45:fecha_explicita | 5/5 | 0/5 | promocion |

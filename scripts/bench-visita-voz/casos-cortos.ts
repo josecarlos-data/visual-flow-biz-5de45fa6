@@ -75,18 +75,18 @@ function cargarMotivos(): MotivoDef[] {
 
 // ------------------------------------------------------------------ casos
 
-interface Caso { id: string; narracion: string; fecha?: string; todos?: string[]; alguno?: string[]; cero?: boolean; comp?: number; prohibidos?: string[]; promociones?: number; sinPrecioCero?: boolean; contactoProhibido?: string[] }
+interface Caso { id: string; narracion: string; fecha?: string; todos?: string[]; alguno?: string[]; cero?: boolean; comp?: number; prohibidos?: string[]; promociones?: number; sinPrecioCero?: boolean; contactoProhibido?: string[]; camposEsperados?: Record<string, string | null> }
 
 /** PROMPT=fase4.6 usa la copia guardada; por defecto, el prompt publicado del repositorio. */
 const P = process.env.PROMPT === "fase4.6" ? P46 : P47;
 const { esquemaExtraccion, sistemaExtraccion, usuarioExtraccion, VERSION_PROMPT } = P;
 
 const narraciones = JSON.parse(readFileSync(join(DIR, "narraciones.json"), "utf8")) as {
-  etiqueta: string; narracion: string; esperado: { motivos: string[]; competencia_bloques: number; prohibidos?: string[]; promocion_bloques?: number; sin_precio_cero?: boolean; contacto_prohibido?: string[] };
+  etiqueta: string; narracion: string; esperado: { motivos: string[]; competencia_bloques: number; prohibidos?: string[]; promocion_bloques?: number; sin_precio_cero?: boolean; contacto_prohibido?: string[]; campos_esperados?: Record<string, string | null> };
 }[];
 
 export const CASOS: Caso[] = [
-  ...narraciones.map((n) => ({ id: `bench:${n.etiqueta}`, narracion: n.narracion, todos: n.esperado.motivos, comp: n.esperado.competencia_bloques, prohibidos: n.esperado.prohibidos, promociones: n.esperado.promocion_bloques, sinPrecioCero: n.esperado.sin_precio_cero, contactoProhibido: n.esperado.contacto_prohibido })),
+  ...narraciones.map((n) => ({ id: `bench:${n.etiqueta}`, narracion: n.narracion, todos: n.esperado.motivos, comp: n.esperado.competencia_bloques, prohibidos: n.esperado.prohibidos, promociones: n.esperado.promocion_bloques, sinPrecioCero: n.esperado.sin_precio_cero, contactoProhibido: n.esperado.contacto_prohibido, camposEsperados: n.esperado.campos_esperados })),
   { id: "f45:sin_contenido", fecha: "2026-11-12", narracion: "No estaba, vuelvo mañana.", cero: true },
   { id: "f45:fecha_relativa", fecha: "2026-11-12", narracion: "He estado con Manolo en el taller. Le he presentado la oferta de baterías Varta y le interesa, pero quiere pensarlo. Le llamo el martes para cerrar el pedido.", alguno: ["promocion", "seguimiento", "revision_seguimiento"] },
   { id: "f45:fecha_explicita", fecha: "2026-11-12", narracion: "Seguimiento con Manolo: le he presentado la oferta de baterías Varta, le interesa pero quiere pensarlo. Próxima acción: le llamo el martes para cerrar el pedido.", alguno: ["promocion", "seguimiento", "revision_seguimiento"] },
@@ -146,7 +146,9 @@ async function llamar(usuario: string) {
 interface Fila { caso: string; ms: number; exito: boolean; cero: boolean; crudos: number; motivos: string[]; coste: number; salida: Record<string, unknown> }
 const filas: Fila[] = [];
 const trabajo: (() => Promise<void>)[] = [];
-for (const k of CASOS) for (let rep = 0; rep < REPS; rep++) trabajo.push(async () => {
+/** SOLO=<id> ejecuta un caso y vuelca sus salidas crudas. */
+const SOLO = process.env.SOLO;
+for (const k of CASOS.filter((c) => !SOLO || c.id === SOLO)) for (let rep = 0; rep < REPS; rep++) trabajo.push(async () => {
   const r = await llamar(usuarioExtraccion(k.narracion, "Cliente de prueba", k.fecha ?? null));
   let crudos = 0;
   const kept: string[] = [];
@@ -172,6 +174,13 @@ for (const k of CASOS) for (let rep = 0; rep < REPS; rep++) trabajo.push(async (
       if (k.contactoProhibido && /contacto|atendid|persona/.test(ck) && typeof v === "string" &&
         k.contactoProhibido.some((x) => v.toLowerCase().includes(x))) extraOk = false;
     }
+  }
+  // campos_esperados: "motivo.campo" => valor exacto (sin distinguir mayúsculas) o null = vacío en todos sus bloques.
+  for (const [ruta, esperado] of Object.entries(k.camposEsperados ?? {})) {
+    const [mk, ck] = ruta.split(".");
+    const vals = ((r.salida[`bloques_${mk}`] ?? []) as { campos?: Record<string, unknown> }[])
+      .map((it) => it?.campos?.[ck]).filter((v) => v !== null && v !== undefined && String(v).trim() !== "").map((v) => String(v).trim().toLowerCase());
+    if (esperado === null ? vals.length > 0 : !vals.includes(esperado.toLowerCase())) extraOk = false;
   }
   filas.push({ caso: k.id, ms: r.ms, exito: exito && extraOk, cero: kept.length === 0, crudos, motivos: kept, salida: r.salida,
     coste: (r.uso.prompt_tokens ?? 0) * CONF.pin + (r.uso.completion_tokens ?? 0) * CONF.pout });
@@ -200,5 +209,6 @@ const lineas = [
 ];
 const cero = conContenido.find((f) => f.cero);
 if (cero) lineas.push("", `Salida cruda de un cero (${cero.caso}):`, "```json", JSON.stringify(cero.salida), "```");
-writeFileSync(join(DIR, `RESULTADOS-cortos-${VERSION_PROMPT}.md`), lineas.join("\n") + "\n");
+if (SOLO) writeFileSync(`/tmp/solo.json`, JSON.stringify(filas.map((f) => f.salida), null, 1));
+else writeFileSync(join(DIR, `RESULTADOS-cortos-${VERSION_PROMPT}.md`), lineas.join("\n") + "\n");
 console.log(lineas.join("\n"));

@@ -64,7 +64,11 @@
       "contacto_prohibido": [
         "taller ad"
       ],
-      "seguimiento_permitido": false
+      "seguimiento_permitido": false,
+      "campos_esperados": {
+        "informacion_potencial.red_o_grupo_de_talleres": "AD Parts",
+        "informacion_potencial.persona_contacto": null
+      }
     },
     "notas": "Caso real. Competidores solo nombrados: sin bloque competencia, van a observaciones de informacion_potencial. Seguimiento es la próxima acción de la promoción. Precios no dichos: null, nunca 0. «Taller AD» no es persona."
   }

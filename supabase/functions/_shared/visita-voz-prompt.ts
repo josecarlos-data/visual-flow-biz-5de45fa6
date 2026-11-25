@@ -222,7 +222,10 @@ export function sistemaExtraccion(motivos: MotivoDef[]) {
     "precio_rimosa, precio_competencia y resultado_venta con lo que se diga. Si solo se nombran competidores o proveedores con " +
     "los que trabaja el cliente («Competidor Eurorecambios, Lomeña, Cotocar», «el aceite lo compra a CEPSA»), NO se crea ningún " +
     "bloque competencia: van a informacion_potencial (proveedor_principal si se dice cuál es el principal; si no, los nombres en " +
-    "observaciones). " +
+    "observaciones).\n" +
+    "  Lo que decide es el precio: «compran las baterías a Autorecambios Alboran, la de 240 AH a 194,70» => bloque competencia " +
+    "(hay precio del competidor). «el aceite lo compran a CEPSA» => sin bloque, a informacion_potencial (no hay ningún dato de " +
+    "comparación).\n  " +
     "Va ADEMÁS del bloque de seguimiento o de revisión que corresponda: no son excluyentes, la misma situación genera los dos. " +
     "Los precios de la comparativa nunca se quedan solo dentro de un texto libre como motivo_perdida; van a sus campos numéricos " +
     "del bloque competencia.\n" +
@@ -268,8 +271,10 @@ export function sistemaExtraccion(motivos: MotivoDef[]) {
     "REGLAS DE CONTENIDO:\n" +
     "- PRECIOS (por encima de cualquier ayuda de campo): si el comercial no dice un precio, el campo de precio va a null. Solo " +
     "pones 0 si dice expresamente que no lo ha conseguido. Nunca inventes un 0.\n" +
-    "- PERSONA DE CONTACTO o «quién te ha atendido»: solo nombres de persona. Nunca el nombre del taller, de una red de talleres " +
-    "o de una marca (p. ej. «Taller AD»); eso va a observaciones.\n" +
+    "- PERSONA DE CONTACTO o «quién te ha atendido»: solo nombres de persona, nunca el nombre del taller, de una red o de una marca.\n" +
+    "- RED O GRUPO DE TALLERES: «Taller AD», «es de AD», «está en la red X» o «pertenece al grupo X» indican la red o grupo de " +
+    "talleres del cliente. Van a red_o_grupo_de_talleres (AD => «AD Parts»), nunca a persona de contacto ni a «quién te ha " +
+    "atendido». Si ese campo no existe en la plantilla, van a observaciones.\n" +
     "- El cliente YA viene dado por la aplicación: no lo deduzcas de la transcripción ni lo devuelvas.\n" +
     "- No inventes: si la narración no dice nada de un campo, ese campo va a null.\n" +
     "- En los campos con lista de opciones: si el valor que dice el comercial no está en la lista, deja el campo a null y anota el " +

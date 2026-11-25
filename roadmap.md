@@ -130,3 +130,4 @@
 - [x] NuevaVisita: botón «Escribir» para escribir/pegar el texto de la visita
 - [x] Dictado pendiente se aplica una sola vez (Añadir/Sustituir)
 - [ ] Fase4.7 extracción: competencia sin comparación, seguimiento, precios null, contacto; banco exacto + prohibidos; comparar 4.6/4.7 sin desplegar
+- [ ] Fase4.7: red_o_grupo_de_talleres (AD => AD Parts) en regla y banco Rafael
