@@ -1,32 +1,28 @@
-# Build 2 KPI: detalle por línea con trazabilidad
+# Escribir o pegar el texto de la visita (NuevaVisita)
 
-## Orden
-1. Migración 0052 y prueba en transacción revertida. Si no cuadra, me detengo y lo explico antes de tocar pantallas.
-2. Pantallas.
+## Diagnóstico (HEAD 52b7581) y comparación con la propuesta
 
-## Migración 0052 (`drizzle/migrations/`, SQL plano)
-- `kpi_trazabilidad(linea, año, mes, vendedor, incluir_excluidos, página, tamaño)`: SECURITY DEFINER, `search_path` fijo, `statement_timeout` en la definición, rango de fechas del mes, ámbito vía `kpi_ambito` (comercial solo lo suyo, jefe su delegación, director/admin todo, sin acceso vacío). REVOKE PUBLIC/anon; GRANT authenticated.
-- Lo que cuenta sale de `kpi_base` (sin modificarla) y se agrupa con la misma regla de conteo que `kpi_resumen`, para que la suma cuadre por construcción.
-- Devuelve el resumen (bloques encontrados → unidades → conseguidos/pendientes, total para paginar) y una fila por unidad: fecha, semana ISO, cliente (código y nombre), motivo, nº de bloques, origen, estado, tipo de validación, revisor y fecha, ids de visitas.
-- Tipo de validación por origen: «Revisada en el CRM» (con revisor y fecha), «Importada de Gespromo», «Pendiente». Los bloques app en Correcto sin revisor no entran en ninguno: los cuento y te los digo.
-- Excluidos (si se piden): una fila por bloque con motivo «No correcto», «Anterior a contar desde» u «Origen no incluido»; reviso si aparecen otros casos (p. ej. motivo sin línea activa) y te los listo.
-- COMMENT de retirada del dashboard `kpi_visitas` dentro de la migración; `kpi_detalle` marcada como retirada, sin borrarla.
-- No toco `kpi_resumen`, `kpi_base` ni el motor de objetivos v2.
+1. **La caja solo aparece tras dictar** — Confirmado. Se muestra con `{transcripcion && ...}`. Además hay un detalle que la propuesta no menciona: si el comercial borra todo el texto (p. ej. seleccionar todo para pegar encima), la caja desaparece en ese momento y pierde el foco. Hay que mantenerla abierta mientras esté en modo «Escribir».
+2. **Crear bloques funciona con cualquier texto** — Confirmado: `pedirCrearBloques` → `analizarTranscripcion(transcripcion, …)`, sin depender del audio. El aviso «Has cambiado el texto», el borrador (incluye `transcripcion`) y el guardado (`transcripcion: transcripcion || null`) ya tratan el texto igual venga de donde venga. «Reanalizar» en Revisión usa la transcripción guardada: también sirve.
+3. **Botón «Escribir» junto al micro, mismas condiciones** — De acuerdo: desactivado sin cliente, mientras se transcribe o se extrae.
+4. **Misma caja vacía, foco y placeholder** — De acuerdo, sin campo nuevo.
+5. **Dictar después → Añadir/Sustituir** — Ya ocurre: con texto en una visita efectiva, el dictado nuevo pregunta Añadir/Sustituir. Sin cambios.
+6. **No efectivas: igual que el dictado** — Matiz importante: hoy la caja «Lo que he entendido» está dentro del bloque solo para visitas efectivas; en no efectivas el dictado va a **Observaciones** (siempre visible abajo). Por tanto, en no efectivas «Escribir» llevará el foco a Observaciones, sin abrir la caja ni crear bloques. Es el mismo comportamiento que el dictado, no un enfoque distinto.
+7. **Misma posición en móvil y escritorio** — De acuerdo: fila centrada micro + botón, igual en ambos.
+8. **Sin migraciones ni edge functions** — Confirmado, no hacen falta.
 
-## Punto a vigilar (me detengo si ocurre)
-`kpi_base` ya descarta los bloques No correcto y los anteriores a «contar desde». Para los excluidos tendré que repetir dentro de la nueva función la misma asignación de nombre de comercial (Gespromo → perfil). Si eso no puede hacerse sin cambiar `kpi_base`, me paro y te lo explico.
+No veo necesario un enfoque distinto.
 
-## Pruebas (identidades simuladas, transacción revertida)
-- Octubre 2026: 2 comerciales × 4 líneas = 8 celdas; suma del detalle = celda de `kpi_resumen`.
-- Ámbito: un comercial no ve filas de otro; con interruptor en «admin», director y comercial no obtienen nada.
-- Totales de octubre por tipo de validación.
-- Aviso de lo que la prueba simulada no reproduce de una llamada real desde la app.
+## Plan final (solo `src/pages/NuevaVisita.tsx`)
 
-## Pantallas
-- `KpiDetalleDialog`: desde la celda de `KpiTablaAnual` (si no hay línea filtrada, pide elegir línea) y desde «Ver detalle» en cada tarjeta de `KpiTarjetasMes`. Arriba el resumen; debajo la tabla paginada con interruptor «Ver también lo que no cuenta»; en móvil, filas como tarjetas.
-- «Descargar CSV» de la celda completa (todas las páginas, con excluidos si están activos), recorriendo páginas desde el navegador; incluye semana ISO. Sin dependencias nuevas.
-- `VisitaSoloLectura`: diálogo de solo lectura con visita y bloques usando consultas y RLS existentes; reutilizo lo de ClienteDetalle si es separable.
-- Objetivos: el jefe de zona ve la tabla anual de su delegación, no las tarjetas.
+- Estado local `escribiendo` (no se guarda en el borrador: al recuperar un borrador con texto la caja ya aparece por tener texto).
+- Botón `variant="outline"` con icono de lápiz y texto «Escribir» junto al `VoiceRecorder`, mismo `disabled`.
+- Al pulsar:
+  - Efectiva: `escribiendo = true`, se muestra la caja y se enfoca el Textarea (ref + `focus()` tras render, con scroll a la vista en móvil).
+  - No efectiva: foco y scroll a Observaciones.
+- La caja se muestra si `transcripcion || escribiendo`; placeholder «Escribe o pega lo que has hablado con el cliente»; el texto de ayuda y el botón Crear/Actualizar bloques siguen igual (desactivado con texto vacío).
+- `escribiendo` vuelve a `false` al descartar borrador / reiniciar formulario, y al cambiar a no efectiva.
+- Título de la caja: se mantiene «Lo que he entendido» si viene de dictado; si está vacía en modo escribir, mismo título (sin cambiar textos existentes) — salvo que prefieras «Texto de la visita».
 
-## Al terminar
-Ficheros cambiados, migración aplicada (solo 0052), resultados de pruebas, nº de bloques app Correcto sin revisor y lo no probado en pantalla.
+## Pruebas
+- Typecheck y tests existentes. Comprobación en navegador con sesión: elegir cliente, «Escribir», pegar texto, Crear bloques, ver bloques; luego dictado no se prueba (sin micrófono).
