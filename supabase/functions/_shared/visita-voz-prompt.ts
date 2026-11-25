@@ -229,6 +229,15 @@ export function sistemaExtraccion(motivos: MotivoDef[]) {
     "Va ADEMÁS del bloque de seguimiento o de revisión que corresponda: no son excluyentes, la misma situación genera los dos. " +
     "Los precios de la comparativa nunca se quedan solo dentro de un texto libre como motivo_perdida; van a sus campos numéricos " +
     "del bloque competencia.\n" +
+    "- UN BLOQUE POR PRODUCTO EN PROMOCION: la plantilla de promocion es de un solo producto (producto, cantidad y precio). " +
+    "Cuando se ofertan o presupuestan productos concretos distintos (con referencia, viscosidad, medida, cantidad o precio propios), " +
+    "cada uno va en su propio bloque promocion, aunque se diga en la misma frase, con su cantidad y su próxima acción. " +
+    "Ejemplo: «Doy ppto de 10w40 y 15w40 en 200L» => DOS bloques promocion, uno por aceite. Si se presenta una promoción, un " +
+    "folleto o una familia en general («le enseñé la promoción de baterías Varta», «le dejé el folleto de filtros y aceites»), " +
+    "es UN solo bloque.\n" +
+    "- REVISION_SEGUIMIENTO: tema_revisado dice qué se revisa (p. ej. «consumo de anticongelante»). resultado sale de lo que pasó: " +
+    "si el cliente ha comprado o hecho pedido de lo revisado, es 'Pedido conseguido', y el importe en importe si se dice. No copies " +
+    "en este bloque la próxima acción de otro bloque.\n" +
     "- UN BLOQUE POR COMPARATIVA: cada referencia comparada es una comparativa independiente. Si el comercial compara dos o más " +
     "referencias o productos con precios distintos, devuelves un bloque competencia por cada uno, con su referencia, sus dos " +
     "precios y su resultado_venta. Nunca resumas varias comparativas en un solo bloque ni dejes resultado_venta vacío.\n" +

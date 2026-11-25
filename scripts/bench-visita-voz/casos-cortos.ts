@@ -75,23 +75,24 @@ function cargarMotivos(): MotivoDef[] {
 
 // ------------------------------------------------------------------ casos
 
-interface Caso { id: string; narracion: string; fecha?: string; todos?: string[]; alguno?: string[]; cero?: boolean; comp?: number; prohibidos?: string[]; promociones?: number; sinPrecioCero?: boolean; contactoProhibido?: string[]; camposEsperados?: Record<string, string | null> }
+interface Caso { id: string; narracion: string; fecha?: string; todos?: string[]; alguno?: string[]; cero?: boolean; comp?: number; prohibidos?: string[]; promociones?: number; sinPrecioCero?: boolean; contactoProhibido?: string[]; camposEsperados?: Record<string, string | null>; camposContienen?: Record<string, string> }
 
 /** PROMPT=fase4.6 usa la copia guardada; por defecto, el prompt publicado del repositorio. */
 const P = process.env.PROMPT === "fase4.6" ? P46 : P47;
 const { esquemaExtraccion, sistemaExtraccion, usuarioExtraccion, VERSION_PROMPT } = P;
 
 const narraciones = JSON.parse(readFileSync(join(DIR, "narraciones.json"), "utf8")) as {
-  etiqueta: string; narracion: string; esperado: { motivos: string[]; competencia_bloques: number; prohibidos?: string[]; promocion_bloques?: number; sin_precio_cero?: boolean; contacto_prohibido?: string[]; campos_esperados?: Record<string, string | null> };
+  etiqueta: string; narracion: string; esperado: { motivos: string[]; competencia_bloques: number; prohibidos?: string[]; promocion_bloques?: number; sin_precio_cero?: boolean; contacto_prohibido?: string[]; campos_esperados?: Record<string, string | null>; campos_contienen?: Record<string, string> };
 }[];
 
 export const CASOS: Caso[] = [
-  ...narraciones.map((n) => ({ id: `bench:${n.etiqueta}`, narracion: n.narracion, todos: n.esperado.motivos, comp: n.esperado.competencia_bloques, prohibidos: n.esperado.prohibidos, promociones: n.esperado.promocion_bloques, sinPrecioCero: n.esperado.sin_precio_cero, contactoProhibido: n.esperado.contacto_prohibido, camposEsperados: n.esperado.campos_esperados })),
+  ...narraciones.map((n) => ({ id: `bench:${n.etiqueta}`, narracion: n.narracion, todos: n.esperado.motivos, comp: n.esperado.competencia_bloques, prohibidos: n.esperado.prohibidos, promociones: n.esperado.promocion_bloques, sinPrecioCero: n.esperado.sin_precio_cero, contactoProhibido: n.esperado.contacto_prohibido, camposEsperados: n.esperado.campos_esperados, camposContienen: n.esperado.campos_contienen })),
   { id: "f45:sin_contenido", fecha: "2026-11-12", narracion: "No estaba, vuelvo mañana.", cero: true },
   { id: "f45:fecha_relativa", fecha: "2026-11-12", narracion: "He estado con Manolo en el taller. Le he presentado la oferta de baterías Varta y le interesa, pero quiere pensarlo. Le llamo el martes para cerrar el pedido.", alguno: ["promocion", "seguimiento", "revision_seguimiento"] },
   { id: "f45:fecha_explicita", fecha: "2026-11-12", narracion: "Seguimiento con Manolo: le he presentado la oferta de baterías Varta, le interesa pero quiere pensarlo. Próxima acción: le llamo el martes para cerrar el pedido.", alguno: ["promocion", "seguimiento", "revision_seguimiento"] },
   { id: "corto:oferta", fecha: "2026-11-12", narracion: "Le dejo la oferta de filtros Mann de noviembre, un 35% en aire y gasoil. Le interesa, dice que hará pedido la semana que viene.", todos: ["promocion"] },
   { id: "corto:competencia", fecha: "2026-11-12", narracion: "Venta fallada de un compresor Wabco, referencia 4123520200. Nosotros lo tenemos a 511 y Luis Moleón se lo da a 480.", todos: ["competencia"], comp: 1 },
+  { id: "corto:folleto", fecha: "2026-11-12", narracion: "Le dejo el folleto de noviembre de filtros, baterías y aceites. Lo mirará con calma.", todos: ["promocion"], promociones: 1 },
   { id: "corto:incidencia", fecha: "2026-11-12", narracion: "Se queja de que el último pedido de pastillas llegó con dos días de retraso y una caja rota. Hay que abrir reclamación con almacén.", todos: ["incidencia"] },
   { id: "corto:seguimiento", fecha: "2026-11-12", narracion: "Hablo con Pepe, el encargado. Está contento con el servicio y no necesita nada ahora. Le llamo el martes para ver si le hace falta aceite.", alguno: ["seguimiento", "revision_seguimiento"] },
   { id: "corto:dos_motivos", fecha: "2026-11-12", narracion: "Le enseño la promoción de baterías Varta y le interesa. Además me dice que las escobillas Bosch se las da Grupo Peña a 9 euros y nosotros a 12.", todos: ["promocion", "competencia"], comp: 1 },
@@ -181,6 +182,13 @@ for (const k of CASOS.filter((c) => !SOLO || c.id === SOLO)) for (let rep = 0; r
     const vals = ((r.salida[`bloques_${mk}`] ?? []) as { campos?: Record<string, unknown> }[])
       .map((it) => it?.campos?.[ck]).filter((v) => v !== null && v !== undefined && String(v).trim() !== "").map((v) => String(v).trim().toLowerCase());
     if (esperado === null ? vals.length > 0 : !vals.includes(esperado.toLowerCase())) extraOk = false;
+  }
+  // campos_contienen: "motivo.campo" => algún bloque lo tiene con ese texto.
+  for (const [ruta, txt] of Object.entries(k.camposContienen ?? {})) {
+    const [mk, ck] = ruta.split(".");
+    const ok = ((r.salida[`bloques_${mk}`] ?? []) as { campos?: Record<string, unknown> }[])
+      .some((it) => String(it?.campos?.[ck] ?? "").toLowerCase().includes(txt.toLowerCase()));
+    if (!ok) extraOk = false;
   }
   filas.push({ caso: k.id, ms: r.ms, exito: exito && extraOk, cero: kept.length === 0, crudos, motivos: kept, salida: r.salida,
     coste: (r.uso.prompt_tokens ?? 0) * CONF.pin + (r.uso.completion_tokens ?? 0) * CONF.pout });
